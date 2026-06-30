@@ -237,7 +237,14 @@ async function init(){
   }catch(e){connected=false;EMPLOYEES=DEMO_EMP;$('banner').className='banner demo';$('banner').innerHTML='⚠️ وضع تجريبي — مش متصل بقاعدة البيانات. اتأكد إنك شغّلت الـ SQL (v3) والملف متستضاف. البيانات مؤقتة.';}
   renderKiosk();
 }
-async function loadRole(){const{data}=await sb.from('app_admins').select('role').maybeSingle();role=data?data.role:null;updRoleBadge()}
+async function loadRole(){
+  const{data:{session}}=await sb.auth.getSession();
+  const uid=session&&session.user?session.user.id:null;
+  if(!uid){role=null;updRoleBadge();return}
+  const{data,error}=await sb.from('app_admins').select('role').eq('user_id',uid).maybeSingle();
+  if(error)console.warn('Could not load admin role',error);
+  role=data?data.role:null;updRoleBadge()
+}
 function updRoleBadge(){const b=$('roleBadge');if(!role){b.innerHTML='';return}b.innerHTML=`<span class="role-badge ${role}">${role==='owner'?'Owner':'HR'}</span>`}
 
 /* ===== KIOSK ===== */
