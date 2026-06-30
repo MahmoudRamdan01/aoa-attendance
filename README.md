@@ -2,6 +2,11 @@
 
 المشروع Static HTML متصل بقاعدة Supabase جاهزة.
 
+## Live URL
+
+- https://mahmoudramdan01.github.io/aoa-attendance/
+- Repository: https://github.com/MahmoudRamdan01/aoa-attendance
+
 ## الملفات
 
 - `index.html`: الملف الذي يتم نشره.
