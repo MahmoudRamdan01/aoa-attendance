@@ -216,10 +216,15 @@ returns bigint language sql stable security definer set search_path=public as $$
 $$;
 
 create or replace function notify_user(p_user uuid, p_title text, p_body text)
-returns void language sql security definer set search_path=public as $$
+returns void language plpgsql security definer set search_path=public as $$
+begin
+  if p_user is null then
+    return;
+  end if;
+
   insert into notifications(user_id,title,body,category,priority,group_id)
   values (p_user,p_title,p_body,'system','normal',gen_random_uuid());
-$$;
+end $$;
 
 create or replace function notify_admins(p_title text, p_body text)
 returns void language plpgsql security definer set search_path=public as $$
@@ -287,6 +292,20 @@ begin
   return jsonb_build_object('ok',true);
 end $$;
 
+create or replace function mark_all_notifications_read_v1()
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+  v_count int;
+begin
+  update notifications
+  set read_at = coalesce(read_at, now())
+  where user_id = auth.uid()
+    and read_at is null
+    and deleted_at is null;
+  get diagnostics v_count = row_count;
+  return jsonb_build_object('ok',true,'count',v_count);
+end $$;
+
 create or replace function owner_delete_notification_v1(p_id bigint)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare
@@ -297,7 +316,7 @@ begin
     return jsonb_build_object('error','owner_only','message','Owner فقط يقدر يحذف إشعار من عند الكل.');
   end if;
 
-  select group_id into v_group from notifications where id = p_id;
+  select group_id into v_group from notifications where id = p_id and deleted_at is null;
   if v_group is null then
     return jsonb_build_object('error','not_found','message','الإشعار غير موجود.');
   end if;
@@ -614,6 +633,7 @@ begin
   if not is_hr() then return jsonb_build_object('error','hr_only','message','للإدارة فقط.'); end if;
   select * into v from permissions where id=p_id;
   if not found then return jsonb_build_object('error','not_found','message','الطلب غير موجود.'); end if;
+  if v.status <> 'pending' then return jsonb_build_object('error','already_decided','message','تم اتخاذ قرار على الطلب قبل كده.'); end if;
   if p_approve and p_hours_approved not in (1,2) then return jsonb_build_object('error','bad_hours','message','مدة الموافقة ساعة أو ساعتين.'); end if;
 
   update permissions
@@ -694,6 +714,7 @@ begin
   if not is_hr() then return jsonb_build_object('error','hr_only','message','للإدارة فقط.'); end if;
   select * into v from leave_requests where id=p_id;
   if not found then return jsonb_build_object('error','not_found','message','الطلب غير موجود.'); end if;
+  if v.status <> 'pending' then return jsonb_build_object('error','already_decided','message','تم اتخاذ قرار على الطلب قبل كده.'); end if;
 
   update leave_requests
   set status = case when p_approve then 'approved' else 'rejected' end,
@@ -707,7 +728,9 @@ begin
   if p_approve then
     update employees set leave_balance = greatest(0,coalesce(leave_balance,0)-v.days) where id=v.employee_id;
     for d in select generate_series(v.from_date,v.to_date,interval '1 day')::date loop
-      if extract(dow from d)::int <> 5 then
+      if extract(dow from d)::int <> 5
+        and not exists (select 1 from official_holidays h where h.holiday_date = d)
+      then
         insert into attendance(employee_id,work_date,status,late_minutes,deduction_days,note,source,approved,recorded_by)
         values (v.employee_id,d,'leave',0,0,'أجازة معتمدة · Cover: ' || v.cover_employee_id,'hr',true,auth.uid())
         on conflict (employee_id,work_date) do update
@@ -778,11 +801,26 @@ create table if not exists missing_checkout_counters (
   primary key(employee_id, work_month)
 );
 
+create table if not exists missing_checkout_reviews (
+  attendance_id bigint primary key references attendance(id) on delete cascade,
+  employee_id bigint not null references employees(id) on delete cascade,
+  work_date date not null,
+  action text not null check (action in ('warning','deduction')),
+  reviewed_by uuid references auth.users(id),
+  reviewed_at timestamptz default now()
+);
+
 alter table missing_checkout_counters enable row level security;
+alter table missing_checkout_reviews enable row level security;
 
 drop policy if exists missing_checkout_counters_hr on missing_checkout_counters;
 create policy missing_checkout_counters_hr
 on missing_checkout_counters for all to authenticated
+using (is_hr()) with check (is_hr());
+
+drop policy if exists missing_checkout_reviews_hr on missing_checkout_reviews;
+create policy missing_checkout_reviews_hr
+on missing_checkout_reviews for all to authenticated
 using (is_hr()) with check (is_hr());
 
 create or replace function mark_missing_checkouts_v1(p_date date)
@@ -791,12 +829,14 @@ declare
   r record;
   v_month text := to_char(p_date,'YYYY-MM');
   v_count int;
+  v_processed int := 0;
   v_user uuid;
 begin
   if not is_hr() then return jsonb_build_object('error','hr_only','message','للإدارة فقط.'); end if;
   for r in
     select * from attendance
     where work_date=p_date and check_in is not null and check_out is null and status in ('present','late')
+      and not exists (select 1 from missing_checkout_reviews m where m.attendance_id = attendance.id)
   loop
     insert into missing_checkout_counters(employee_id,work_month,warning_count)
     values (r.employee_id,v_month,1)
@@ -808,6 +848,9 @@ begin
 
     if v_count <= 2 then
       perform notify_user(v_user,'تنبيه عدم تسجيل انصراف','دي المرة رقم ' || v_count::text || ' في الشهر.');
+      insert into missing_checkout_reviews(attendance_id,employee_id,work_date,action,reviewed_by)
+      values (r.id,r.employee_id,p_date,'warning',auth.uid())
+      on conflict (attendance_id) do nothing;
     else
       update attendance
       set deduction_days = coalesce(deduction_days,0) + 0.25,
@@ -817,11 +860,16 @@ begin
       set deduction_count = deduction_count + 1
       where employee_id = r.employee_id and work_month = v_month;
       perform notify_user(v_user,'خصم عدم تسجيل انصراف','تم تطبيق خصم ربع يوم بعد تكرار عدم تسجيل الانصراف.');
+      insert into missing_checkout_reviews(attendance_id,employee_id,work_date,action,reviewed_by)
+      values (r.id,r.employee_id,p_date,'deduction',auth.uid())
+      on conflict (attendance_id) do nothing;
     end if;
+    v_processed := v_processed + 1;
   end loop;
-  return jsonb_build_object('ok',true);
+  return jsonb_build_object('ok',true,'processed',v_processed);
 end $$;
 
+drop function if exists owner_list_employee_accounts_v1();
 create or replace function owner_list_employee_accounts_v1()
 returns table(
   employee_id bigint,
@@ -829,6 +877,7 @@ returns table(
   user_id uuid,
   email text,
   role text,
+  admin_role text,
   active boolean
 )
 language sql security definer set search_path=public as $$
@@ -838,10 +887,12 @@ language sql security definer set search_path=public as $$
     ea.user_id,
     u.email,
     ea.role,
+    aa.role as admin_role,
     coalesce(ea.active,false) as active
   from employees e
   left join employee_accounts ea on ea.employee_id = e.id
   left join auth.users u on u.id = ea.user_id
+  left join app_admins aa on aa.user_id = ea.user_id
   where e.active
   order by e.id;
 $$;
@@ -876,6 +927,10 @@ begin
     return jsonb_build_object('error','auth_user_missing','message','اعمل حساب Auth بالإيميل ده الأول من Supabase Authentication.');
   end if;
 
+  if p_role = 'employee' and v_user = auth.uid() and is_owner() then
+    return jsonb_build_object('error','self_demote','message','لا يمكن إزالة صلاحية Owner من حسابك الحالي من هنا.');
+  end if;
+
   delete from employee_accounts
   where employee_id = p_employee_id and user_id <> v_user;
 
@@ -885,6 +940,20 @@ begin
     set employee_id=excluded.employee_id,
         role=excluded.role,
         active=true;
+
+  if p_role in ('hr','owner') then
+    insert into app_admins(user_id,name,role)
+    values (
+      v_user,
+      coalesce((select name from employees where id = p_employee_id), trim(p_email)),
+      p_role
+    )
+    on conflict (user_id) do update
+      set name = excluded.name,
+          role = excluded.role;
+  else
+    delete from app_admins where user_id = v_user;
+  end if;
 
   insert into audit_log(actor,action,entity,entity_id,details)
   values (auth.uid(),'link_employee_account','employee_accounts',p_employee_id::text,jsonb_build_object('email',p_email,'role',p_role));
@@ -899,6 +968,7 @@ grant select on daily_qr_codes to authenticated;
 grant select, update on notifications to authenticated;
 grant select on employee_accounts to authenticated;
 grant select, insert, update, delete on late_arrival_counters to authenticated;
+grant select, insert, update, delete on missing_checkout_counters, missing_checkout_reviews to authenticated;
 grant execute on function get_my_context_v1() to authenticated;
 grant execute on function get_daily_qr_v1() to authenticated;
 grant execute on function get_qr_for_date_v1(date) to authenticated;
@@ -914,4 +984,5 @@ grant execute on function owner_list_employee_accounts_v1() to authenticated;
 grant execute on function owner_link_employee_account_v1(bigint,text,text) to authenticated;
 grant execute on function send_admin_message_v1(text,bigint,text,text) to authenticated;
 grant execute on function mark_notification_read_v1(bigint) to authenticated;
+grant execute on function mark_all_notifications_read_v1() to authenticated;
 grant execute on function owner_delete_notification_v1(bigint) to authenticated;

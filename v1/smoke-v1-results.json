@@ -1,20 +1,20 @@
 {
-  "marker": "CODX-SMOKE-1782907689672",
-  "generatedAt": "2026-07-01T12:08:14.816Z",
-  "total": 10,
-  "passed": 10,
+  "marker": "CODX-SMOKE-1782933988221",
+  "generatedAt": "2026-07-01T19:26:36.799Z",
+  "total": 11,
+  "passed": 11,
   "skipped": 0,
   "failed": 0,
   "results": [
     {
       "name": "auth: employee, owner, hr login",
       "status": "pass",
-      "ms": 523
+      "ms": 1396
     },
     {
       "name": "context: roles and employee mapping",
       "status": "pass",
-      "ms": 426,
+      "ms": 820,
       "employeeId": 1,
       "coverEmployeeId": 2,
       "employeeCount": 12
@@ -22,56 +22,64 @@
     {
       "name": "qr: daily code, tomorrow code, employee blocked",
       "status": "pass",
-      "ms": 398,
+      "ms": 543,
       "today": "2026-07-01",
       "tomorrow": "2026-07-02"
     },
     {
       "name": "cleanup: stale smoke requests before tests",
       "status": "pass",
-      "ms": 203,
+      "ms": 281,
       "stalePermissions": 0,
       "staleLeaves": 0
     },
     {
       "name": "requests: permission is visible to employee and owner",
       "status": "pass",
-      "ms": 472,
-      "permissionId": 6,
+      "ms": 660,
+      "permissionId": 7,
       "permDate": "2026-08-10"
     },
     {
       "name": "requests: leave is visible to employee and owner",
       "status": "pass",
-      "ms": 397,
-      "leaveId": 6,
+      "ms": 717,
+      "leaveId": 7,
       "leaveFrom": "2026-09-14"
     },
     {
       "name": "notifications: owner team message, read, delete for all",
       "status": "pass",
-      "ms": 583,
+      "ms": 629,
       "sent": 12,
       "deleted": 12
     },
     {
       "name": "notifications: HR sends to one employee",
       "status": "pass",
-      "ms": 283,
-      "notificationId": 158
+      "ms": 479,
+      "notificationId": 188
+    },
+    {
+      "name": "attendance: missing checkout review is idempotent",
+      "status": "pass",
+      "ms": 506,
+      "date": "2026-10-29",
+      "first": 1,
+      "second": 0
     },
     {
       "name": "attendance: bad QR guard and late warning/deduction rule",
       "status": "pass",
-      "ms": 1079,
-      "lateMin": 368,
+      "ms": 1156,
+      "lateMin": 806,
       "firstDeduction": 0,
       "secondDeduction": 0.25
     },
     {
       "name": "cleanup: reject leftover requests and delete leftover notifications",
       "status": "pass",
-      "ms": 765,
+      "ms": 1370,
       "cleanedNotifications": 2,
       "stalePermissions": 0,
       "staleLeaves": 0
