@@ -109,6 +109,7 @@ tbody tr:hover{background:rgba(255,255,255,.025)}tbody tr.late-flag{background:r
 .mini:hover{border-color:var(--border-strong);color:var(--text)}
 .mini.approve{color:#6ee7b7;border-color:rgba(16,185,129,.3)}.mini.approve:hover{background:rgba(16,185,129,.12)}
 .mini.owner{color:var(--gold);border-color:rgba(251,191,36,.3)}.mini.owner:hover{background:rgba(251,191,36,.12)}
+.mini.undo{color:#fca5a5;border-color:rgba(239,68,68,.35)}.mini.undo:hover{background:rgba(239,68,68,.12)}
 select.csel{padding:5px 8px;color-scheme:dark;cursor:pointer}
 .rpt table{font-size:11.5px;border-collapse:collapse;width:100%}
 .rpt td,.rpt th{padding:5px 6px;text-align:center;border:1px solid rgba(255,255,255,.07);white-space:nowrap}
@@ -434,6 +435,7 @@ async function renderDash(){
     if(s==='pending')action=`<button class="mini approve" onclick="approveEntry(${e.id})">اعتمد دخوله</button> ${classifySelect(e.id)}`;
     else if(s==='none')action=classifySelect(e.id);
     if(isOwner()&&s!=='none'&&s!=='present')action+=` <button class="mini owner" onclick="ownerForgive(${e.id})">إعفاء</button>`;
+    if(r)action+=` <button class="mini undo" onclick="resetDay(${e.id})">تراجع</button>`;
     const tr=document.createElement('tr');if(red)tr.className='late-flag';
     tr.innerHTML=`<td><div class="emp-link" onclick="openDetail(${e.id})"><span class="av">${initials(e.name)}</span>${e.name}</div></td>
       <td>${red?statusPill('none'):statusPill(s)}</td><td class="tnum">${r&&r.check_in?String(r.check_in).slice(0,5):'—'}</td>
@@ -450,6 +452,11 @@ async function classify(id,kind){if(!kind)return;const today=isoDate(new Date())
 async function approveEntry(id){const today=isoDate(new Date());
   if(connected){await sb.from('attendance').update({status:'late',approved:true,note:'دخول معتمد من المدير'}).eq('employee_id',id).eq('work_date',today);}
   else{const k=`${id}|${today}`;DEMO_ATT[k]={...(DEMO_ATT[k]||{}),status:'late'}}
+  renderDash()}
+async function resetDay(id){const today=isoDate(new Date());
+  if(!confirm('تمسح سجل اليوم للموظف ده وترجعه "لم يسجّل"؟'))return;
+  if(connected){const{error}=await sb.from('attendance').delete().eq('employee_id',id).eq('work_date',today);if(error){alert('مش قادر أمسح السجل. اتأكد إن الحساب HR أو Owner.');return}}
+  else delete DEMO_ATT[`${id}|${today}`];
   renderDash()}
 async function ownerForgive(id){const today=isoDate(new Date());
   if(connected){const{data}=await sb.rpc('owner_set_special',{p_emp:id,p_date:today,p_status:'present',p_note:'إعفاء — حالة خاصة'});if(data&&data.error){alert(data.message||'للـ Owner فقط');return}}
