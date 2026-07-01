@@ -1,47 +1,35 @@
-# Air Ocean Line Attendance - Deploy Notes
+# Air Ocean Line Attendance
 
-المشروع Static HTML متصل بقاعدة Supabase جاهزة.
+Static Supabase-powered attendance app.
 
-## Live URL
+## Live
 
-- https://mahmoudramdan01.github.io/aoa-attendance/
+- App: https://mahmoudramdan01.github.io/aoa-attendance/
 - Repository: https://github.com/MahmoudRamdan01/aoa-attendance
 
-## الملفات
+## Current Version
 
-- `index.html`: الملف الذي يتم نشره.
-- `supabase-schema.sql`: نسخة احتياطية من سكيمة Supabase، تستخدم فقط لو هتعمل Supabase project جديد أو تعيد بناء القاعدة.
-
-## نشر سريع على Vercel
-
-1. افتح https://vercel.com/new
-2. اختر Import / Upload للمجلد `aoa-attendance-deploy`.
-3. الإعدادات:
-   - Framework Preset: Other
-   - Build Command: اتركه فارغ
-   - Output Directory: `.`
-4. Deploy.
-
-## نشر سريع على Netlify
-
-1. افتح https://app.netlify.com/drop
-2. اسحب مجلد `aoa-attendance-deploy` بالكامل.
-3. بعد النشر، افتح الرابط الناتج وجرب شاشة الحضور.
+- UI: `v0.9`
+- Main file: `index.html`
+- Database schema: `supabase-schema.sql`
 
 ## Supabase
 
-الكود الحالي يستخدم Supabase project موجود، وتم التأكد أن جدول الموظفين بيرجع 12 موظف.
+The app currently points to:
 
-لو هتستخدم Supabase project جديد:
+- URL: `https://gdgrdwjlxcavogztvxon.supabase.co`
+- Project ref: `gdgrdwjlxcavogztvxon`
 
-1. افتح Supabase Dashboard.
-2. ادخل SQL Editor.
-3. شغل محتوى `supabase-schema.sql`.
-4. من Authentication أضف حساب Owner أو HR.
-5. انسخ UID الخاص بالمستخدم، ثم شغل insert مناسب في جدول `app_admins` كما هو موضح في آخر ملف SQL.
-6. غير `CONFIG.url` و `CONFIG.anonKey` داخل `index.html` لقيم المشروع الجديد.
+For a fresh database, run `supabase-schema.sql` in Supabase SQL Editor, then add Owner/HR users to `app_admins`.
 
-## ملاحظات
+`admin-fix.sql` links `mahmoud01@airocean.com` as `owner` in the current project.
 
-- مفتاح `anon` ظاهر في الواجهة وهذا طبيعي لتطبيقات Supabase، لكن الأمان الفعلي يعتمد على RLS والـ functions.
-- لو QR هيتستخدم من موبايلات الموظفين، لازم الرابط المنشور يكون HTTPS عام، وليس `file://` أو localhost.
+## Deploy
+
+This app has no build step. Any static host can serve the folder root:
+
+- Entry file: `index.html`
+- Build command: none
+- Output directory: `.`
+
+GitHub Pages is already configured from the `main` branch root.
