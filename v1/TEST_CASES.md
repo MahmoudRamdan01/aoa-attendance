@@ -69,14 +69,17 @@ The script writes the last result to `../../outputs/smoke-v1-results.json`.
 | Requests page | Leave submit | Toast appears and "my requests" refreshes immediately |
 | Admin dashboard | Pending permission | Request appears under pending permissions |
 | Admin dashboard | Pending leave | Request appears under pending leaves |
-| Admin dashboard | Approve permission 1 hour | Employee notification shows approved 1 hour |
-| Admin dashboard | Approve permission 2 hours | Employee notification shows approved 2 hours |
-| Admin dashboard | Reject permission | Employee notification shows rejection |
-| Admin dashboard | Approve leave | Leave balance decreases and attendance is marked leave |
-| Admin dashboard | Reject leave | Leave balance is unchanged |
+| Admin dashboard | HR approval guard | HR can view pending requests but cannot approve/reject permission or leave |
+| Admin dashboard | Owner approve permission 1 hour | Employee notification shows approved 1 hour |
+| Admin dashboard | Owner approve permission 2 hours | Employee notification shows approved 2 hours |
+| Admin dashboard | Owner reject permission | Employee notification shows rejection |
+| Admin dashboard | Owner approve leave | Leave balance decreases and attendance is marked leave |
+| Admin dashboard | Owner reject leave | Leave balance is unchanged |
 | Admin dashboard | Official holiday range | Selected days are saved as holidays |
 | Admin dashboard | QR panel | Today and tomorrow codes are visible to HR/Owner |
 | Admin dashboard | QR visual | QR image renders and code can be copied/printed |
+| Admin dashboard | Auto QR broadcast | First login/open of the day sends today's QR notification to active team members once |
+| Admin dashboard | Auto QR idempotency | Re-running the daily QR broadcast does not duplicate team notifications |
 | Admin dashboard | Reset attendance | Owner can remove a wrong daily record |
 | Admin dashboard | Filters | Name search and status filter keep table readable |
 | Notifications | Admin compose team | Team message appears for team members |
@@ -86,7 +89,8 @@ The script writes the last result to `../../outputs/smoke-v1-results.json`.
 | Notifications | Owner delete for all | Deleted message disappears for all recipients |
 | Owner dashboard | Day/week/month switch | Metrics update for selected period |
 | Owner dashboard | HR salary privacy | HR does not see salary amounts |
-| Owner dashboard | Owner salary visibility | Owner sees deduction estimates |
+| Owner dashboard | Owner salary visibility | Owner sees monthly salary, deduction days, deduction amount, and estimated net salary |
+| Owner dashboard | Payroll CSV export | Owner can export salary/deduction rows for the selected period |
 | Owner dashboard | CSV export | CSV file contains date, employee, status, times, late minutes, and deduction days |
 | Account management | Role linking | Owner can link employee accounts as Employee/HR/Owner |
 | Account management | Admin role sync | HR/Owner roles update `app_admins` as well as `employee_accounts` |
