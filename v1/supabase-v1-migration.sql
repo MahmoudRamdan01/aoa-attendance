@@ -591,6 +591,13 @@ create table if not exists missing_checkout_counters (
   primary key(employee_id, work_month)
 );
 
+alter table missing_checkout_counters enable row level security;
+
+drop policy if exists missing_checkout_counters_hr on missing_checkout_counters;
+create policy missing_checkout_counters_hr
+on missing_checkout_counters for all to authenticated
+using (is_hr()) with check (is_hr());
+
 create or replace function mark_missing_checkouts_v1(p_date date)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare
