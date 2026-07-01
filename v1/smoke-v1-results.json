@@ -1,0 +1,80 @@
+{
+  "marker": "CODX-SMOKE-1782907689672",
+  "generatedAt": "2026-07-01T12:08:14.816Z",
+  "total": 10,
+  "passed": 10,
+  "skipped": 0,
+  "failed": 0,
+  "results": [
+    {
+      "name": "auth: employee, owner, hr login",
+      "status": "pass",
+      "ms": 523
+    },
+    {
+      "name": "context: roles and employee mapping",
+      "status": "pass",
+      "ms": 426,
+      "employeeId": 1,
+      "coverEmployeeId": 2,
+      "employeeCount": 12
+    },
+    {
+      "name": "qr: daily code, tomorrow code, employee blocked",
+      "status": "pass",
+      "ms": 398,
+      "today": "2026-07-01",
+      "tomorrow": "2026-07-02"
+    },
+    {
+      "name": "cleanup: stale smoke requests before tests",
+      "status": "pass",
+      "ms": 203,
+      "stalePermissions": 0,
+      "staleLeaves": 0
+    },
+    {
+      "name": "requests: permission is visible to employee and owner",
+      "status": "pass",
+      "ms": 472,
+      "permissionId": 6,
+      "permDate": "2026-08-10"
+    },
+    {
+      "name": "requests: leave is visible to employee and owner",
+      "status": "pass",
+      "ms": 397,
+      "leaveId": 6,
+      "leaveFrom": "2026-09-14"
+    },
+    {
+      "name": "notifications: owner team message, read, delete for all",
+      "status": "pass",
+      "ms": 583,
+      "sent": 12,
+      "deleted": 12
+    },
+    {
+      "name": "notifications: HR sends to one employee",
+      "status": "pass",
+      "ms": 283,
+      "notificationId": 158
+    },
+    {
+      "name": "attendance: bad QR guard and late warning/deduction rule",
+      "status": "pass",
+      "ms": 1079,
+      "lateMin": 368,
+      "firstDeduction": 0,
+      "secondDeduction": 0.25
+    },
+    {
+      "name": "cleanup: reject leftover requests and delete leftover notifications",
+      "status": "pass",
+      "ms": 765,
+      "cleanedNotifications": 2,
+      "stalePermissions": 0,
+      "staleLeaves": 0
+    }
+  ]
+}

@@ -73,6 +73,16 @@ alter table official_holidays enable row level security;
 alter table daily_qr_codes enable row level security;
 alter table notifications enable row level security;
 
+alter table notifications add column if not exists category text not null default 'system';
+alter table notifications add column if not exists priority text not null default 'normal'
+  check (priority in ('low','normal','high','urgent'));
+alter table notifications add column if not exists group_id uuid;
+alter table notifications add column if not exists created_by uuid references auth.users(id);
+alter table notifications add column if not exists deleted_at timestamptz;
+
+update notifications set group_id = gen_random_uuid() where group_id is null;
+alter table notifications alter column group_id set default gen_random_uuid();
+
 drop policy if exists company_locations_read on company_locations;
 create policy company_locations_read on company_locations for select to authenticated using (true);
 
@@ -93,10 +103,13 @@ create policy daily_qr_hr_read on daily_qr_codes for select to authenticated usi
 drop policy if exists notifications_read on notifications;
 create policy notifications_read on notifications for select to authenticated
 using (
-  user_id = auth.uid()
-  or (target_role = 'admin' and is_hr())
-  or (target_role = 'hr' and is_hr())
-  or (target_role = 'owner' and is_owner())
+  deleted_at is null
+  and (
+    user_id = auth.uid()
+    or (target_role = 'admin' and is_hr())
+    or (target_role = 'hr' and is_hr())
+    or (target_role = 'owner' and is_owner())
+  )
 );
 
 drop policy if exists notifications_update_read on notifications;
@@ -124,12 +137,32 @@ alter table permissions add column if not exists hours_requested numeric(3,1);
 alter table permissions add column if not exists hours_approved numeric(3,1);
 alter table permissions add column if not exists requested_by uuid references auth.users(id);
 alter table permissions add column if not exists decision_note text;
+alter table permissions add column if not exists decided_at timestamptz;
+alter table permissions add column if not exists decided_by uuid references auth.users(id);
 
 update permissions set hours_requested = coalesce(hours_requested, hours)
 where hours_requested is null;
 
 alter table leave_requests add column if not exists requested_by uuid references auth.users(id);
 alter table leave_requests add column if not exists decision_note text;
+alter table leave_requests add column if not exists decided_at timestamptz;
+alter table leave_requests add column if not exists decided_by uuid references auth.users(id);
+
+create table if not exists late_arrival_counters (
+  employee_id bigint not null references employees(id) on delete cascade,
+  work_month text not null,
+  late_count int not null default 0,
+  warning_count int not null default 0,
+  deduction_count int not null default 0,
+  primary key(employee_id, work_month)
+);
+
+alter table late_arrival_counters enable row level security;
+
+drop policy if exists late_arrival_counters_hr on late_arrival_counters;
+create policy late_arrival_counters_hr
+on late_arrival_counters for all to authenticated
+using (is_hr()) with check (is_hr());
 
 -- Employee read policies for their own records.
 drop policy if exists att_employee_read on attendance;
@@ -184,14 +217,101 @@ $$;
 
 create or replace function notify_user(p_user uuid, p_title text, p_body text)
 returns void language sql security definer set search_path=public as $$
-  insert into notifications(user_id,title,body) values (p_user,p_title,p_body);
+  insert into notifications(user_id,title,body,category,priority,group_id)
+  values (p_user,p_title,p_body,'system','normal',gen_random_uuid());
 $$;
 
 create or replace function notify_admins(p_title text, p_body text)
-returns void language sql security definer set search_path=public as $$
-  insert into notifications(user_id,target_role,title,body)
-  select user_id, 'admin', p_title, p_body from app_admins;
-$$;
+returns void language plpgsql security definer set search_path=public as $$
+declare
+  v_group uuid := gen_random_uuid();
+begin
+  insert into notifications(user_id,target_role,title,body,category,priority,group_id)
+  select user_id, 'admin', p_title, p_body, 'approval', 'high', v_group
+  from app_admins;
+end $$;
+
+create or replace function send_admin_message_v1(
+  p_scope text,
+  p_employee_id bigint,
+  p_title text,
+  p_body text
+)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+  v_group uuid := gen_random_uuid();
+  v_count int := 0;
+begin
+  if not is_hr() then
+    return jsonb_build_object('error','hr_only','message','للإدارة فقط.');
+  end if;
+
+  if coalesce(trim(p_title),'') = '' or coalesce(trim(p_body),'') = '' then
+    return jsonb_build_object('error','required','message','اكتب عنوان ونص الرسالة.');
+  end if;
+
+  if p_scope = 'team' then
+    insert into notifications(user_id,title,body,category,priority,created_by,group_id)
+    select ea.user_id, trim(p_title), trim(p_body), 'admin_message', 'high', auth.uid(), v_group
+    from employee_accounts ea
+    join employees e on e.id = ea.employee_id
+    where ea.active and e.active;
+    get diagnostics v_count = row_count;
+  elsif p_scope = 'employee' then
+    insert into notifications(user_id,title,body,category,priority,created_by,group_id)
+    select ea.user_id, trim(p_title), trim(p_body), 'admin_message', 'high', auth.uid(), v_group
+    from employee_accounts ea
+    join employees e on e.id = ea.employee_id
+    where ea.active and e.active and ea.employee_id = p_employee_id;
+    get diagnostics v_count = row_count;
+  else
+    return jsonb_build_object('error','bad_scope','message','اختار الفريق كله أو موظف معين.');
+  end if;
+
+  if v_count = 0 then
+    return jsonb_build_object('error','no_recipients','message','لا يوجد مستلمين للرسالة.');
+  end if;
+
+  insert into audit_log(actor,action,entity,entity_id,details)
+  values (auth.uid(),'send_notification','notifications',v_group::text,jsonb_build_object('scope',p_scope,'employee_id',p_employee_id,'count',v_count));
+
+  return jsonb_build_object('ok',true,'count',v_count,'group_id',v_group);
+end $$;
+
+create or replace function mark_notification_read_v1(p_id bigint)
+returns jsonb language plpgsql security definer set search_path=public as $$
+begin
+  update notifications
+  set read_at = coalesce(read_at, now())
+  where id = p_id and user_id = auth.uid() and deleted_at is null;
+  return jsonb_build_object('ok',true);
+end $$;
+
+create or replace function owner_delete_notification_v1(p_id bigint)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+  v_group uuid;
+  v_count int;
+begin
+  if not is_owner() then
+    return jsonb_build_object('error','owner_only','message','Owner فقط يقدر يحذف إشعار من عند الكل.');
+  end if;
+
+  select group_id into v_group from notifications where id = p_id;
+  if v_group is null then
+    return jsonb_build_object('error','not_found','message','الإشعار غير موجود.');
+  end if;
+
+  update notifications
+  set deleted_at = now()
+  where group_id = v_group and deleted_at is null;
+  get diagnostics v_count = row_count;
+
+  insert into audit_log(actor,action,entity,entity_id,details)
+  values (auth.uid(),'delete_notification_for_all','notifications',v_group::text,jsonb_build_object('notification_id',p_id,'count',v_count));
+
+  return jsonb_build_object('ok',true,'count',v_count);
+end $$;
 
 create or replace function ensure_daily_qr(p_date date)
 returns text language plpgsql security definer set search_path=public as $$
@@ -264,6 +384,18 @@ begin
   return jsonb_build_object('date', v_date, 'code', v_code);
 end $$;
 
+create or replace function get_qr_for_date_v1(p_date date)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+  v_code text;
+begin
+  if not is_hr() then
+    return jsonb_build_object('error','hr_only','message','للإدارة فقط.');
+  end if;
+  v_code := ensure_daily_qr(p_date);
+  return jsonb_build_object('date', p_date, 'code', v_code);
+end $$;
+
 -- ---------------------------------------------------------------------
 -- Employee GPS/QR attendance.
 -- ---------------------------------------------------------------------
@@ -295,6 +427,8 @@ declare
   v_label text := '';
   v_cut numeric := 0;
   v_att attendance%rowtype;
+  v_late_count int := 0;
+  v_late_month text;
 begin
   v_date := v_now::date;
   v_time := v_now::time;
@@ -338,6 +472,7 @@ begin
 
     v_min := extract(hour from v_now)::int*60 + extract(minute from v_now)::int;
     v_late := greatest(0, v_min - (extract(hour from s_start)::int*60 + extract(minute from s_start)::int));
+    v_late_month := to_char(v_date,'YYYY-MM');
 
     if v_time >= s_absent then
       v_status := 'pending'; v_label := 'بعد 10:00 · موافقة المدير'; v_cut := 0;
@@ -350,6 +485,28 @@ begin
           exit;
         end if;
       end loop;
+    end if;
+
+    if v_late > 15 then
+      insert into late_arrival_counters(employee_id,work_month,late_count,warning_count,deduction_count)
+      values (v_emp,v_late_month,1,1,0)
+      on conflict (employee_id,work_month) do update
+        set late_count = late_arrival_counters.late_count + 1,
+            warning_count = late_arrival_counters.warning_count + case when late_arrival_counters.late_count = 0 then 1 else 0 end,
+            deduction_count = late_arrival_counters.deduction_count + case when late_arrival_counters.late_count >= 1 then 1 else 0 end
+      returning late_count into v_late_count;
+
+      if v_status <> 'pending' then
+        v_status := 'late';
+      end if;
+
+      if v_late_count = 1 then
+        v_cut := 0;
+        v_label := 'إنذار تأخير أول مرة بعد السماح';
+      else
+        v_cut := 0.25;
+        v_label := 'خصم ربع يوم لتكرار التأخير';
+      end if;
     end if;
 
     insert into attendance(employee_id,work_date,check_in,status,late_minutes,deduction_days,source,approved,recorded_by,device_id,latitude,longitude,gps_accuracy,location_distance_m,qr_code)
@@ -371,7 +528,18 @@ begin
     insert into audit_log(actor,action,entity,entity_id,details)
     values (auth.uid(),'employee_checkin','attendance',v_emp::text,jsonb_build_object('date',v_date,'time',v_time,'distance',round(v_distance)));
 
-    perform notify_user(auth.uid(),'تم تسجيل الحضور','الوقت ' || to_char(v_time,'HH24:MI') || ' · ' || v_label);
+    if v_late > 15 then
+      perform notify_user(
+        auth.uid(),
+        case when v_late_count = 1 then 'إنذار تأخير' else 'خصم تأخير' end,
+        case when v_late_count = 1
+          then 'دي أول مرة تتأخر أكتر من 15 دقيقة هذا الشهر. المرات القادمة عليها خصم ربع يوم.'
+          else 'تم تطبيق خصم ربع يوم بسبب تكرار التأخير أكتر من 15 دقيقة.'
+        end
+      );
+    else
+      perform notify_user(auth.uid(),'تم تسجيل الحضور','الوقت ' || to_char(v_time,'HH24:MI') || ' · ' || v_label);
+    end if;
     return jsonb_build_object('ok',true,'status',v_status,'time',to_char(v_time,'HH24:MI'),'label',v_label,'lateMin',v_late,'deductionDays',v_cut);
   elsif p_kind = 'out' then
     if not found or v_att.check_in is null then
@@ -561,13 +729,32 @@ end $$;
 create or replace function reset_attendance_day_v1(p_employee_id bigint, p_date date, p_reason text)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare
-  v_old jsonb;
+  v_old attendance%rowtype;
+  v_old_json jsonb;
+  v_month text := to_char(p_date,'YYYY-MM');
 begin
   if not is_owner() then return jsonb_build_object('error','owner_only','message','Owner فقط يقدر يمسح سجل اليوم.'); end if;
-  select to_jsonb(a.*) into v_old from attendance a where employee_id=p_employee_id and work_date=p_date;
+  select * into v_old from attendance where employee_id=p_employee_id and work_date=p_date;
+  v_old_json := to_jsonb(v_old);
   delete from attendance where employee_id=p_employee_id and work_date=p_date;
+
+  if v_old.id is not null and coalesce(v_old.late_minutes,0) > 15 then
+    update late_arrival_counters
+    set late_count = greatest(0, late_count - 1),
+        warning_count = greatest(0, warning_count - case when coalesce(v_old.deduction_days,0) = 0 then 1 else 0 end),
+        deduction_count = greatest(0, deduction_count - case when coalesce(v_old.deduction_days,0) > 0 then 1 else 0 end)
+    where employee_id = p_employee_id and work_month = v_month;
+
+    delete from late_arrival_counters
+    where employee_id = p_employee_id
+      and work_month = v_month
+      and late_count = 0
+      and warning_count = 0
+      and deduction_count = 0;
+  end if;
+
   insert into audit_log(actor,action,entity,entity_id,details)
-  values (auth.uid(),'reset_attendance','attendance',p_employee_id::text,jsonb_build_object('date',p_date,'reason',p_reason,'old',v_old));
+  values (auth.uid(),'reset_attendance','attendance',p_employee_id::text,jsonb_build_object('date',p_date,'reason',p_reason,'old',v_old_json));
   return jsonb_build_object('ok',true);
 end $$;
 
@@ -711,8 +898,10 @@ grant select on company_locations, official_holidays to authenticated;
 grant select on daily_qr_codes to authenticated;
 grant select, update on notifications to authenticated;
 grant select on employee_accounts to authenticated;
+grant select, insert, update, delete on late_arrival_counters to authenticated;
 grant execute on function get_my_context_v1() to authenticated;
 grant execute on function get_daily_qr_v1() to authenticated;
+grant execute on function get_qr_for_date_v1(date) to authenticated;
 grant execute on function employee_attendance_action_v1(text,numeric,numeric,int,text,text) to authenticated;
 grant execute on function request_permission_v1(date,numeric,text) to authenticated;
 grant execute on function decide_permission_v1(bigint,boolean,numeric,text) to authenticated;
@@ -723,3 +912,6 @@ grant execute on function set_official_holiday_v1(date,text) to authenticated;
 grant execute on function mark_missing_checkouts_v1(date) to authenticated;
 grant execute on function owner_list_employee_accounts_v1() to authenticated;
 grant execute on function owner_link_employee_account_v1(bigint,text,text) to authenticated;
+grant execute on function send_admin_message_v1(text,bigint,text,text) to authenticated;
+grant execute on function mark_notification_read_v1(bigint) to authenticated;
+grant execute on function owner_delete_notification_v1(bigint) to authenticated;
