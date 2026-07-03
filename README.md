@@ -31,6 +31,8 @@ For a fresh database, run `supabase-schema.sql` in Supabase SQL Editor, then add
 
 `admin-fix.sql` links `mahmoud01@airocean.com` as `owner` in the current project.
 
+`create-admins.sql` creates the HR + Owner login accounts (email/password) and links their roles in `app_admins`. Set strong passwords in the file before running it in the SQL Editor. Run it after `supabase-schema.sql`.
+
 ## Deploy
 
 This app has no build step. Any static host can serve the folder root:
