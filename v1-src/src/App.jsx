@@ -58,21 +58,25 @@ const roleOptions = [
 ];
 
 function addDays(date, days) {
-  const next = new Date(`${date}T00:00:00`);
-  next.setDate(next.getDate() + days);
+  // Parse and compute in UTC. Parsing "${date}T00:00:00" as *local* time and then
+  // reading it back via toISOString() (UTC) makes positive-offset timezones (e.g.
+  // Africa/Cairo, UTC+2/+3) land on the same day — which made datesBetween() loop
+  // forever and froze the Owner dashboard. UTC-only math avoids that entirely.
+  const next = new Date(`${date}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + days);
   return next.toISOString().slice(0, 10);
 }
 
 function dateRangeForPeriod(period, anchor = todayIso()) {
-  const day = new Date(`${anchor}T00:00:00`);
+  const day = new Date(`${anchor}T00:00:00Z`);
   if (period === "day") return { from: anchor, to: anchor, label: "اليوم" };
   if (period === "week") {
     const start = new Date(day);
-    const dayIndex = start.getDay();
+    const dayIndex = start.getUTCDay();
     const diffToSaturday = (dayIndex + 1) % 7;
-    start.setDate(start.getDate() - diffToSaturday);
+    start.setUTCDate(start.getUTCDate() - diffToSaturday);
     const end = new Date(start);
-    end.setDate(start.getDate() + 6);
+    end.setUTCDate(start.getUTCDate() + 6);
     return {
       from: start.toISOString().slice(0, 10),
       to: end.toISOString().slice(0, 10),
@@ -85,7 +89,8 @@ function dateRangeForPeriod(period, anchor = todayIso()) {
 function datesBetween(from, to) {
   const dates = [];
   let cursor = from;
-  while (cursor <= to) {
+  // Safety cap (defense-in-depth): never iterate more than ~2 years of days.
+  while (cursor <= to && dates.length < 800) {
     dates.push(cursor);
     cursor = addDays(cursor, 1);
   }
@@ -1136,7 +1141,7 @@ function OwnerDashboard({ onToast }) {
   const stats = useMemo(() => {
     const holidaySet = new Set(holidays.map((item) => item.holiday_date));
     const workDates = datesBetween(range.from, range.to).filter((day) => {
-      const dow = new Date(`${day}T00:00:00`).getDay();
+      const dow = new Date(`${day}T00:00:00Z`).getUTCDay();
       return dow !== 5 && !holidaySet.has(day);
     });
     const expected = employees.length * workDates.length;
