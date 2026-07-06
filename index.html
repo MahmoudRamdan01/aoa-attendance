@@ -373,7 +373,7 @@ async function init(){
   }catch(e){connected=false;EMPLOYEES=DEMO_EMP;$('banner').className='banner demo';$('banner').innerHTML='⚠️ وضع تجريبي — مش متصل. شغّل الـ SQL (v3 + موديول2) والملف متستضاف. البيانات مؤقتة.';}
   renderKiosk();
 }
-async function loadRole(){const{data}=await sb.from('app_admins').select('role').maybeSingle();role=data?data.role:null;updRoleBadge()}
+async function loadRole(){const{data:{user}}=await sb.auth.getUser();if(!user){role=null;return updRoleBadge()}const{data}=await sb.from('app_admins').select('role').eq('user_id',user.id).maybeSingle();role=data?data.role:null;updRoleBadge()}
 function updRoleBadge(){const b=$('roleBadge');b.innerHTML=role?`<span class="role-badge ${role}">${role==='owner'?'Owner':'HR'}</span>`:''}
 
 /* ===== KIOSK ===== */
@@ -682,7 +682,7 @@ function exportExcel(){
 /* ===== QR / CLOCK ===== */
 function showQR(){const url=location.href.split('#')[0];$('qrUrl').textContent=url;const box=$('qrBox');box.innerHTML='';
   try{const qr=qrcode(0,'M');qr.addData(url);qr.make();box.innerHTML=qr.createSvgTag({cellSize:5,margin:2})}catch(e){box.innerHTML='<div style="color:#92400E;padding:20px;font-size:13px">افتح الأداة وهي متستضافة عشان الـ QR.</div>'}show('qrModal')}
-function renderClock(){const n=new Date();$('clock').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;$('today').textContent=arDate(n);if($('view-checkin').classList.contains('active'))renderKiosk()}
+function renderClock(){const n=new Date();let h=n.getHours();const ap=h<12?'ص':'م';h=h%12||12;$('clock').textContent=`${pad(h)}:${pad(n.getMinutes())}:${pad(n.getSeconds())} ${ap}`;$('today').textContent=arDate(n);if($('view-checkin').classList.contains('active'))renderKiosk()}
 init();
 </script>
 </body>
