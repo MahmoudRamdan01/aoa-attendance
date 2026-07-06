@@ -2,3 +2,7 @@
 
 # Don't ship source maps to production (they re-expose full source and bloat load).
 *.map
+
+# v1 build artifacts — React source lives in v1-src/, built output is committed under v1/
+node_modules/
+v1-src/dist/
