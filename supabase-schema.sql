@@ -113,7 +113,9 @@ begin
                             then now() + interval '15 minutes' else null end;
   return 'bad_pin';
 end $$;
-revoke all on function _verify_emp_pin(bigint,text) from public;
+-- Supabase default-grants EXECUTE to anon/authenticated on new functions; revoke explicitly.
+-- Callers (do_checkin ...) are SECURITY DEFINER and run as owner, so they still reach it.
+revoke all on function _verify_emp_pin(bigint,text) from anon, authenticated, public;
 
 insert into employees(name,leave_balance)
 select v.name,10 from (values('أبرار'),('ندى'),('إسراء'),('ياسمين'),('آلاء'),
@@ -241,8 +243,18 @@ alter table salaries enable row level security;
 alter table attendance enable row level security;
 alter table audit_log enable row level security;
 
+-- SELECT returns only the caller's own row (v0.9 loadRole uses maybeSingle(), and it
+-- would break if an admin could see all admin rows). is_hr()/is_owner() are SECURITY
+-- DEFINER so they still see everything. Writes stay admin-gated.
 drop policy if exists admins_hr on app_admins;
-create policy admins_hr on app_admins for all to authenticated using (is_hr()) with check (is_hr());
+drop policy if exists app_admins_own_select on app_admins;
+drop policy if exists app_admins_hr_insert on app_admins;
+drop policy if exists app_admins_hr_update on app_admins;
+drop policy if exists app_admins_hr_delete on app_admins;
+create policy app_admins_own_select on app_admins for select to authenticated using (user_id = auth.uid());
+create policy app_admins_hr_insert on app_admins for insert to authenticated with check (is_hr());
+create policy app_admins_hr_update on app_admins for update to authenticated using (is_hr()) with check (is_hr());
+create policy app_admins_hr_delete on app_admins for delete to authenticated using (is_hr());
 drop policy if exists settings_read on settings;
 drop policy if exists settings_write on settings;
 create policy settings_read on settings for select to anon,authenticated using (true);
