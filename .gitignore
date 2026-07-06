@@ -1,1 +1,4 @@
 .vercel
+
+# Don't ship source maps to production (they re-expose full source and bloat load).
+*.map

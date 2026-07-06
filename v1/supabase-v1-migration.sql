@@ -3,6 +3,11 @@
 
 create extension if not exists pgcrypto;
 
+-- أقصى نصف قطر خطأ مقبول لقراءة الـ GPS (متر). قراءة أوسع من كده بتترفض عشان متزوّرش الموقع.
+insert into settings(key, value, note) values
+  ('max_gps_accuracy_m', '100', 'أقصى خطأ GPS مقبول لتسجيل الحضور (متر)')
+on conflict (key) do nothing;
+
 -- ---------------------------------------------------------------------
 -- Account mapping: every employee logs in with Supabase Auth.
 -- Owner/HR remain in app_admins; employees are mapped here.
@@ -389,6 +394,9 @@ begin
   if auth.uid() is null then
     return jsonb_build_object('error','auth_required','message','لازم تسجيل دخول.');
   end if;
+  if not is_hr() then
+    return jsonb_build_object('error','hr_only','message','بث كود اليوم للإدارة فقط.');
+  end if;
 
   v_code := ensure_daily_qr(v_date);
 
@@ -543,6 +551,13 @@ begin
   end if;
 
   select name into v_name from employees where id = v_emp;
+
+  -- دقة الموقع لازم تكون معقولة. قراءة ضعيفة/غايبة = رفض بدل ما نثق في موقع ممكن يكون متزوّر.
+  if p_lat is null or p_lng is null
+     or p_accuracy is null
+     or p_accuracy > coalesce((select (value#>>'{}')::int from settings where key='max_gps_accuracy_m'), 100) then
+    return jsonb_build_object('error','low_accuracy','message','دقة تحديد الموقع ضعيفة. اتأكد إن الـ GPS شغّال وانت في مكان مكشوف وحاول تاني.');
+  end if;
 
   if extract(dow from v_date)::int = 5 or exists(select 1 from official_holidays where holiday_date = v_date) then
     return jsonb_build_object('error','holiday','message','اليوم أجازة رسمية أو راحة أسبوعية.');
@@ -954,6 +969,39 @@ begin
   return jsonb_build_object('ok',true,'processed',v_processed);
 end $$;
 
+-- تعليم غياب تلقائي: أي موظف نشِط معندوش صف حضور في يوم عمل (مش جمعة ولا أجازة رسمية) يتسجّل غياب.
+-- بينده يدويًا من الإدارة، أو أوتوماتيك من pg_cron (شوف v1/supabase-v1-hardening.sql).
+create or replace function mark_absentees_v1(p_date date default null)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+  v_date date := coalesce(p_date, (now() at time zone 'Africa/Cairo')::date);
+  v_count int := 0;
+begin
+  -- نداء بشري لازم يكون إدارة؛ نداء الـ cron بيشتغل كـ owner والـ auth.uid() = null فبيعدّي.
+  if auth.uid() is not null and not is_hr() then
+    return jsonb_build_object('error','hr_only','message','للإدارة فقط.');
+  end if;
+
+  if extract(dow from v_date)::int = 5
+     or exists (select 1 from official_holidays where holiday_date = v_date) then
+    return jsonb_build_object('ok', true, 'skipped', 'holiday', 'count', 0);
+  end if;
+
+  insert into attendance(employee_id, work_date, status, deduction_days, source, approved, note)
+  select e.id, v_date, 'absent', 1, 'auto', false, 'غياب تلقائي — لم يسجّل حضور'
+  from employees e
+  where e.active
+    and not exists (
+      select 1 from attendance a where a.employee_id = e.id and a.work_date = v_date
+    );
+  get diagnostics v_count = row_count;
+
+  insert into audit_log(actor, action, entity, entity_id, details)
+  values (auth.uid(), 'mark_absentees', 'attendance', v_date::text, jsonb_build_object('count', v_count));
+
+  return jsonb_build_object('ok', true, 'count', v_count);
+end $$;
+
 drop function if exists owner_list_employee_accounts_v1();
 create or replace function owner_list_employee_accounts_v1()
 returns table(
@@ -1068,6 +1116,7 @@ grant execute on function decide_leave_v1(bigint,boolean,text) to authenticated;
 grant execute on function reset_attendance_day_v1(bigint,date,text) to authenticated;
 grant execute on function set_official_holiday_v1(date,text) to authenticated;
 grant execute on function mark_missing_checkouts_v1(date) to authenticated;
+grant execute on function mark_absentees_v1(date) to authenticated;
 grant execute on function owner_list_employee_accounts_v1() to authenticated;
 grant execute on function owner_link_employee_account_v1(bigint,text,text) to authenticated;
 grant execute on function send_admin_message_v1(text,bigint,text,text) to authenticated;

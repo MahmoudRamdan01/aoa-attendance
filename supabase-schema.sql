@@ -76,15 +76,54 @@ $$;
 create or replace view kiosk_employees with (security_invoker=off) as
   select id, name, active from employees where active;
 
+-- ---- 3b) Brute-force protection على الـ PIN ----
+-- كل محاولة PIN غلط بتتعدّ، وبعد 5 محاولات القفل 15 دقيقة. مفيش policy = مقفول قدام anon/authenticated؛
+-- بيتقري بس جوّه دوال SECURITY DEFINER (do_checkin ...).
+create table if not exists pin_attempts (
+  employee_id bigint primary key references employees(id) on delete cascade,
+  fail_count int not null default 0,
+  locked_until timestamptz,
+  last_attempt timestamptz default now()
+);
+alter table pin_attempts enable row level security;
+
+create or replace function _verify_emp_pin(p_emp bigint, p_pin text)
+returns text language plpgsql security definer set search_path=public, extensions as $$
+declare v_locked timestamptz; v_ok boolean;
+begin
+  select locked_until into v_locked from pin_attempts where employee_id=p_emp;
+  if v_locked is not null and v_locked > now() then
+    return 'locked';
+  end if;
+  -- قفل منتهي؟ صفّر العدّاد قبل ما نجرّب تاني.
+  if v_locked is not null then
+    update pin_attempts set fail_count=0, locked_until=null where employee_id=p_emp;
+  end if;
+  select exists(select 1 from employees where id=p_emp and active and pin_hash=crypt(p_pin,pin_hash)) into v_ok;
+  if v_ok then
+    delete from pin_attempts where employee_id=p_emp;
+    return 'ok';
+  end if;
+  insert into pin_attempts(employee_id,fail_count,last_attempt)
+  values (p_emp,1,now())
+  on conflict (employee_id) do update
+    set fail_count = pin_attempts.fail_count + 1,
+        last_attempt = now(),
+        locked_until = case when pin_attempts.fail_count + 1 >= 5
+                            then now() + interval '15 minutes' else null end;
+  return 'bad_pin';
+end $$;
+revoke all on function _verify_emp_pin(bigint,text) from public;
+
 insert into employees(name,leave_balance)
 select v.name,10 from (values('أبرار'),('ندى'),('إسراء'),('ياسمين'),('آلاء'),
   ('رودينا'),('ميروان'),('روان'),('حبيبة'),('عبدالرحمن'),('سهيلة'),('عمر')) as v(name)
 where not exists (select 1 from employees);
-select set_employee_pin(e.id, v.p) from (values
-  ('أبرار','4023'),('ندى','1190'),('إسراء','7754'),('ياسمين','3318'),
-  ('آلاء','8602'),('رودينا','5247'),('ميروان','9061'),('روان','2835'),
-  ('حبيبة','6479'),('عبدالرحمن','1503'),('سهيلة','7128'),('عمر','3994')
-) as v(nm,p) join employees e on e.name=v.nm;
+-- PINs: بنولّد PIN عشوائي مؤقت للحسابات اللي لسه من غير PIN بس (تركيب جديد).
+-- بنستخدم set_employee_pin (اللي search_path بتاعها فيه extensions) عشان crypt/gen_salt.
+-- الـ PINs الحقيقية بيحطّها/بيغيّرها الـ Owner عبر v1/rotate-pins.sql ومتتحطّش هنا نهائيًا.
+select set_employee_pin(e.id, lpad((floor(random()*10000))::int::text,4,'0'))
+from employees e where e.pin_hash is null;
 
 -- ---- 4) Salaries (OWNER فقط — مخفي تمامًا عن HR) ----
 create table if not exists salaries (
@@ -92,12 +131,10 @@ create table if not exists salaries (
   monthly_salary numeric(12,2) not null check (monthly_salary>=0),
   updated_at timestamptz default now()
 );
+-- المرتبات بيانات حساسة — مبتتحطّش في الريبو. بنعمل صف placeholder=0 لكل موظف على تركيب جديد بس،
+-- والـ Owner بيحدّث القيم الحقيقية من واجهته أو بـ update مباشر في Supabase.
 insert into salaries(employee_id, monthly_salary)
-select e.id, v.s from (values
-  ('أبرار',10000),('ندى',7000),('إسراء',5000),('ياسمين',4500),('آلاء',5000),
-  ('رودينا',4000),('ميروان',6000),('روان',3400),('حبيبة',3750),
-  ('عبدالرحمن',2300),('سهيلة',1700),('عمر',5000)
-) as v(nm,s) join employees e on e.name=v.nm
+select e.id, 0 from employees e
 where not exists (select 1 from salaries);
 
 -- ---- 5) Attendance (الخصم ككسر يوم، مش جنيه) ----
@@ -132,10 +169,12 @@ returns jsonb language plpgsql security definer set search_path=public, extensio
 declare
   s_from time; s_to time; s_start time; s_absent time;
   v_now timestamp; v_date date; v_time time; v_min int; v_late int;
-  v_tier jsonb; v_tiers jsonb; v_status text:='pending'; v_label text:=''; v_cut numeric:=0; v_name text;
+  v_tier jsonb; v_tiers jsonb; v_status text:='pending'; v_label text:=''; v_cut numeric:=0; v_name text; v_pin text;
 begin
-  if not exists (select 1 from employees where id=p_emp and active
-                 and pin_hash=crypt(p_pin,pin_hash)) then
+  v_pin := _verify_emp_pin(p_emp, p_pin);
+  if v_pin = 'locked' then
+    return jsonb_build_object('error','locked','message','اتقفل التسجيل مؤقتًا بعد محاولات غلط كتير. جرّب تاني بعد ١٥ دقيقة.');
+  elsif v_pin <> 'ok' then
     return jsonb_build_object('error','bad_pin','message','PIN غلط.');
   end if;
   select (value#>>'{}')::time into s_from   from settings where key='checkin_from';
@@ -250,10 +289,13 @@ create or replace function do_checkout(p_emp bigint, p_pin text)
 returns jsonb language plpgsql security definer set search_path=public, extensions as $$
 declare
   s_from time; s_to time; s_grace time;
-  v_now timestamp; v_date date; v_time time; v_rec record; v_name text; v_note text;
+  v_now timestamp; v_date date; v_time time; v_rec record; v_name text; v_note text; v_pin text;
 begin
   -- 1) PIN
-  if not exists (select 1 from employees where id=p_emp and active and pin_hash=crypt(p_pin,pin_hash)) then
+  v_pin := _verify_emp_pin(p_emp, p_pin);
+  if v_pin = 'locked' then
+    return jsonb_build_object('error','locked','message','اتقفل التسجيل مؤقتًا بعد محاولات غلط كتير. جرّب تاني بعد ١٥ دقيقة.');
+  elsif v_pin <> 'ok' then
     return jsonb_build_object('error','bad_pin','message','PIN غلط.');
   end if;
 
@@ -324,9 +366,12 @@ create or replace function request_permission(
   p_emp bigint, p_pin text, p_date date,
   p_hours numeric default null, p_start time default null, p_end time default null, p_reason text default null)
 returns jsonb language plpgsql security definer set search_path=public, extensions as $$
-declare v_max int; v_cnt int; v_name text;
+declare v_max int; v_cnt int; v_name text; v_pin text;
 begin
-  if not exists (select 1 from employees where id=p_emp and active and pin_hash=crypt(p_pin,pin_hash)) then
+  v_pin := _verify_emp_pin(p_emp, p_pin);
+  if v_pin = 'locked' then
+    return jsonb_build_object('error','locked','message','اتقفل مؤقتًا بعد محاولات غلط كتير. جرّب تاني بعد ١٥ دقيقة.');
+  elsif v_pin <> 'ok' then
     return jsonb_build_object('error','bad_pin','message','PIN غلط.');
   end if;
   select (value#>>'{}')::int into v_max from settings where key='monthly_permission_max';
@@ -385,9 +430,12 @@ create or replace function do_checkout(p_emp bigint, p_pin text)
 returns jsonb language plpgsql security definer set search_path=public, extensions as $$
 declare
   s_from time; s_to time; s_grace time;
-  v_now timestamp; v_date date; v_time time; v_rec record; v_name text; v_perm boolean;
+  v_now timestamp; v_date date; v_time time; v_rec record; v_name text; v_perm boolean; v_pin text;
 begin
-  if not exists (select 1 from employees where id=p_emp and active and pin_hash=crypt(p_pin,pin_hash)) then
+  v_pin := _verify_emp_pin(p_emp, p_pin);
+  if v_pin = 'locked' then
+    return jsonb_build_object('error','locked','message','اتقفل التسجيل مؤقتًا بعد محاولات غلط كتير. جرّب تاني بعد ١٥ دقيقة.');
+  elsif v_pin <> 'ok' then
     return jsonb_build_object('error','bad_pin','message','PIN غلط.');
   end if;
 
@@ -463,9 +511,12 @@ create index if not exists idx_leave_emp on leave_requests(employee_id);
 create or replace function request_leave(
   p_emp bigint, p_pin text, p_from date, p_to date, p_cover bigint, p_reason text default null)
 returns jsonb language plpgsql security definer set search_path=public, extensions as $$
-declare v_today date; v_days int; v_max int; v_used int; v_name text;
+declare v_today date; v_days int; v_max int; v_used int; v_name text; v_pin text;
 begin
-  if not exists (select 1 from employees where id=p_emp and active and pin_hash=crypt(p_pin,pin_hash)) then
+  v_pin := _verify_emp_pin(p_emp, p_pin);
+  if v_pin = 'locked' then
+    return jsonb_build_object('error','locked','message','اتقفل مؤقتًا بعد محاولات غلط كتير. جرّب تاني بعد ١٥ دقيقة.');
+  elsif v_pin <> 'ok' then
     return jsonb_build_object('error','bad_pin','message','PIN غلط.');
   end if;
   if p_cover is null then return jsonb_build_object('error','no_cover','message','لازم تختار الموظف اللي هيغطّيك.'); end if;
