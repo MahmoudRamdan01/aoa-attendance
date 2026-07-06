@@ -16,11 +16,24 @@ Static Supabase-powered attendance app.
 
 ## v1
 
-- Static build: `v1/` (React app, Auth + GPS/QR + notifications).
+- React app (Auth + GPS/QR + notifications).
+- **Source:** `v1-src/` (Vite + React). **Built output:** `v1/` (served by GitHub Pages at `/v1/`).
 - Database migration: `v1/supabase-v1-migration.sql`
 - Run the v1 migration in Supabase SQL Editor before using employee login, GPS/QR attendance, notifications, account linking, and v1 reports.
 
-> ⚠️ **v1 source is not in this repo.** `v1/assets/*.js` is a compiled Vite bundle only — there is no `package.json`/`src/`, so v1 cannot currently be rebuilt or edited from this repo. Either commit the original React source, or treat the bundle as the source of truth. Server-side rules (RLS + the RPC functions in the SQL files) are the real security boundary for both v0.9 and v1, so most hardening lives in SQL.
+### Rebuilding v1
+
+```bash
+cd v1-src
+npm install
+npm run build          # outputs to v1-src/dist/
+# then publish the build:
+cp dist/index.html ../v1/index.html
+cp dist/assets/*.js dist/assets/*.css ../v1/assets/
+cp dist/icon.svg dist/manifest.webmanifest dist/sw.js ../v1/
+```
+
+Source maps are intentionally disabled in `vite.config.js` so the bundle isn't re-exposed in production. Server-side rules (RLS + the RPC functions in the SQL files) remain the real security boundary for both v0.9 and v1.
 
 ## Database setup / run order
 
