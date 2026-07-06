@@ -113,7 +113,9 @@ begin
                             then now() + interval '15 minutes' else null end;
   return 'bad_pin';
 end $$;
-revoke all on function _verify_emp_pin(bigint,text) from public;
+-- Supabase default-grants EXECUTE to anon/authenticated on new functions; revoke explicitly.
+-- Callers (do_checkin ...) are SECURITY DEFINER and run as owner, so they still reach it.
+revoke all on function _verify_emp_pin(bigint,text) from anon, authenticated, public;
 
 insert into employees(name,leave_balance)
 select v.name,10 from (values('أبرار'),('ندى'),('إسراء'),('ياسمين'),('آلاء'),
