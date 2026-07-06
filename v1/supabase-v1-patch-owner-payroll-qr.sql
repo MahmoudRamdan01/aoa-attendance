@@ -50,6 +50,9 @@ begin
   if auth.uid() is null then
     return jsonb_build_object('error','auth_required','message','لازم تسجيل دخول.');
   end if;
+  if not is_hr() then
+    return jsonb_build_object('error','hr_only','message','بث كود اليوم للإدارة فقط.');
+  end if;
 
   v_code := ensure_daily_qr(v_date);
 

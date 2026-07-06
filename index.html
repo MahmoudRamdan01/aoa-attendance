@@ -326,8 +326,9 @@ let SETTINGS={checkin_from:"08:30",checkin_to:"10:00",checkout_from:"16:30",chec
 const DEMO_ATT={};
 const DEMO_PERM=[];  // {id,employee_id,perm_date,hours,reason,status}
 const DEMO_LEAVE=[]; // {id,employee_id,from_date,to_date,days,cover_employee_id,reason,status}
-const DEMO_EMP=[{id:1,name:"أبرار",pin:"4023"},{id:2,name:"ندى",pin:"1190"},{id:3,name:"إسراء",pin:"7754"},{id:4,name:"ياسمين",pin:"3318"},{id:5,name:"آلاء",pin:"8602"},{id:6,name:"رودينا",pin:"5247"},{id:7,name:"ميروان",pin:"9061"},{id:8,name:"روان",pin:"2835"},{id:9,name:"حبيبة",pin:"6479"},{id:10,name:"عبدالرحمن",pin:"1503"},{id:11,name:"سهيلة",pin:"7128"},{id:12,name:"عمر",pin:"3994"}];
-const DEMO_SAL={1:10000,2:7000,3:5000,4:4500,5:5000,6:4000,7:6000,8:3400,9:3750,10:2300,11:1700,12:5000};
+/* بيانات وهمية للمعاينة بدون سيرفر فقط — مفيش أسماء/PINs/مرتبات حقيقية هنا. */
+const DEMO_EMP=[{id:1,name:"موظف تجريبي ١",pin:"0000"},{id:2,name:"موظف تجريبي ٢",pin:"0000"},{id:3,name:"موظف تجريبي ٣",pin:"0000"},{id:4,name:"موظف تجريبي ٤",pin:"0000"},{id:5,name:"موظف تجريبي ٥",pin:"0000"},{id:6,name:"موظف تجريبي ٦",pin:"0000"}];
+const DEMO_SAL={1:5000,2:5000,3:5000,4:5000,5:5000,6:5000};
 
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
@@ -335,7 +336,10 @@ const hmToMin=hm=>{const[h,m]=hm.split(':').map(Number);return h*60+m};
 const nowHM=()=>{const n=new Date();return pad(n.getHours())+':'+pad(n.getMinutes())};
 const initials=n=>n.trim().slice(0,1);
 const fmtEGP=n=>Math.round(n).toLocaleString('en-US');
-const isoDate=d=>d.toISOString().slice(0,10);
+/* تنسيق تاريخ بمكوّنات محلية (مش UTC) عشان مايحصلش off-by-one في التقارير. */
+const isoDate=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+/* "النهاردة" بتوقيت القاهرة عشان يطابق السيرفر عند منتصف الليل. */
+const todayISO=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo'}).format(new Date());
 const AR_MON=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 const AR_DAYS=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 const arDate=d=>`${AR_DAYS[d.getDay()]} ${d.getDate()} ${AR_MON[d.getMonth()]} ${d.getFullYear()}`;
@@ -382,7 +386,7 @@ function renderKiosk(){
   if(mode==='closed'){$('banner').className='banner warn';$('banner').innerHTML=`مفيش تسجيل دلوقتي. الحضور ${SETTINGS.checkin_from}–${SETTINGS.checkin_to} · الانصراف ${SETTINGS.checkout_from}–${SETTINGS.checkout_to}.`;$('kioskSub').textContent='ارجع في مواعيد التسجيل.';}
   else{if(connected)$('banner').className='banner';$('kioskSub').textContent = mode==='out'?'دوس على اسمك لتسجيل انصرافك.':'دوس على اسمك وادخل الـ PIN بتاعك.';}
   const g=$('empGrid');g.innerHTML='';
-  const today=isoDate(new Date());
+  const today=todayISO();
   EMPLOYEES.forEach(e=>{
     const rec=!connected?DEMO_ATT[`${e.id}|${today}`]:null;
     const done = !connected && (mode==='in'? (rec&&rec.check_in) : mode==='out'? (rec&&rec.check_out):false);
@@ -400,7 +404,7 @@ function key(k){if(busy)return;if(k==='⌫'){pinBuf=pinBuf.slice(0,-1);return up
 function updateDots(){document.querySelectorAll('#pinDots span').forEach((s,i)=>s.classList.toggle('on',i<pinBuf.length));$('pinDots').classList.remove('err')}
 async function submitPin(){
   if(pinBuf.length<4||busy)return;busy=true;
-  const today=isoDate(new Date()),key0=`${pinEmp.id}|${today}`;
+  const today=todayISO(),key0=`${pinEmp.id}|${today}`;
   if(connected){$('modalMsg').style.color='var(--text-muted)';$('modalMsg').textContent='ثانية...';
     const fn=kMode==='out'?'do_checkout':'do_checkin';
     const{data,error}=await sb.rpc(fn,{p_emp:pinEmp.id,p_pin:pinBuf});busy=false;
@@ -441,7 +445,7 @@ function goHR(){if(role){showView('dash');renderDash()}else{showView('login');if
 function demoButtons(){$('demoLogin').innerHTML='<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px"><div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">معاينة تجريبية:</div><button class="ghost-btn" style="width:100%;margin-bottom:8px;padding:11px" onclick="demoEnter(\'hr\')">دخول كـ HR (كسور يوم بس)</button><button class="ghost-btn" style="width:100%;padding:11px;color:var(--gold);border-color:rgba(252,193,7,.3)" onclick="demoEnter(\'owner\')">دخول كـ Owner (الأرقام)</button></div>'}
 function demoEnter(r){role=r;if(r==='owner')SAL={...DEMO_SAL};updRoleBadge();showView('dash');renderDash()}
 async function hrLogin(){const email=$('hrEmail').value.trim(),pass=$('hrPass').value;$('loginMsg').textContent='';
-  if(!connected){demoEnter('owner');return}
+  if(!connected){$('loginMsg').textContent='مفيش اتصال بالسيرفر دلوقتي — حاول تاني. (للمعاينة بس استخدم أزرار الدخول التجريبي تحت.)';demoButtons();return}
   const{error}=await sb.auth.signInWithPassword({email,password:pass});
   if(error){$('loginMsg').textContent='الإيميل أو الباسورد غلط.';return}
   await loadRole();
@@ -454,10 +458,10 @@ async function hrLogout(){if(connected&&sb)await sb.auth.signOut();role=null;SAL
 async function renderDash(){
   $('dedHead').textContent=isOwner()?'الخصم (ج)':'الخصم';
   let emps=[],recs={};
-  if(connected){const today=isoDate(new Date());
+  if(connected){const today=todayISO();
     const[{data:e},{data:a}]=await Promise.all([sb.from('employees').select('id,name,leave_balance').order('id'),sb.from('attendance').select('*').eq('work_date',today)]);
     emps=e||[];(a||[]).forEach(r=>recs[r.employee_id]=r);$('demoNote').style.display='none';
-  }else{emps=DEMO_EMP;const today=isoDate(new Date());
+  }else{emps=DEMO_EMP;const today=todayISO();
     DEMO_EMP.forEach(em=>{const r=DEMO_ATT[`${em.id}|${today}`];if(r)recs[em.id]={employee_id:em.id,status:r.status,check_in:r.check_in,check_out:r.check_out,late_minutes:r.lateMin,deduction_days:r.cut}});
     $('demoNote').style.display='block';$('demoNote').innerHTML='<b>وضع تجريبي.</b> أرقام الـ PIN: <details class="pins"><summary>عرض</summary><div class="pin-grid">'+DEMO_EMP.map(e=>`<div><span>${e.name}</span><span class="pn">${e.pin}</span></div>`).join('')+'</div></details>';}
   window._emps=emps;
@@ -488,15 +492,15 @@ async function renderDash(){
   renderPermissions();renderLeaves();
 }
 function classifySelect(id){return `<select class="mini csel" onchange="classify(${id},this.value);this.selectedIndex=0"><option value="">صنّف…</option><option value="leave">أجازة</option><option value="absent">غياب</option><option value="mission">مأمورية</option><option value="sick">مرضي</option></select>`}
-async function classify(id,kind){if(!kind)return;const today=isoDate(new Date());
+async function classify(id,kind){if(!kind)return;const today=todayISO();
   if(connected){const{data}=await sb.rpc('set_day_status',{p_emp:id,p_date:today,p_kind:kind});if(data&&data.error){alert(data.message||'غير مسموح');return}}
   else{const k=`${id}|${today}`;DEMO_ATT[k]={...(DEMO_ATT[k]||{}),status:kind,lateMin:0,cut:kind==='absent'?1:0}}
   renderDash()}
-async function approveEntry(id){const today=isoDate(new Date());
+async function approveEntry(id){const today=todayISO();
   if(connected){await sb.from('attendance').update({status:'late',approved:true,note:'دخول معتمد من المدير'}).eq('employee_id',id).eq('work_date',today);}
   else{const k=`${id}|${today}`;DEMO_ATT[k]={...(DEMO_ATT[k]||{}),status:'late'}}
   renderDash()}
-async function ownerForgive(id){const today=isoDate(new Date());
+async function ownerForgive(id){const today=todayISO();
   if(connected){const{data}=await sb.rpc('owner_set_special',{p_emp:id,p_date:today,p_status:'present',p_note:'إعفاء — حالة خاصة'});if(data&&data.error){alert(data.message||'للـ Owner فقط');return}}
   else{const k=`${id}|${today}`;DEMO_ATT[k]={...(DEMO_ATT[k]||{}),status:'present',cut:0}}
   renderDash()}
@@ -505,7 +509,7 @@ async function ownerForgive(id){const today=isoDate(new Date());
 async function openDetail(id){const e=(window._emps||EMPLOYEES).find(x=>x.id===id);showView('detail');
   const wageTxt=isOwner()?`الأجر اليومي <span class="tnum">${fmtEGP(dwage(id))}</span> ج · `:'';
   $('detailHead').innerHTML=`<div class="avatar">${initials(e.name)}</div><div><h2>${e.name}</h2><div class="role">${wageTxt}رصيد الأجازات <span class="tnum">${e.leave_balance??10}</span>/21</div></div>`;
-  let rows=[];const today=isoDate(new Date());
+  let rows=[];const today=todayISO();
   if(connected){const start=isoDate(new Date(new Date().getFullYear(),new Date().getMonth(),1));const{data}=await sb.from('attendance').select('*').eq('employee_id',id).gte('work_date',start).order('work_date');rows=(data||[]).map(r=>({d:new Date(r.work_date),r}));}
   else{Object.keys(DEMO_ATT).filter(k=>+k.split('|')[0]===id).forEach(k=>{const r=DEMO_ATT[k];rows.push({d:new Date(k.split('|')[1]),r:{status:r.status,check_in:r.check_in,check_out:r.check_out,late_minutes:r.lateMin,deduction_days:r.cut}})})}
   let abs=0,lat=0,lv=0,dd=0;rows.forEach(({r})=>{if(r.status==='absent'){abs++;dd+=1}if(r.status==='late')lat++;if(r.status==='leave')lv++;dd+=Number(r.deduction_days||0)});
@@ -526,7 +530,7 @@ let permHours=1;
 function empName(id){const e=(EMPLOYEES.concat(window._emps||[])).find(x=>x.id===id);return e?e.name:('#'+id)}
 function openPerm(){
   const sel=$('permEmp');sel.innerHTML=EMPLOYEES.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
-  $('permPin').value='';$('permReason').value='';$('permDate').value=isoDate(new Date());$('permDate').min=isoDate(new Date());
+  $('permPin').value='';$('permReason').value='';$('permDate').value=todayISO();$('permDate').min=todayISO();
   setHours(1);$('permMsg').textContent='';show('permModal');
 }
 function setHours(h){permHours=h;$('h1').classList.toggle('on',h===1);$('h2').classList.toggle('on',h===2)}
@@ -589,7 +593,7 @@ async function submitLeave(){
     msg.style.color='var(--success)';msg.textContent=data.message||'تم الإرسال.';setTimeout(()=>hide('leaveModal'),1500);
   }else{
     const e=DEMO_EMP.find(x=>x.id===emp);if(pin!==e.pin){msg.textContent='PIN غلط.';return}
-    if(from<=isoDate(new Date())){msg.textContent='لازم قبلها بيوم على الأقل.';return}
+    if(from<=todayISO()){msg.textContent='لازم قبلها بيوم على الأقل.';return}
     DEMO_LEAVE.push({id:Date.now(),employee_id:emp,from_date:from,to_date:to,days:1,cover_employee_id:cover,reason,status:'pending'});
     msg.style.color='var(--success)';msg.textContent='تم الإرسال — في انتظار الموافقة.';setTimeout(()=>hide('leaveModal'),1500);
   }
