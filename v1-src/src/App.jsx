@@ -11,6 +11,7 @@ import {
   Download,
   LogOut,
   MapPin,
+  MessageSquare,
   Plane,
   Printer,
   QrCode,
@@ -425,6 +426,7 @@ function SetupBanner({ message }) {
 
 function EmployeeToday({ context, onToast }) {
   const [qr, setQr] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState("");
   const [locationState, setLocationState] = useState(null);
   const [todayRecord, setTodayRecord] = useState(null);
@@ -449,8 +451,9 @@ function EmployeeToday({ context, onToast }) {
     setTodayRecord(data || null);
   }
 
-  async function submitAttendance(kind, loc, qrValue, deviceId = getDeviceId()) {
+  async function submitAttendance(kind, loc, qrValue, deviceId = getDeviceId(), noteValue = "") {
     const cleanQr = normalizeQr(qrValue);
+    const cleanNote = (noteValue || "").trim();
     const distance = distanceMeters(loc, companyLocation);
     setLocationState({ ...loc, distance });
     if (distance > companyLocation.radiusMeters) {
@@ -467,6 +470,7 @@ function EmployeeToday({ context, onToast }) {
       p_accuracy: loc.accuracy,
       p_qr_code: cleanQr,
       p_device_id: deviceId,
+      p_note: cleanNote || null,
     });
     if (error) throw error;
     return data;
@@ -481,11 +485,12 @@ function EmployeeToday({ context, onToast }) {
     let loc = null;
     try {
       loc = await getLocation();
-      const data = await submitAttendance(kind, loc, qr);
+      const data = await submitAttendance(kind, loc, qr, getDeviceId(), note);
       if (data?.error) {
         onToast(data.message || "تعذر التسجيل.");
       } else {
         onToast(data.label || (kind === "in" ? "تم تسجيل الحضور." : "تم تسجيل الانصراف."));
+        setNote("");
         loadToday();
       }
     } catch (error) {
@@ -498,6 +503,7 @@ function EmployeeToday({ context, onToast }) {
             id: crypto.randomUUID(),
             kind,
             qr,
+            note,
             location: loc,
             deviceId: getDeviceId(),
             at: new Date().toISOString(),
@@ -519,7 +525,7 @@ function EmployeeToday({ context, onToast }) {
     for (const item of items) {
       try {
         const loc = item.location || (await getLocation());
-        const data = await submitAttendance(item.kind, loc, item.qr || qr, item.deviceId);
+        const data = await submitAttendance(item.kind, loc, item.qr || qr, item.deviceId, item.note || "");
         if (data?.error) remaining.push(item);
       } catch {
         remaining.push(item);
@@ -562,6 +568,20 @@ function EmployeeToday({ context, onToast }) {
             autoComplete="one-time-code"
           />
         </label>
+        <label className="field">
+          ملاحظة (اختياري)
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="اكتب ملاحظة تظهر للإدارة (مثال: اتأخرت بسبب الزحمة)"
+            maxLength={280}
+          />
+        </label>
+        {todayRecord?.employee_note && (
+          <p className="muted">
+            <MessageSquare size={15} /> ملاحظتك المسجلة: {todayRecord.employee_note}
+          </p>
+        )}
         <div className="actions-row">
           <button className="primary" disabled={busy || !!todayRecord?.check_in} onClick={() => attendance("in")}>
             <CheckCircle2 size={18} /> {busy === "in" ? "جاري..." : "تسجيل حضور"}
@@ -976,10 +996,10 @@ function AdminDashboard({ context, onToast }) {
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>الموظف</th><th>الحالة</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>إجراء</th></tr></thead>
+            <thead><tr><th>الموظف</th><th>الحالة</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan="6">جاري التحميل...</td></tr>}
-              {!loading && filteredEmployees.length === 0 && <tr><td colSpan="6">لا توجد نتائج مطابقة.</td></tr>}
+              {loading && <tr><td colSpan="7">جاري التحميل...</td></tr>}
+              {!loading && filteredEmployees.length === 0 && <tr><td colSpan="7">لا توجد نتائج مطابقة.</td></tr>}
               {!loading && filteredEmployees.map((emp) => {
                 const rec = recs.get(emp.id);
                 return (
@@ -989,6 +1009,9 @@ function AdminDashboard({ context, onToast }) {
                     <td dir="ltr">{rec?.check_in?.slice(0, 5) || "-"}</td>
                     <td dir="ltr">{rec?.check_out?.slice(0, 5) || "-"}</td>
                     <td>{rec?.deduction_days || 0} يوم</td>
+                    <td>
+                      <AdminNoteCell empId={emp.id} rec={rec} reportDate={reportDate} onToast={onToast} onSaved={loadAdmin} />
+                    </td>
                     <td>{context.role === "owner" && rec ? <button className="danger-link" onClick={() => reset(emp.id)}>تراجع</button> : "-"}</td>
                   </tr>
                 );
@@ -1020,6 +1043,68 @@ function AdminDashboard({ context, onToast }) {
 
       <Approvals title="أذونات معلقة" rows={permissions} type="permission" canApprove={canApprove} onPermission={decidePermission} />
       <Approvals title="أجازات معلقة" rows={leaves} type="leave" canApprove={canApprove} onLeave={decideLeave} />
+    </div>
+  );
+}
+
+function AdminNoteCell({ empId, rec, reportDate, onToast, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(rec?.hr_note || "");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setValue(rec?.hr_note || "");
+    setEditing(false);
+  }, [rec?.hr_note, reportDate, empId]);
+
+  async function save() {
+    setBusy(true);
+    const { data, error } = await supabase.rpc("set_attendance_note_v1", {
+      p_employee_id: empId,
+      p_date: reportDate,
+      p_note: value.trim() || null,
+    });
+    setBusy(false);
+    if (error || data?.error) {
+      onToast(data?.message || "تعذر حفظ الملاحظة.");
+      return;
+    }
+    onToast("تم حفظ الملاحظة.");
+    setEditing(false);
+    onSaved();
+  }
+
+  return (
+    <div className="note-cell">
+      {rec?.employee_note && (
+        <p className="note-emp" title="ملاحظة الموظف">
+          <MessageSquare size={13} /> {rec.employee_note}
+        </p>
+      )}
+      {editing ? (
+        <div className="note-edit">
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="ملاحظة الإدارة (مثال: تأخير)"
+            maxLength={280}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+              if (e.key === "Escape") {
+                setValue(rec?.hr_note || "");
+                setEditing(false);
+              }
+            }}
+          />
+          <button className="link" onClick={save} disabled={busy}>{busy ? "..." : "حفظ"}</button>
+          <button className="link-muted" onClick={() => { setValue(rec?.hr_note || ""); setEditing(false); }}>إلغاء</button>
+        </div>
+      ) : (
+        <button className="note-hr" onClick={() => setEditing(true)} title="اكتب ملاحظة للإدارة">
+          {rec?.hr_note ? rec.hr_note : <span className="muted">+ ملاحظة</span>}
+        </button>
+      )}
     </div>
   );
 }
