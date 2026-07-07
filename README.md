@@ -43,6 +43,7 @@ Run these in Supabase SQL Editor **in order** (all are idempotent, safe to re-ru
 2. `v1/supabase-v1-migration.sql` — v1 tables/functions, GPS-accuracy check, `mark_absentees_v1`.
 3. `v1/supabase-v1-patch-owner-payroll-qr.sql` — owner-only approvals + QR broadcast (HR-gated).
 4. `v1/supabase-v1-hardening.sql` — least-privilege revokes + optional `pg_cron` jobs for auto-absence / missing-checkout.
+5. `v1/supabase-v1-schedules-notes.sql` — per-employee check-in/out windows (global check-in `08:00–11:00`, check-out `16:30–20:00`; عبدالرحمن checks in `14:00–16:00`), employee/HR notes on the daily record (`attendance.employee_note` / `attendance.hr_note`), and `set_attendance_note_v1`. Window enforcement + the note are added to `employee_attendance_action_v1` (new `p_note` arg), and `mark_absentees_v1` now respects each employee's window.
 
 ### ⚠️ Rotate all PINs (mandatory)
 
