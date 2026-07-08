@@ -6,3 +6,5 @@
 # v1 build artifacts — React source lives in v1-src/, built output is committed under v1/
 node_modules/
 v1-src/dist/
+v2-src/dist/
+v2-src/node_modules/

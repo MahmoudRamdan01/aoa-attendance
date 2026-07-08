@@ -1,0 +1,247 @@
+# Other Dashboard Pages
+
+## Department Dashboard
+
+### Overview
+
+Detailed view of department performance with filters, comparison tools, and drill-down capabilities.
+
+### Layout
+
+- **Filter bar**: Department selector, date range, view toggle
+- **KPI row**: 4 cards (Avg Attendance, Headcount, Overtime Hours, Satisfaction Score)
+- **Main chart**: Department trend line chart
+- **Department breakdown table**: Sortable by all columns
+- **Comparison section**: Side-by-side department comparison
+
+### Elements
+
+**Filter Bar:**
+- Department dropdown: "All Departments" / الأقسام
+- Date range picker: "This Month" / هذا الشهر
+- View toggle: Chart / Table
+
+**Department Table Columns:**
+- Department Name (Arabic + English)
+- Headcount
+- Attendance Rate
+- Overtime Hours
+- Late Count
+- Early Leave Count
+- Score
+- Status (badge)
+- Actions (view button)
+
+---
+
+## Employee Dashboard
+
+### Overview
+
+Employee directory with search, filters, and detailed employee cards.
+
+### Layout
+
+- **Search bar**: Full width with filters
+- **Stats row**: Total employees, active, on leave, new hires
+- **Employee grid/table**: Toggle view
+- **Pagination**: Bottom
+
+### Elements
+
+**Employee Card (Grid View):**
+- Avatar (40px circle, initials)
+- Name (Arabic + English)
+- Employee ID
+- Department badge
+- Role/Position
+- Status indicator (green dot = active)
+- Quick actions (view, edit)
+
+**Employee Table Columns:**
+- Employee (avatar + name)
+- ID
+- Department
+- Role
+- Join Date
+- Attendance Rate
+- Status
+- Actions
+
+---
+
+## Recruitment Dashboard
+
+### Overview
+
+Hiring pipeline visualization, open positions, and candidate tracking.
+
+### Layout
+
+- **Pipeline**: Horizontal Kanban-style pipeline
+- **Stats row**: Open positions, candidates, interviews, offers
+- **Open positions table**: List of active job openings
+- **Candidate funnel**: Conversion chart
+
+### Elements
+
+**Hiring Pipeline:**
+- Stages: New Applications → Screening → Interview → Offer → Hired
+- Each stage: Card count + drag-drop area
+- Stage colors: Gray → Blue → Yellow → Green
+
+**Funnel Chart:**
+- Vertical funnel showing conversion rates
+- 5 stages narrowing down
+- Percentage labels on each stage
+
+---
+
+## Workforce Dashboard
+
+### Overview
+
+Attendance tracking, scheduling, and workforce planning.
+
+### Layout
+
+- **Date selector**: Calendar picker
+- **Attendance overview**: Present, Absent, Late, On Leave counts
+- **Attendance chart**: Daily/Weekly view
+- **Schedule table**: Employee shift schedule
+- **Overtime section**: Overtime hours and approvals
+
+### Elements
+
+**Attendance Summary:**
+- Present: Green card with count and percentage
+- Absent: Red card
+- Late: Orange card
+- On Leave: Blue card
+
+**Schedule Table:**
+- Rows: Employees
+- Columns: Days of week
+- Cells: Shift time or "Off" / "Leave"
+- Color-coded by shift type
+
+---
+
+## KPI Management
+
+### Overview
+
+Define, track, and manage Key Performance Indicators.
+
+### Layout
+
+- **KPI categories**: Tabs by category
+- **KPI table**: All defined KPIs
+- **Add/Edit form**: Modal for KPI configuration
+
+### Elements
+
+**KPI Table Columns:**
+- KPI Name (Arabic + English)
+- Category
+- Target Value
+- Current Value
+- Weight
+- Department
+- Status
+- Actions
+
+**Categories:**
+- Attendance, Productivity, Quality, Behavior, Development
+
+---
+
+## Scorecard System
+
+### Overview
+
+Employee performance scorecards with ratings and evaluations.
+
+### Layout
+
+- **Period selector**: Monthly/Quarterly/Annual
+- **Scorecard table**: Employee evaluations
+- **Summary chart**: Score distribution
+
+### Elements
+
+**Scorecard Columns:**
+- Employee
+- Department
+- Period
+- Overall Score
+- Category Scores (breakdown)
+- Rating (Excellent/Good/Average/Below Average)
+- Status
+- Actions (view full scorecard)
+
+---
+
+## Rewards & Penalties
+
+### Overview
+
+Manage incentives, bonuses, and disciplinary actions.
+
+### Layout
+
+- **Tabs**: Rewards / Penalties
+- **Stats row**: Total rewards, total amount, pending approvals
+- **Rewards table**: List of rewards/awards
+- **Penalties table**: List of penalties/warnings
+
+### Elements
+
+**Reward Entry:**
+- Employee name
+- Type (Bonus, Promotion, Certificate)
+- Amount (if applicable)
+- Date
+- Approved by
+- Status
+
+**Penalty Entry:**
+- Employee name
+- Type (Warning, Deduction, Suspension)
+- Reason
+- Date
+- Severity
+- Status
+
+---
+
+## Reports
+
+### Overview
+
+Report generation interface with templates and export options.
+
+### Layout
+
+- **Report templates**: Grid of available reports
+- **Custom report builder**: Filters and options
+- **Recent reports**: Table of generated reports
+- **Export options**: PDF, Excel, CSV
+
+### Elements
+
+**Report Templates:**
+- Attendance Report
+- Payroll Report
+- Performance Report
+- Recruitment Report
+- Department Summary
+- Custom Report
+
+**Recent Reports Table:**
+- Report Name
+- Type
+- Generated Date
+- Generated By
+- Format
+- Actions (download, share)

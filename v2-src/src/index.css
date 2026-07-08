@@ -1,0 +1,184 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.625rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   AOI brand tokens (light + dark). Prefixed --c-* so they never collide with
+   the shadcn HSL variables above. Consumed via arbitrary classes like
+   bg-[var(--c-panel)] and via inline style={{ color: "var(--c-green)" }}.
+--------------------------------------------------------------------------- */
+:root {
+  --c-page: #f1f5f9;
+  --c-panel: #ffffff;
+  --c-panel-soft: #f8fafc;
+  --c-ink: #1e293b;
+  --c-muted: #64748b;
+  --c-faint: #94a3b8;
+  --c-faint2: #cbd5e1;
+  --c-line: #e2e8f0;
+  --c-line-soft: #f1f5f9;
+  --c-nav: #383737;
+  --c-nav-hover: #4a4a4a;
+  --c-green: #22c55e;
+  --c-green-bg: #dcfce7;
+  --c-green-bg2: #f0fdf4;
+  --c-red: #ef4444;
+  --c-red-bg: #fee2e2;
+  --c-red-bg2: #fef2f2;
+  --c-amber: #ca8a04;
+  --c-amber-bg: #fef9c3;
+  --c-amber-40: rgba(202, 138, 4, 0.4);
+  --c-orange: #f97316;
+  --c-orange-bg: #ffedd5;
+  --c-orange-bg2: #fffbeb;
+  --c-orange-40: rgba(249, 115, 22, 0.4);
+  --c-blue: #3b82f6;
+  --c-blue-bg: #dbeafe;
+  --c-violet: #8b5cf6;
+  --c-violet-bg: #ede9fe;
+  --c-gold: #b45309;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-login: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+
+.dark {
+  --c-page: #1b1a19;
+  --c-panel: #262524;
+  --c-panel-soft: #2f2e2d;
+  --c-ink: #f1f5f9;
+  --c-muted: #a3aab5;
+  --c-faint: #7d8694;
+  --c-faint2: #4b5563;
+  --c-line: #3a3938;
+  --c-line-soft: #302f2e;
+  --c-nav: #211f1e;
+  --c-nav-hover: #383737;
+  --c-green: #4ade80;
+  --c-green-bg: rgba(34, 197, 94, 0.16);
+  --c-green-bg2: rgba(34, 197, 94, 0.1);
+  --c-red: #f87171;
+  --c-red-bg: rgba(239, 68, 68, 0.16);
+  --c-red-bg2: rgba(239, 68, 68, 0.1);
+  --c-amber: #fbbf24;
+  --c-amber-bg: rgba(202, 138, 4, 0.2);
+  --c-amber-40: rgba(251, 191, 36, 0.4);
+  --c-orange: #fb923c;
+  --c-orange-bg: rgba(249, 115, 22, 0.16);
+  --c-orange-bg2: rgba(249, 115, 22, 0.1);
+  --c-orange-40: rgba(251, 146, 60, 0.4);
+  --c-blue: #60a5fa;
+  --c-blue-bg: rgba(59, 130, 246, 0.16);
+  --c-violet: #a78bfa;
+  --c-violet-bg: rgba(139, 92, 246, 0.16);
+  --c-gold: #e8b64c;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-card-hover: 0 6px 16px rgba(0, 0, 0, 0.5);
+  --shadow-login: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+body {
+  background-color: var(--c-page);
+}
+
+/* Native date/month/time pickers follow the theme */
+.dark input,
+.dark select,
+.dark textarea {
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------------
+   Recharts theming — CSS beats the inline presentation attributes so both
+   themes read correctly without touching every chart's props.
+--------------------------------------------------------------------------- */
+.recharts-cartesian-grid line {
+  stroke: var(--c-line-soft) !important;
+}
+.recharts-cartesian-axis-tick text {
+  fill: var(--c-faint) !important;
+}
+.recharts-default-tooltip {
+  background-color: var(--c-panel) !important;
+  border-color: var(--c-line) !important;
+  border-radius: 8px;
+}
+.recharts-tooltip-label,
+.recharts-tooltip-item-list .recharts-tooltip-item {
+  color: var(--c-ink) !important;
+}
+.recharts-legend-item-text {
+  color: var(--c-muted) !important;
+}

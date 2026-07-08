@@ -39,6 +39,24 @@ light/dark theme toggle persisted per device (`localStorage['aol-theme']`).
 
 Source maps are intentionally disabled in `vite.config.js` so the bundle isn't re-exposed in production. Server-side rules (RLS + the RPC functions in the SQL files) remain the real security boundary for both v0.9 and v1.
 
+## v2 (HR Dashboard + Attendance)
+
+- Full HR dashboard (Executive/Departments/Employees/Recruitment/Workforce/KPI/Scorecard/Rewards/Reports) merged with the real v1 attendance system (Supabase auth + GPS/QR check-in + requests + notifications + owner payroll).
+- **Live:** https://mahmoudramdan01.github.io/aoa-attendance/v2/
+- **Source:** `v2-src/` (Vite + React 19 + TS + Tailwind + shadcn/ui). **Built output:** `v2/`.
+- Role-gated: owner/hr see all dashboards; employees see only their attendance portal. Dashboards without backing tables yet show a "بيانات تجريبية" badge (hybrid data phase 1).
+- Light/dark theme persisted via `localStorage['aol-theme']` (same key as v1). Uses HashRouter (`/v2/#/...`) so GitHub Pages refreshes work.
+- Uses the same Supabase project, RPCs and RLS as v1 — no schema changes required.
+
+### Rebuilding v2
+
+```bash
+cd v2-src
+npm install
+npm run build        # outputs to v2-src/dist/
+cp -r dist/. ../v2/  # publish
+```
+
 ## Database setup / run order
 
 Run these in Supabase SQL Editor **in order** (all are idempotent, safe to re-run):
