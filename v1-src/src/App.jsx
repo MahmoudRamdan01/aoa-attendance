@@ -1,18 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import QRCodeLib from "qrcode";
 import {
+  Activity,
+  AlertTriangle,
   Banknote,
+  BarChart3,
   Bell,
   CalendarDays,
   CheckCircle2,
   CheckCheck,
+  ChevronLeft,
   Clipboard,
   Clock3,
   Download,
+  FileSpreadsheet,
+  History,
   LogOut,
   MapPin,
+  Menu,
   MessageSquare,
-  Plane,
+  Moon,
+  PieChart as PieChartIcon,
   Printer,
   QrCode,
   RefreshCcw,
@@ -20,12 +28,31 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
+  Sun,
   Trash2,
+  TrendingUp,
+  UserCheck,
   UserPlus,
   UserCog,
   Users,
+  UserX,
   WifiOff,
+  X,
 } from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  Bar as ReBar,
+  BarChart as ReBarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart as RePieChart,
+  ResponsiveContainer,
+  Tooltip as ChartTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   COMPANY_LOCATION,
   distanceMeters,
@@ -57,6 +84,70 @@ const roleOptions = [
   { value: "hr", label: "HR" },
   { value: "owner", label: "Owner" },
 ];
+
+// KPI-style navigation: Arabic primary label + small English secondary label.
+const MENU = [
+  { id: "today", ar: "اليوم", en: "Today", icon: Clock3, kind: "employee" },
+  { id: "month", ar: "سجلي", en: "My Record", icon: History, kind: "employee" },
+  { id: "requests", ar: "الطلبات", en: "Requests", icon: CalendarDays, kind: "employee" },
+  { id: "notifications", ar: "الإشعارات", en: "Alerts", icon: Bell, kind: "all" },
+  { id: "admin", ar: "الإدارة", en: "Admin", icon: UserCog, kind: "admin" },
+  { id: "owner", ar: "لوحة Owner", en: "Owner", icon: ShieldCheck, kind: "owner" },
+];
+
+const CHART_COLORS = ["#FCC107", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6", "#64748B"];
+
+function getInitialTheme() {
+  try {
+    const saved = localStorage.getItem("aol-theme");
+    if (saved === "dark" || saved === "light") return saved;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } catch {
+    return "light";
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  try {
+    localStorage.setItem("aol-theme", theme);
+  } catch {
+    /* private mode */
+  }
+}
+
+function ThemeToggle() {
+  const [theme, setTheme] = useState(getInitialTheme);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  return (
+    <button
+      className="icon-btn"
+      type="button"
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      title={theme === "dark" ? "الوضع الفاتح" : "الوضع الغامق"}
+    >
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
+}
+
+function nameInitials(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "AO";
+  return parts.slice(0, 2).map((part) => part[0]).join("");
+}
+
+function BrandLogo({ large }) {
+  return (
+    <div className={cls("brand-mark", large && "large")}>
+      <img src="./logo.png" alt="Air Ocean Line" />
+    </div>
+  );
+}
 
 function addDays(date, days) {
   // Parse and compute in UTC. Parsing "${date}T00:00:00" as *local* time and then
@@ -200,6 +291,15 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState("today");
   const [toast, setToast] = useState("");
+  const [sideOpen, setSideOpen] = useState(() => {
+    try {
+      return localStorage.getItem("aol-side") !== "closed";
+    } catch {
+      return true;
+    }
+  });
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -224,7 +324,7 @@ function App() {
     if (!context) return;
     const role = context.role || "employee";
     const isAdminOnly = (role === "hr" || role === "owner") && !context.employee;
-    if (isAdminOnly && (activeView === "today" || activeView === "requests")) {
+    if (isAdminOnly && ["today", "month", "requests"].includes(activeView)) {
       setActiveView(role === "owner" ? "owner" : "admin");
     }
   }, [context?.role, context?.employee?.id, activeView]);
@@ -274,6 +374,22 @@ function App() {
     setContext(null);
   }
 
+  // Unread notifications counter for the topbar bell (head-count only, RLS-scoped).
+  useEffect(() => {
+    if (!session || !context || context.migration_required) return;
+    let cancelled = false;
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .is("read_at", null)
+      .then(({ count }) => {
+        if (!cancelled) setUnread(count || 0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, context?.role, activeView]);
+
   if (loading) return <Splash />;
   if (!session) return <LoginScreen />;
 
@@ -281,78 +397,149 @@ function App() {
   const isAdmin = role === "hr" || role === "owner";
   const hasEmployeePortal = !!context?.employee;
 
+  const menuItems = MENU.filter(
+    (item) =>
+      item.kind === "all" ||
+      (item.kind === "employee" && hasEmployeePortal) ||
+      (item.kind === "admin" && isAdmin) ||
+      (item.kind === "owner" && role === "owner")
+  );
+  const activeItem = menuItems.find((item) => item.id === activeView) || menuItems[0];
+  const displayName = context?.employee?.name || context?.admin_name || session.user.email;
+
+  function toggleSide() {
+    setSideOpen((open) => {
+      try {
+        localStorage.setItem("aol-side", open ? "closed" : "open");
+      } catch {
+        /* private mode */
+      }
+      return !open;
+    });
+  }
+
+  function go(id) {
+    setActiveView(id);
+    setMobileOpen(false);
+  }
+
   return (
-    <div className="app-shell">
+    <div className={cls("app-shell", !sideOpen && "side-collapsed")}>
       <aside className="side">
-        <div className="brand">
-          <div className="brand-mark">
-            <Plane size={24} />
+        <div className="side-head">
+          <div className="brand">
+            <BrandLogo />
+            <div className="brand-text">
+              <p>Air Ocean Line</p>
+              <strong>الموارد البشرية</strong>
+            </div>
           </div>
-          <div>
-            <p>Air Ocean Line</p>
-            <strong>HR v1</strong>
-          </div>
+          <button className="icon-btn" type="button" onClick={toggleSide} title={sideOpen ? "طي القائمة" : "فتح القائمة"}>
+            {sideOpen ? <X size={17} /> : <Menu size={17} />}
+          </button>
         </div>
 
         <nav className="nav">
-          {hasEmployeePortal && (
-            <>
-              <button className={cls(activeView === "today" && "active")} onClick={() => setActiveView("today")}>
-                <Clock3 size={18} /> اليوم
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeView === item.id;
+            return (
+              <button key={item.id} className={cls(isActive && "active")} onClick={() => go(item.id)} title={item.ar}>
+                <Icon size={19} />
+                <span className="nav-labels">
+                  <b>{item.ar}</b>
+                  <span className="nav-en">{item.en}</span>
+                </span>
+                {isActive && <ChevronLeft className="active-arrow" size={16} />}
               </button>
-              <button className={cls(activeView === "requests" && "active")} onClick={() => setActiveView("requests")}>
-                <CalendarDays size={18} /> الطلبات
-              </button>
-            </>
-          )}
-          <button className={cls(activeView === "notifications" && "active")} onClick={() => setActiveView("notifications")}>
-            <Bell size={18} /> الإشعارات
-          </button>
-          {isAdmin && (
-            <button className={cls(activeView === "admin" && "active")} onClick={() => setActiveView("admin")}>
-              <UserCog size={18} /> الإدارة
-            </button>
-          )}
-          {role === "owner" && (
-            <button className={cls(activeView === "owner" && "active")} onClick={() => setActiveView("owner")}>
-              <ShieldCheck size={18} /> Owner
-            </button>
-          )}
+            );
+          })}
         </nav>
 
+        <div className="side-status">
+          <p>
+            <span className="dot" /> النظام شغّال
+          </p>
+          <small>Quick · Reliable · Delivered</small>
+        </div>
+
         <button className="logout" onClick={signOut}>
-          <LogOut size={18} /> خروج
+          <LogOut size={18} /> <span>خروج</span>
         </button>
       </aside>
+
+      <div className="mobile-top">
+        <div className="m-brand">
+          <BrandLogo />
+          <strong>Air Ocean Line</strong>
+        </div>
+        <div className="top-actions">
+          <button className="icon-btn" type="button" onClick={() => setMobileOpen((open) => !open)} title="القائمة">
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </div>
+      {mobileOpen && (
+        <div className="mobile-menu">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button key={item.id} className={cls(activeView === item.id && "active")} onClick={() => go(item.id)}>
+                <Icon size={19} /> {item.ar}
+              </button>
+            );
+          })}
+          <button className="logout" onClick={signOut}>
+            <LogOut size={18} /> <span>خروج</span>
+          </button>
+        </div>
+      )}
 
       <main className="main">
         <header className="top">
           <div>
-            <span className="eyebrow">{fmtDate(new Date())}</span>
-            <h1>أهلًا، {context?.employee?.name || context?.admin_name || session.user.email}</h1>
+            <span className="eyebrow">
+              {fmtDate(new Date())} · أهلًا، {displayName}
+            </span>
+            <h1>{activeItem?.ar || "لوحة التحكم"}</h1>
           </div>
           <div className="top-actions">
             <span className="badge">{roleNames[role] || role}</span>
             <button className="icon-btn" onClick={loadContext} title="تحديث">
               <RefreshCcw size={18} />
             </button>
+            <ThemeToggle />
+            <button className="icon-btn" onClick={() => go("notifications")} title="الإشعارات">
+              <Bell size={18} />
+              {unread > 0 && <span className="bell-dot">{unread > 99 ? "99+" : unread}</span>}
+            </button>
+            <div className="avatar" title={displayName}>
+              {nameInitials(displayName)}
+            </div>
           </div>
         </header>
 
-        {context?.migration_required && <SetupBanner message={context.setup_message} />}
-        {toast && <div className="toast">{toast}</div>}
+        <div className="content">
+          {context?.migration_required && <SetupBanner message={context.setup_message} />}
+          {toast && <div className="toast">{toast}</div>}
 
-        {activeView === "today" && hasEmployeePortal && (
-          <EmployeeToday context={context} session={session} onToast={setToast} />
-        )}
-        {activeView === "requests" && hasEmployeePortal && (
-          <RequestsView context={context} session={session} onToast={setToast} />
-        )}
-        {activeView === "notifications" && <NotificationsView context={context} onToast={setToast} />}
-        {activeView === "admin" && isAdmin && (
-          <AdminDashboard context={context} onToast={setToast} />
-        )}
-        {activeView === "owner" && role === "owner" && <OwnerDashboard onToast={setToast} />}
+          <div className="view-anim" key={activeView}>
+            {activeView === "today" && hasEmployeePortal && (
+              <EmployeeToday context={context} session={session} onToast={setToast} />
+            )}
+            {activeView === "month" && hasEmployeePortal && (
+              <MyMonthView context={context} onToast={setToast} />
+            )}
+            {activeView === "requests" && hasEmployeePortal && (
+              <RequestsView context={context} session={session} onToast={setToast} />
+            )}
+            {activeView === "notifications" && <NotificationsView context={context} onToast={setToast} />}
+            {activeView === "admin" && isAdmin && (
+              <AdminDashboard context={context} onToast={setToast} />
+            )}
+            {activeView === "owner" && role === "owner" && <OwnerDashboard onToast={setToast} />}
+          </div>
+        </div>
       </main>
     </div>
   );
@@ -361,9 +548,7 @@ function App() {
 function Splash() {
   return (
     <div className="splash">
-      <div className="brand-mark large">
-        <Plane size={34} />
-      </div>
+      <BrandLogo large />
       <p>تحميل نظام Air Ocean Line...</p>
     </div>
   );
@@ -388,9 +573,7 @@ function LoginScreen() {
     <main className="login-screen">
       <section className="login-panel">
         <div className="brand login-brand">
-          <div className="brand-mark">
-            <Plane size={24} />
-          </div>
+          <BrandLogo />
           <div>
             <p>Air Ocean Line</p>
             <strong>نظام الحضور والموارد البشرية</strong>
@@ -627,6 +810,149 @@ function StatusDot({ done, label, value }) {
         <small>{label}</small>
         <strong>{value}</strong>
       </div>
+    </div>
+  );
+}
+
+function weekdayName(date) {
+  return new Intl.DateTimeFormat("ar-EG", { weekday: "long", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+}
+
+function Sparkline({ data, width = 120, height = 28 }) {
+  if (!data.length) return null;
+  const max = Math.max(...data, 1);
+  const points = data
+    .map((value, index) => {
+      const x = data.length > 1 ? (index / (data.length - 1)) * width : width / 2;
+      const y = height - (value / max) * (height - 4) - 2;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  return (
+    <svg width={width} height={height} style={{ direction: "ltr", flex: "0 0 auto" }}>
+      <polyline fill="none" stroke="#F59E0B" strokeWidth="2" points={points} />
+    </svg>
+  );
+}
+
+function MyMonthView({ context, onToast }) {
+  const employee = context?.employee;
+  const [month, setMonth] = useState(() => todayIso().slice(0, 7));
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const range = useMemo(() => {
+    const [year, mon] = month.split("-").map(Number);
+    return {
+      from: `${month}-01`,
+      to: new Date(Date.UTC(year, mon, 0)).toISOString().slice(0, 10),
+    };
+  }, [month]);
+
+  useEffect(() => {
+    if (!employee?.id) return;
+    setLoading(true);
+    supabase
+      .from("attendance")
+      .select("*")
+      .eq("employee_id", employee.id)
+      .gte("work_date", range.from)
+      .lte("work_date", range.to)
+      .order("work_date")
+      .then(({ data, error }) => {
+        if (error) onToast?.("تعذر تحميل سجل الشهر.");
+        setRows(data || []);
+        setLoading(false);
+      });
+  }, [employee?.id, range.from, range.to]);
+
+  const summary = useMemo(() => {
+    const present = rows.filter((row) => row.check_in).length;
+    const lateRows = rows.filter((row) => row.status === "late");
+    const absent = rows.filter((row) => row.status === "absent").length;
+    const leave = rows.filter((row) => ["leave", "mission", "sick"].includes(row.status)).length;
+    const lateMinutes = lateRows.reduce((sum, row) => sum + Number(row.late_minutes || 0), 0);
+    const deductions = rows.reduce(
+      (sum, row) => sum + Number(row.deduction_days || 0) + (row.status === "absent" ? 1 : 0),
+      0
+    );
+    return { present, lateCount: lateRows.length, lateMinutes, absent, leave, deductions };
+  }, [rows]);
+
+  const spark = useMemo(() => rows.map((row) => Number(row.late_minutes || 0)), [rows]);
+
+  function exportMonthCsv() {
+    const header = ["التاريخ", "اليوم", "الحالة", "حضور", "انصراف", "دقائق تأخير", "خصم أيام", "ملاحظتي"];
+    const lines = rows.map((row) =>
+      [
+        row.work_date,
+        weekdayName(row.work_date),
+        statusLabels[row.status] || row.status,
+        row.check_in || "",
+        row.check_out || "",
+        row.late_minutes || 0,
+        row.deduction_days || 0,
+        row.employee_note || "",
+      ].map(csvCell).join(",")
+    );
+    downloadTextFile(`my-month-${month}.csv`, "\ufeff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+  }
+
+  return (
+    <div className="stack">
+      <section className="panel">
+        <div className="panel-title between">
+          <div><History size={20} /><h2>سجلي الشهري</h2></div>
+          <div className="toolbar">
+            <input type="month" value={month} max={todayIso().slice(0, 7)} onChange={(e) => setMonth(e.target.value)} />
+            <button className="secondary" onClick={exportMonthCsv} disabled={loading || rows.length === 0}>
+              <FileSpreadsheet size={16} /> Excel
+            </button>
+          </div>
+        </div>
+        <div className="stats-grid compact-stats">
+          <Metric label="أيام حضور" value={summary.present} tone="ok" icon={UserCheck} />
+          <Metric label="تأخير" value={summary.lateCount} sub={`${summary.lateMinutes} دقيقة إجمالًا`} tone="warn" icon={Clock3} />
+          <Metric label="غياب" value={summary.absent} tone="danger" icon={UserX} />
+          <Metric label="أجازة/مأمورية" value={summary.leave} tone="info" icon={CalendarDays} />
+          <Metric label="خصومات" value={summary.deductions.toFixed(2)} sub="يوم" tone="gold" icon={Banknote} />
+        </div>
+        {employee?.leave_balance != null && (
+          <p className="muted">رصيد أجازاتك المتبقي: {employee.leave_balance} يوم</p>
+        )}
+        {spark.some((value) => value > 0) && (
+          <p className="muted">
+            اتجاه دقائق التأخير خلال الشهر: <Sparkline data={spark} />
+          </p>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-title"><CalendarDays size={20} /><h2>تفاصيل الأيام</h2></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>حضور</th><th>انصراف</th><th>تأخير</th><th>خصم</th><th>ملاحظتي</th></tr>
+            </thead>
+            <tbody>
+              {loading && <tr><td colSpan="8">جاري التحميل...</td></tr>}
+              {!loading && rows.length === 0 && <tr><td colSpan="8">لا توجد سجلات في الشهر ده.</td></tr>}
+              {!loading && rows.map((row) => (
+                <tr key={row.id || row.work_date}>
+                  <td dir="ltr">{row.work_date}</td>
+                  <td>{weekdayName(row.work_date)}</td>
+                  <td><StatusBadge status={row.status} /></td>
+                  <td dir="ltr">{row.check_in?.slice(0, 5) || "-"}</td>
+                  <td dir="ltr">{row.check_out?.slice(0, 5) || "-"}</td>
+                  <td>{row.late_minutes || 0} د</td>
+                  <td>{row.deduction_days || 0}</td>
+                  <td className="note-cell">{row.employee_note || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
@@ -959,7 +1285,38 @@ function AdminDashboard({ context, onToast }) {
       return matchesStatus && matchesQuery;
     });
   }, [employees, employeeQuery, statusFilter, recs]);
+  const donutData = useMemo(() => {
+    const active = employees.filter((emp) => emp.active !== false);
+    const count = (statuses) => active.filter((emp) => statuses.includes(recs.get(emp.id)?.status)).length;
+    const registered = active.filter((emp) => recs.get(emp.id)).length;
+    return [
+      { name: "حاضر", value: count(["present"]), color: "#10B981" },
+      { name: "متأخر", value: count(["late"]), color: "#F59E0B" },
+      { name: "معلّق", value: count(["pending"]), color: "#FCC107" },
+      { name: "أجازة/مأمورية", value: count(["leave", "mission", "sick"]), color: "#8B5CF6" },
+      { name: "غياب", value: count(["absent"]), color: "#EF4444" },
+      { name: "لم يسجل", value: Math.max(0, active.length - registered), color: "#94A3B8" },
+    ].filter((item) => item.value > 0);
+  }, [employees, recs]);
   const canApprove = context.role === "owner";
+
+  function exportDayCsv() {
+    const header = ["الموظف", "الحالة", "حضور", "انصراف", "دقائق تأخير", "خصم أيام", "ملاحظة الموظف", "ملاحظة HR"];
+    const lines = filteredEmployees.map((emp) => {
+      const rec = recs.get(emp.id);
+      return [
+        emp.name,
+        rec ? statusLabels[rec.status] || rec.status : "لم يسجل",
+        rec?.check_in || "",
+        rec?.check_out || "",
+        rec?.late_minutes || 0,
+        rec?.deduction_days || 0,
+        rec?.employee_note || "",
+        rec?.hr_note || "",
+      ].map(csvCell).join(",");
+    });
+    downloadTextFile(`attendance-${reportDate}.csv`, `\ufeff${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+  }
 
   return (
     <div className="stack">
@@ -969,16 +1326,19 @@ function AdminDashboard({ context, onToast }) {
           <div><Users size={20} /><h2>جدول الحضور</h2></div>
           <div className="toolbar">
             <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} />
+            <button className="secondary" onClick={exportDayCsv} disabled={loading}>
+              <FileSpreadsheet size={16} /> Excel
+            </button>
             <button className="secondary" onClick={markMissingCheckouts}>مراجعة الانصراف</button>
             <button className="secondary" onClick={loadAdmin}>تحديث</button>
           </div>
         </div>
         <div className="stats-grid compact-stats">
-          <Metric label="الموظفون" value={adminStats.active} />
-          <Metric label="سجلوا حضور" value={adminStats.checkedIn} tone="info" />
-          <Metric label="لم يسجلوا" value={adminStats.notRegistered} tone="danger" />
-          <Metric label="تأخير" value={adminStats.late} tone="warn" />
-          <Metric label="بدون انصراف" value={adminStats.missingCheckout} tone="gold" />
+          <Metric label="الموظفون" value={adminStats.active} icon={Users} />
+          <Metric label="سجلوا حضور" value={adminStats.checkedIn} tone="ok" icon={UserCheck} />
+          <Metric label="لم يسجلوا" value={adminStats.notRegistered} tone="danger" icon={UserX} />
+          <Metric label="تأخير" value={adminStats.late} tone="warn" icon={Clock3} />
+          <Metric label="بدون انصراف" value={adminStats.missingCheckout} tone="gold" icon={AlertTriangle} />
         </div>
         <div className="toolbar table-filters">
           <label className="search-field">
@@ -1030,16 +1390,25 @@ function AdminDashboard({ context, onToast }) {
           </div>
           <p className="muted">الكود بيتولد ويتبعت تلقائيًا للفريق مرة واحدة يوميًا. اللوحة هنا للعرض والطباعة فقط.</p>
         </section>
-        <form className="panel form" onSubmit={submitHoliday}>
-          <div className="panel-title"><CalendarDays size={20} /><h2>أجازة رسمية</h2></div>
-          <div className="form-grid">
-            <label>من<input type="date" value={holiday.date} onChange={(e) => setHoliday((h) => ({ ...h, date: e.target.value }))} /></label>
-            <label>إلى<input type="date" value={holiday.to} onChange={(e) => setHoliday((h) => ({ ...h, to: e.target.value }))} /></label>
-          </div>
-          <label>السبب<input value={holiday.label} onChange={(e) => setHoliday((h) => ({ ...h, label: e.target.value }))} placeholder="مثال: عيد رسمي" /></label>
-          <button className="primary">تسجيل أجازة رسمية</button>
-        </form>
+        <section className="panel">
+          <div className="panel-title"><PieChartIcon size={20} /><h2>توزيع حالات اليوم</h2></div>
+          {donutData.length > 0 ? (
+            <StatusDonut data={donutData} />
+          ) : (
+            <p className="muted">لا توجد بيانات لليوم بعد.</p>
+          )}
+        </section>
       </div>
+
+      <form className="panel form" onSubmit={submitHoliday}>
+        <div className="panel-title"><CalendarDays size={20} /><h2>أجازة رسمية</h2></div>
+        <div className="form-grid">
+          <label>من<input type="date" value={holiday.date} onChange={(e) => setHoliday((h) => ({ ...h, date: e.target.value }))} /></label>
+          <label>إلى<input type="date" value={holiday.to} onChange={(e) => setHoliday((h) => ({ ...h, to: e.target.value }))} /></label>
+        </div>
+        <label>السبب<input value={holiday.label} onChange={(e) => setHoliday((h) => ({ ...h, label: e.target.value }))} placeholder="مثال: عيد رسمي" /></label>
+        <button className="primary">تسجيل أجازة رسمية</button>
+      </form>
 
       <Approvals title="أذونات معلقة" rows={permissions} type="permission" canApprove={canApprove} onPermission={decidePermission} />
       <Approvals title="أجازات معلقة" rows={leaves} type="leave" canApprove={canApprove} onLeave={decideLeave} />
@@ -1270,6 +1639,7 @@ function OwnerDashboard({ onToast }) {
         deductionDays: empDeductionDays,
         deductionAmount: empDeductionAmount,
         netSalary: Math.max(0, salary - empDeductionAmount),
+        present: employeeRows.filter((row) => row.check_in).length,
         late: employeeRows.filter((row) => row.status === "late").length,
         absent: employeeRows.filter((row) => row.status === "absent").length,
         missingCheckout: employeeRows.filter((row) => row.check_in && !row.check_out && ["present", "late"].includes(row.status)).length,
@@ -1290,6 +1660,32 @@ function OwnerDashboard({ onToast }) {
       payrollRows,
     };
   }, [rows, salaries, employees, holidays, range.from, range.to]);
+
+  // Daily series for the trend chart (skips Fridays; empty workdays render as zeros).
+  const dailyData = useMemo(() => {
+    const byDate = new Map();
+    rows.forEach((row) => {
+      const entry = byDate.get(row.work_date) || { present: 0, late: 0, absent: 0 };
+      if (row.check_in) entry.present += 1;
+      if (row.status === "late") entry.late += 1;
+      if (row.status === "absent") entry.absent += 1;
+      byDate.set(row.work_date, entry);
+    });
+    return datesBetween(range.from, range.to)
+      .filter((day) => new Date(`${day}T00:00:00Z`).getUTCDay() !== 5)
+      .map((day) => ({
+        day: `${day.slice(8)}/${day.slice(5, 7)}`,
+        ...(byDate.get(day) || { present: 0, late: 0, absent: 0 }),
+      }));
+  }, [rows, range.from, range.to]);
+
+  const employeeBars = useMemo(
+    () =>
+      [...stats.payrollRows]
+        .sort((a, b) => b.present - a.present || a.name.localeCompare(b.name, "ar"))
+        .map((row) => ({ name: row.name, حضور: row.present, تأخير: row.late, غياب: row.absent })),
+    [stats.payrollRows]
+  );
 
   function exportCsv() {
     const employeeMap = new Map(employees.map((emp) => [emp.id, emp.name]));
@@ -1334,33 +1730,77 @@ function OwnerDashboard({ onToast }) {
               <button className={cls(period === "month" && "active")} onClick={() => setPeriod("month")}>شهري</button>
             </div>
             <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} />
-            <button className="secondary" onClick={exportCsv} disabled={loading || rows.length === 0}>CSV</button>
+            <button className="secondary" onClick={exportCsv} disabled={loading || rows.length === 0}>
+              <FileSpreadsheet size={16} /> Excel
+            </button>
             <button className="secondary" onClick={() => window.print()}>PDF</button>
           </div>
         </div>
         <p className="muted">الفترة: {range.from} إلى {range.to}</p>
       </section>
       <div className="stats-grid">
-        <Metric label="معدل التغطية" value={`${stats.attendanceRate}%`} />
-        <Metric label={`سجلات ${range.label}`} value={`${stats.total}/${stats.expected}`} />
-        <Metric label="تأخيرات" value={stats.late} tone="warn" />
-        <Metric label="بدون انصراف" value={stats.missingCheckout} tone="danger" />
-        <Metric label="خصم أيام" value={stats.deductionDays.toFixed(2)} tone="warn" />
-        <Metric label="خصومات تقديرية" value={`${money(stats.deductions)} ج`} tone="gold" />
+        <Metric label="معدل التغطية" value={`${stats.attendanceRate}%`} tone="ok" icon={Activity} />
+        <Metric label={`سجلات ${range.label}`} value={`${stats.total}/${stats.expected}`} icon={CalendarDays} />
+        <Metric label="تأخيرات" value={stats.late} tone="warn" icon={Clock3} />
+        <Metric label="بدون انصراف" value={stats.missingCheckout} tone="danger" icon={AlertTriangle} />
+        <Metric label="خصم أيام" value={stats.deductionDays.toFixed(2)} tone="warn" icon={TrendingUp} />
+        <Metric label="خصومات تقديرية" value={`${money(stats.deductions)} ج`} tone="gold" icon={Banknote} />
+      </div>
+      <div className="grid two">
+        <section className="panel">
+          <div className="panel-title"><TrendingUp size={20} /><h2>اتجاه الحضور اليومي</h2></div>
+          {dailyData.length > 0 ? (
+            <div className="chart-box">
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={dailyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
+                  <ChartTooltip />
+                  <Area type="monotone" dataKey="present" name="حضور" stroke="#FCC107" fill="#FCC107" fillOpacity={0.2} strokeWidth={2.2} />
+                  <Area type="monotone" dataKey="late" name="تأخير" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.12} strokeWidth={2} />
+                  <Area type="monotone" dataKey="absent" name="غياب" stroke="#EF4444" fill="#EF4444" fillOpacity={0.1} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="muted">لا توجد بيانات في الفترة.</p>
+          )}
+        </section>
+        <section className="panel">
+          <div className="panel-title"><BarChart3 size={20} /><h2>تحليل سريع</h2></div>
+          <Bar label="الحضور" value={stats.checkedIn + stats.leave} max={Math.max(stats.expected, 1)} />
+          <Bar label="التأخير" value={stats.late} max={Math.max(stats.total, 1)} tone="warn" />
+          <Bar label="غياب مسجل" value={stats.absent} max={Math.max(stats.total, 1)} tone="danger" />
+          <Bar label="بدون انصراف" value={stats.missingCheckout} max={Math.max(stats.total, 1)} tone="danger" />
+        </section>
       </div>
       <section className="panel">
-        <div className="panel-title between">
-          <div><Download size={20} /><h2>تحليل سريع</h2></div>
-        </div>
-        <Bar label="الحضور" value={stats.checkedIn + stats.leave} max={Math.max(stats.expected, 1)} />
-        <Bar label="التأخير" value={stats.late} max={Math.max(stats.total, 1)} tone="warn" />
-        <Bar label="غياب مسجل" value={stats.absent} max={Math.max(stats.total, 1)} tone="danger" />
-        <Bar label="بدون انصراف" value={stats.missingCheckout} max={Math.max(stats.total, 1)} tone="danger" />
+        <div className="panel-title"><Users size={20} /><h2>حضور الموظفين ({range.label})</h2></div>
+        {employeeBars.length > 0 ? (
+          <div className="chart-box">
+            <ResponsiveContainer width="100%" height={Math.max(180, employeeBars.length * 34 + 40)}>
+              <ReBarChart data={employeeBars} layout="vertical" margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" orientation="right" width={92} tick={{ fontSize: 12 }} />
+                <ChartTooltip />
+                <ReBar dataKey="حضور" fill="#FCC107" radius={[0, 6, 6, 0]} barSize={12} />
+                <ReBar dataKey="تأخير" fill="#F59E0B" radius={[0, 6, 6, 0]} barSize={12} />
+                <ReBar dataKey="غياب" fill="#EF4444" radius={[0, 6, 6, 0]} barSize={12} />
+              </ReBarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="muted">لا توجد بيانات موظفين في الفترة.</p>
+        )}
       </section>
       <section className="panel">
         <div className="panel-title between">
           <div><Banknote size={20} /><h2>المرتبات والخصومات</h2></div>
-          <button className="secondary" onClick={exportPayrollCsv} disabled={loading || stats.payrollRows.length === 0}>CSV مرتبات</button>
+          <button className="secondary" onClick={exportPayrollCsv} disabled={loading || stats.payrollRows.length === 0}>
+            <FileSpreadsheet size={16} /> Excel مرتبات
+          </button>
         </div>
         <div className="table-wrap">
           <table>
@@ -1618,12 +2058,65 @@ function StatusBadge({ status }) {
   return <span className={cls("status-badge", status)}>{statusLabels[status] || status}</span>;
 }
 
-function Metric({ label, value, tone }) {
+function Metric({ label, value, tone, icon: Icon, sub }) {
   return (
     <div className={cls("metric", tone)}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <div className="metric-head">
+        <div>
+          <span>{label}</span>
+          <strong>{value}</strong>
+        </div>
+        {Icon && (
+          <div className="metric-icon">
+            <Icon size={19} />
+          </div>
+        )}
+      </div>
+      {sub && <span className="metric-sub">{sub}</span>}
     </div>
+  );
+}
+
+function StatusDonut({ data }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  return (
+    <>
+      <div className="chart-box">
+        <ResponsiveContainer width="100%" height={220}>
+          <RePieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius={58}
+              outerRadius={88}
+              paddingAngle={4}
+            >
+              {data.map((item) => (
+                <Cell key={item.name} fill={item.color} />
+              ))}
+            </Pie>
+            <ChartTooltip />
+          </RePieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="donut-legend">
+        {data.map((item) => (
+          <div key={item.name}>
+            <span>
+              <i style={{ background: item.color }} />
+              {item.name}
+            </span>
+            <b>
+              {item.value}
+              {total ? ` · ${Math.round((item.value / total) * 100)}%` : ""}
+            </b>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 

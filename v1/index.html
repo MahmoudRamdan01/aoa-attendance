@@ -10,8 +10,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="./assets/index-CM-EDult.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DpXCz3B8.css">
+    <script>
+      // Apply the saved theme before the bundle loads to avoid a light/dark flash.
+      try {
+        var t = localStorage.getItem("aol-theme");
+        if (t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (e) {}
+    </script>
+    <script type="module" crossorigin src="./assets/index-YjoZxYJP.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CkYEyxgB.css">
   </head>
   <body>
     <div id="root"></div>
