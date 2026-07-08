@@ -25,13 +25,17 @@ Static Supabase-powered attendance app.
 
 ```bash
 cd v1-src
-npm install
+npm install            # deps include Tailwind CSS + Recharts (KPI dashboard UI)
 npm run build          # outputs to v1-src/dist/
-# then publish the build:
+# then publish the build (remove the old hashed assets first):
+rm ../v1/assets/index-*.js ../v1/assets/index-*.css
 cp dist/index.html ../v1/index.html
 cp dist/assets/*.js dist/assets/*.css ../v1/assets/
-cp dist/icon.svg dist/manifest.webmanifest dist/sw.js ../v1/
+cp dist/icon.svg dist/logo.png dist/manifest.webmanifest dist/sw.js ../v1/
 ```
+
+The UI follows the AOI brand (yellow `#FCC107` + charcoal, logo in `assets/`) with a
+light/dark theme toggle persisted per device (`localStorage['aol-theme']`).
 
 Source maps are intentionally disabled in `vite.config.js` so the bundle isn't re-exposed in production. Server-side rules (RLS + the RPC functions in the SQL files) remain the real security boundary for both v0.9 and v1.
 
