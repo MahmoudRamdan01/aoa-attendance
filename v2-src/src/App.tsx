@@ -12,6 +12,7 @@ import KpiManagement from './pages/dashboard/KpiManagement'
 import ScorecardSystem from './pages/dashboard/ScorecardSystem'
 import RewardsPenalties from './pages/dashboard/RewardsPenalties'
 import Reports from './pages/dashboard/Reports'
+import TrainingPage from './pages/TrainingPage'
 import TodayPage from './pages/attendance/TodayPage'
 import MyMonthPage from './pages/attendance/MyMonthPage'
 import RequestsPage from './pages/attendance/RequestsPage'
@@ -77,6 +78,7 @@ export default function App() {
 
       {/* Shared */}
       <Route path="/notifications" element={<Shell><NotificationsPage /></Shell>} />
+      <Route path="/training" element={<Shell><TrainingPage /></Shell>} />
 
       {/* Attendance administration */}
       <Route path="/attendance/admin" element={<AdminShell><AdminAttendancePage /></AdminShell>} />

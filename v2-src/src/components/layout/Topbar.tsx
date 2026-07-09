@@ -27,6 +27,7 @@ const pageTitles: Record<string, { ar: string; en: string }> = {
   "/attendance/month": { ar: "سجلي", en: "My Record" },
   "/attendance/requests": { ar: "الطلبات", en: "Requests" },
   "/notifications": { ar: "الإشعارات", en: "Alerts" },
+  "/training": { ar: "التدريب", en: "Training" },
   "/attendance/admin": { ar: "إدارة الحضور", en: "Attendance Admin" },
   "/owner": { ar: "لوحة Owner", en: "Owner Dashboard" },
 };
