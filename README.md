@@ -66,6 +66,9 @@ Run these in Supabase SQL Editor **in order** (all are idempotent, safe to re-ru
 3. `v1/supabase-v1-patch-owner-payroll-qr.sql` — owner-only approvals + QR broadcast (HR-gated).
 4. `v1/supabase-v1-hardening.sql` — least-privilege revokes + optional `pg_cron` jobs for auto-absence / missing-checkout.
 5. `v1/supabase-v1-schedules-notes.sql` — per-employee check-in/out windows (global check-in `08:00–11:00`, check-out `16:30–20:00`; عبدالرحمن checks in `14:00–16:00`), employee/HR notes on the daily record (`attendance.employee_note` / `attendance.hr_note`), and `set_attendance_note_v1`. Window enforcement + the note are added to `employee_attendance_action_v1` (new `p_note` arg), and `mark_absentees_v1` now respects each employee's window.
+6. `v1/supabase-financial-migration.sql` — financial modules: employee loans + installments, canteen, other deductions, company expenses (owner-confirmed), Air Ocean partner ledger with owner-confirmed settlements, owner personal ledger. RLS keeps loans + owner ledger hidden from HR.
+7. `v1/supabase-v1-ops-update.sql` — company GPS fix (real coords + 1000m radius), attendance windows (global 08–11 / 16–19, per-employee overrides), `employees.attendance_exempt` payroll-only flag, salary updates, one-time deduction reset, `notify_team()` + auto team notifications (late arrivals, approved leaves) + notifications realtime publication.
+8. `v1/supabase-v1-exempt-guard.sql` — exempt employees are blocked from check-in/out and never auto-marked absent.
 
 ### ⚠️ Rotate all PINs (mandatory)
 

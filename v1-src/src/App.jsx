@@ -180,6 +180,33 @@ function ThemeToggle() {
   );
 }
 
+// Two-tone "ding" via WebAudio — no asset needed. Best-effort: browsers may
+// block audio before the first user gesture, so failures are swallowed.
+function playNotificationSound() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const play = (freq, start, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + duration + 0.05);
+    };
+    play(880, 0, 0.18);
+    play(1174.66, 0.12, 0.22);
+    setTimeout(() => ctx.close(), 900);
+  } catch {
+    /* autoplay restrictions */
+  }
+}
+
 function nameInitials(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "AO";
@@ -434,6 +461,28 @@ function App() {
       cancelled = true;
     };
   }, [session?.user?.id, context?.role, activeView]);
+
+  // Realtime: any new notification for me → red badge + toast + ding, instantly.
+  useEffect(() => {
+    if (!session || !context || context.migration_required) return;
+    const channel = supabase
+      .channel(`notifications-${session.user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${session.user.id}` },
+        (payload) => {
+          setUnread((count) => count + 1);
+          const title = payload.new?.title || "إشعار جديد";
+          const body = payload.new?.body || "";
+          setToast(`🔔 ${title}${body ? " — " + body : ""}`);
+          playNotificationSound();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id, context?.migration_required]);
 
   if (loading) return <Splash />;
   if (!session) return <LoginScreen />;
@@ -1198,7 +1247,7 @@ function AdminDashboard({ context, onToast }) {
     setError("");
     try {
       const [emp, att, perm, leave, qrData, tomorrowQr] = await Promise.all([
-        supabase.from("employees").select("id,name,leave_balance,active").order("id"),
+        supabase.from("employees").select("id,name,leave_balance,active,attendance_exempt").order("id"),
         supabase.from("attendance").select("*").eq("work_date", reportDate),
         supabase.from("permissions").select("*, employees(name)").eq("status", "pending").order("perm_date"),
         supabase.from("leave_requests").select("*, employees!leave_requests_employee_id_fkey(name), cover:employees!leave_requests_cover_employee_id_fkey(name)").eq("status", "pending").order("from_date"),
@@ -1207,7 +1256,8 @@ function AdminDashboard({ context, onToast }) {
       ]);
       const failed = [emp, att, perm, leave, qrData, tomorrowQr].find((item) => item.error);
       if (failed) throw failed.error;
-      setEmployees(emp.data || []);
+      // Payroll-only employees (attendance_exempt) never appear on the attendance board.
+      setEmployees((emp.data || []).filter((e) => !e.attendance_exempt));
       setAttendance(att.data || []);
       setPermissions(perm.data || []);
       setLeaves(leave.data || []);
@@ -1627,7 +1677,7 @@ function OwnerDashboard({ onToast }) {
     Promise.all([
       supabase.from("attendance").select("*").gte("work_date", range.from).lte("work_date", range.to),
       supabase.from("salaries").select("employee_id,monthly_salary"),
-      supabase.from("employees").select("id,name,active").eq("active", true).order("id"),
+      supabase.from("employees").select("id,name,active,attendance_exempt").eq("active", true).order("id"),
       supabase.from("official_holidays").select("holiday_date,label").gte("holiday_date", range.from).lte("holiday_date", range.to),
       // Financial deductions in range. !inner is required so voided loans are excluded.
       supabase.from("emp_loan_installments")
@@ -1659,7 +1709,9 @@ function OwnerDashboard({ onToast }) {
       const dow = new Date(`${day}T00:00:00Z`).getUTCDay();
       return dow !== 5 && !holidaySet.has(day);
     });
-    const expected = employees.length * workDates.length;
+    // Exempt (payroll-only) employees don't count toward expected attendance.
+    const attendanceEmployees = employees.filter((emp) => !emp.attendance_exempt);
+    const expected = attendanceEmployees.length * workDates.length;
     const employeeMap = new Map(employees.map((emp) => [emp.id, emp.name]));
     const total = rows.length;
     const checkedIn = rows.filter((r) => r.check_in).length;
@@ -1703,6 +1755,7 @@ function OwnerDashboard({ onToast }) {
       return {
         employee_id: emp.id,
         name: emp.name,
+        exempt: !!emp.attendance_exempt,
         salary,
         deductionDays: empDeductionDays,
         deductionAmount: empDeductionAmount,
@@ -1751,7 +1804,8 @@ function OwnerDashboard({ onToast }) {
 
   const employeeBars = useMemo(
     () =>
-      [...stats.payrollRows]
+      stats.payrollRows
+        .filter((row) => !row.exempt)
         .sort((a, b) => b.present - a.present || a.name.localeCompare(b.name, "ar"))
         .map((row) => ({ name: row.name, حضور: row.present, تأخير: row.late, غياب: row.absent })),
     [stats.payrollRows]
