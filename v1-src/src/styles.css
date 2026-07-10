@@ -898,21 +898,27 @@
   }
 
   .status-badge.present,
-  .status-badge.approved {
+  .status-badge.approved,
+  .status-badge.active,
+  .status-badge.confirmed,
+  .status-badge.settled {
     background: rgba(16, 185, 129, 0.12);
     color: var(--green);
     border-color: rgba(16, 185, 129, 0.35);
   }
 
   .status-badge.late,
-  .status-badge.pending {
+  .status-badge.pending,
+  .status-badge.partial,
+  .status-badge.open {
     background: rgba(245, 158, 11, 0.12);
     color: var(--amber);
     border-color: rgba(245, 158, 11, 0.4);
   }
 
   .status-badge.absent,
-  .status-badge.rejected {
+  .status-badge.rejected,
+  .status-badge.voided {
     background: rgba(239, 68, 68, 0.12);
     color: var(--red);
     border-color: rgba(239, 68, 68, 0.35);

@@ -25,13 +25,16 @@ import {
   PieChart as PieChartIcon,
   Printer,
   QrCode,
+  Receipt,
   RefreshCcw,
+  Scale,
   Search,
   Send,
   ShieldCheck,
   Sparkles,
   Sun,
   Trash2,
+  Wallet,
   TrendingUp,
   UserCheck,
   UserPlus,
@@ -74,12 +77,44 @@ const statusLabels = {
   pending: "معلّق",
   approved: "مربوط",
   rejected: "مرفوض",
+  active: "ساري",
+  voided: "ملغي",
+  confirmed: "مؤكد",
+  open: "مفتوح",
+  partial: "سداد جزئي",
+  settled: "مُسدد",
 };
 const notificationCategoryLabels = {
   admin_message: "رسالة إدارية",
   approval: "موافقة مطلوبة",
   qr: "QR يومي",
   system: "النظام",
+};
+const deductionCategoryLabels = {
+  damage: "تلفيات",
+  penalty: "جزاء",
+  uniform: "زي",
+  other: "أخرى",
+};
+const expenseCategoryLabels = {
+  water: "مياه",
+  electricity: "كهرباء",
+  gas: "غاز",
+  internet: "إنترنت",
+  rent: "إيجار",
+  maintenance: "صيانة",
+  stationery: "قرطاسية",
+  other: "أخرى",
+};
+const partnerKindLabels = {
+  invoice: "فاتورة",
+  loan: "سلفة",
+  deal: "صفقة",
+  other: "أخرى",
+};
+const partnerDirectionLabels = {
+  owed_to_us: "لنا عندهم",
+  owed_by_us: "علينا ليهم",
 };
 const roleOptions = [
   { value: "employee", label: "موظف" },
@@ -94,8 +129,12 @@ const MENU = [
   { id: "requests", ar: "الطلبات", en: "Requests", icon: CalendarDays, kind: "employee" },
   { id: "notifications", ar: "الإشعارات", en: "Alerts", icon: Bell, kind: "all" },
   { id: "training", ar: "التدريب", en: "Training", icon: GraduationCap, kind: "all" },
+  { id: "deductions", ar: "الاستقطاعات", en: "Deductions", icon: Banknote, kind: "all" },
+  { id: "expenses", ar: "المصروفات", en: "Expenses", icon: Receipt, kind: "admin" },
+  { id: "partner", ar: "مديونية Air Ocean", en: "Partner Ledger", icon: Scale, kind: "admin" },
   { id: "admin", ar: "الإدارة", en: "Admin", icon: UserCog, kind: "admin" },
   { id: "owner", ar: "لوحة Owner", en: "Owner", icon: ShieldCheck, kind: "owner" },
+  { id: "ownerbook", ar: "دفتر شخصي", en: "Owner Book", icon: Wallet, kind: "owner" },
 ];
 
 const CHART_COLORS = ["#FCC107", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6", "#64748B"];
@@ -541,10 +580,14 @@ function App() {
             )}
             {activeView === "notifications" && <NotificationsView context={context} onToast={setToast} />}
             {activeView === "training" && <TrainingView context={context} />}
+            {activeView === "deductions" && <DeductionsView context={context} onToast={setToast} />}
+            {activeView === "expenses" && isAdmin && <ExpensesView context={context} onToast={setToast} />}
+            {activeView === "partner" && isAdmin && <PartnerLedgerView context={context} onToast={setToast} />}
             {activeView === "admin" && isAdmin && (
               <AdminDashboard context={context} onToast={setToast} />
             )}
             {activeView === "owner" && role === "owner" && <OwnerDashboard onToast={setToast} />}
+            {activeView === "ownerbook" && role === "owner" && <OwnerLedgerView onToast={setToast} />}
           </div>
         </div>
       </main>
@@ -1571,6 +1614,7 @@ function OwnerDashboard({ onToast }) {
   const [salaries, setSalaries] = useState({});
   const [employees, setEmployees] = useState([]);
   const [holidays, setHolidays] = useState([]);
+  const [finRows, setFinRows] = useState([]);
   const [period, setPeriod] = useState("month");
   const [reportDate, setReportDate] = useState(todayIso());
   const [loading, setLoading] = useState(true);
@@ -1585,13 +1629,23 @@ function OwnerDashboard({ onToast }) {
       supabase.from("salaries").select("employee_id,monthly_salary"),
       supabase.from("employees").select("id,name,active").eq("active", true).order("id"),
       supabase.from("official_holidays").select("holiday_date,label").gte("holiday_date", range.from).lte("holiday_date", range.to),
-    ]).then(([att, sal, emp, hol]) => {
-      const failed = [att, sal, emp, hol].find((item) => item.error);
+      // Financial deductions in range. !inner is required so voided loans are excluded.
+      supabase.from("emp_loan_installments")
+        .select("employee_id,amount,due_month,loan:emp_loans!inner(status)")
+        .gte("due_month", range.from.slice(0, 7)).lte("due_month", range.to.slice(0, 7))
+        .eq("loan.status", "active"),
+      supabase.from("canteen_entries").select("employee_id,amount")
+        .eq("status", "active").gte("entry_date", range.from).lte("entry_date", range.to),
+      supabase.from("other_deductions").select("employee_id,amount")
+        .eq("status", "active").gte("entry_date", range.from).lte("entry_date", range.to),
+    ]).then(([att, sal, emp, hol, inst, cant, other]) => {
+      const failed = [att, sal, emp, hol, inst, cant, other].find((item) => item.error);
       if (failed) throw failed.error;
       setRows(att.data || []);
       setSalaries(Object.fromEntries((sal.data || []).map((s) => [s.employee_id, Number(s.monthly_salary || 0)])));
       setEmployees(emp.data || []);
       setHolidays(hol.data || []);
+      setFinRows([...(inst.data || []), ...(cant.data || []), ...(other.data || [])]);
       setLoading(false);
     }).catch((err) => {
       setError(err.message || "تعذر تحميل تقارير الـ Owner.");
@@ -1632,6 +1686,12 @@ function OwnerDashboard({ onToast }) {
       acc.set(row.employee_id, list);
       return acc;
     }, new Map());
+    // Financial deductions (loan installments + canteen + other) summed per employee.
+    const finByEmployee = finRows.reduce((acc, row) => {
+      acc.set(row.employee_id, (acc.get(row.employee_id) || 0) + Number(row.amount || 0));
+      return acc;
+    }, new Map());
+    const financialTotal = [...finByEmployee.values()].reduce((sum, value) => sum + value, 0);
     const payrollRows = employees.map((emp) => {
       const employeeRows = rowsByEmployee.get(emp.id) || [];
       const salary = salaries[emp.id] || 0;
@@ -1639,19 +1699,21 @@ function OwnerDashboard({ onToast }) {
         sum + Number(row.deduction_days || 0) + (row.status === "absent" ? 1 : 0)
       ), 0);
       const empDeductionAmount = empDeductionDays * (salary / 30);
+      const financialDeduction = finByEmployee.get(emp.id) || 0;
       return {
         employee_id: emp.id,
         name: emp.name,
         salary,
         deductionDays: empDeductionDays,
         deductionAmount: empDeductionAmount,
-        netSalary: Math.max(0, salary - empDeductionAmount),
+        financialDeduction,
+        netSalary: Math.max(0, salary - empDeductionAmount - financialDeduction),
         present: employeeRows.filter((row) => row.check_in).length,
         late: employeeRows.filter((row) => row.status === "late").length,
         absent: employeeRows.filter((row) => row.status === "absent").length,
         missingCheckout: employeeRows.filter((row) => row.check_in && !row.check_out && ["present", "late"].includes(row.status)).length,
       };
-    }).sort((a, b) => b.deductionAmount - a.deductionAmount || a.name.localeCompare(b.name, "ar"));
+    }).sort((a, b) => (b.deductionAmount + b.financialDeduction) - (a.deductionAmount + a.financialDeduction) || a.name.localeCompare(b.name, "ar"));
     return {
       total,
       expected,
@@ -1662,11 +1724,12 @@ function OwnerDashboard({ onToast }) {
       missingCheckout,
       deductionDays,
       deductions,
+      financialTotal,
       attendanceRate: expected ? Math.round(((checkedIn + leave) / expected) * 100) : 0,
       lateByEmployee: [...lateByEmployee.values()].sort((a, b) => b.count - a.count || b.minutes - a.minutes).slice(0, 5),
       payrollRows,
     };
-  }, [rows, salaries, employees, holidays, range.from, range.to]);
+  }, [rows, salaries, employees, holidays, finRows, range.from, range.to]);
 
   // Daily series for the trend chart (skips Fridays; empty workdays render as zeros).
   const dailyData = useMemo(() => {
@@ -1710,12 +1773,13 @@ function OwnerDashboard({ onToast }) {
   }
 
   function exportPayrollCsv() {
-    const header = ["الموظف", "المرتب الشهري", "خصم أيام", "قيمة الخصم", "الصافي التقديري", "تأخير", "غياب", "بدون انصراف"];
+    const header = ["الموظف", "المرتب الشهري", "خصم أيام", "قيمة الخصم", "استقطاعات مالية", "الصافي التقديري", "تأخير", "غياب", "بدون انصراف"];
     const lines = stats.payrollRows.map((row) => [
       row.name,
       row.salary,
       row.deductionDays.toFixed(2),
       row.deductionAmount.toFixed(2),
+      row.financialDeduction.toFixed(2),
       row.netSalary.toFixed(2),
       row.late,
       row.absent,
@@ -1752,6 +1816,7 @@ function OwnerDashboard({ onToast }) {
         <Metric label="بدون انصراف" value={stats.missingCheckout} tone="danger" icon={AlertTriangle} />
         <Metric label="خصم أيام" value={stats.deductionDays.toFixed(2)} tone="warn" icon={TrendingUp} />
         <Metric label="خصومات تقديرية" value={`${money(stats.deductions)} ج`} tone="gold" icon={Banknote} />
+        <Metric label="استقطاعات مالية" value={`${money(stats.financialTotal)} ج`} tone="gold" icon={Wallet} />
       </div>
       <div className="grid two">
         <section className="panel">
@@ -1817,19 +1882,21 @@ function OwnerDashboard({ onToast }) {
                 <th>المرتب الشهري</th>
                 <th>خصم أيام</th>
                 <th>قيمة الخصم</th>
+                <th>استقطاعات مالية</th>
                 <th>الصافي التقديري</th>
                 <th>مؤشرات</th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan="6">جاري التحميل...</td></tr>}
-              {!loading && stats.payrollRows.length === 0 && <tr><td colSpan="6">لا توجد بيانات مرتبات.</td></tr>}
+              {loading && <tr><td colSpan="7">جاري التحميل...</td></tr>}
+              {!loading && stats.payrollRows.length === 0 && <tr><td colSpan="7">لا توجد بيانات مرتبات.</td></tr>}
               {!loading && stats.payrollRows.map((row) => (
                 <tr key={row.employee_id}>
                   <td>{row.name}</td>
                   <td>{money(row.salary)} ج</td>
                   <td>{row.deductionDays.toFixed(2)} يوم</td>
                   <td>{money(row.deductionAmount)} ج</td>
+                  <td>{money(row.financialDeduction)} ج</td>
                   <td><strong>{money(row.netSalary)} ج</strong></td>
                   <td>{row.late} تأخير · {row.absent} غياب · {row.missingCheckout} بدون انصراف</td>
                 </tr>
@@ -2115,6 +2182,1164 @@ function TrainingView({ context }) {
           </div>
         </section>
       ))}
+    </div>
+  );
+}
+
+// ===================== Financial modules =====================
+
+function monthRangeFor(month) {
+  const [year, mon] = month.split("-").map(Number);
+  return { from: `${month}-01`, to: new Date(Date.UTC(year, mon, 0)).toISOString().slice(0, 10) };
+}
+
+// Current auth uid — used to decide which rows HR can self-void (same-day rule).
+function useUid() {
+  const [uid, setUid] = useState(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUid(data.user?.id || null));
+  }, []);
+  return uid;
+}
+
+async function voidFinancial(kind, id, onToast, reload) {
+  const reason = prompt("سبب الإلغاء؟ (إجباري — بيتسجل في السجل)");
+  if (reason == null) return;
+  if (!reason.trim()) {
+    onToast("سبب الإلغاء إجباري.");
+    return;
+  }
+  const { data, error } = await supabase.rpc("void_financial_v1", {
+    p_kind: kind,
+    p_id: id,
+    p_reason: reason.trim(),
+  });
+  if (error || data?.error) onToast(data?.message || "تعذر الإلغاء.");
+  else {
+    onToast("تم الإلغاء.");
+    reload();
+  }
+}
+
+function DeductionsView({ context, onToast }) {
+  const role = context?.role || "employee";
+  const isAdmin = role === "hr" || role === "owner";
+  if (isAdmin) return <DeductionsAdmin context={context} onToast={onToast} />;
+  if (!context?.employee) return <p className="muted">لا يوجد ملف موظف مرتبط بحسابك.</p>;
+  return <DeductionsEmployee context={context} />;
+}
+
+function DeductionsEmployee({ context }) {
+  const empId = context.employee.id;
+  const [month, setMonth] = useState(() => todayIso().slice(0, 7));
+  const [loans, setLoans] = useState([]);
+  const [installments, setInstallments] = useState([]);
+  const [canteen, setCanteen] = useState([]);
+  const [others, setOthers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const range = useMemo(() => monthRangeFor(month), [month]);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      supabase.from("emp_loans").select("*").eq("employee_id", empId).order("created_at", { ascending: false }),
+      supabase.from("emp_loan_installments").select("*").eq("employee_id", empId).order("due_month"),
+      supabase.from("canteen_entries").select("*").eq("employee_id", empId).gte("entry_date", range.from).lte("entry_date", range.to).order("entry_date", { ascending: false }),
+      supabase.from("other_deductions").select("*").eq("employee_id", empId).gte("entry_date", range.from).lte("entry_date", range.to).order("entry_date", { ascending: false }),
+    ]).then(([l, i, c, o]) => {
+      setLoans(l.data || []);
+      setInstallments(i.data || []);
+      setCanteen(c.data || []);
+      setOthers(o.data || []);
+      setLoading(false);
+    });
+  }, [empId, range.from, range.to]);
+
+  const activeLoanIds = useMemo(() => new Set(loans.filter((l) => l.status === "active").map((l) => l.id)), [loans]);
+  const summary = useMemo(() => {
+    const monthInstallment = installments
+      .filter((i) => activeLoanIds.has(i.loan_id) && i.due_month === month)
+      .reduce((sum, i) => sum + Number(i.amount), 0);
+    const canteenTotal = canteen.filter((c) => c.status === "active").reduce((sum, c) => sum + Number(c.amount), 0);
+    const otherTotal = others.filter((o) => o.status === "active").reduce((sum, o) => sum + Number(o.amount), 0);
+    const loanRemaining = loans
+      .filter((l) => l.status === "active")
+      .reduce((sum, l) => {
+        const paid = installments
+          .filter((i) => i.loan_id === l.id && i.due_month < todayIso().slice(0, 7))
+          .reduce((s, i) => s + Number(i.amount), 0);
+        return sum + Math.max(0, Number(l.amount) - paid);
+      }, 0);
+    return { monthInstallment, canteenTotal, otherTotal, loanRemaining, monthTotal: monthInstallment + canteenTotal + otherTotal };
+  }, [loans, installments, canteen, others, activeLoanIds, month]);
+
+  return (
+    <div className="stack">
+      <section className="panel">
+        <div className="panel-title between">
+          <div><Banknote size={20} /><h2>استقطاعاتي</h2></div>
+          <div className="toolbar">
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+          </div>
+        </div>
+        <div className="stats-grid compact-stats">
+          <Metric label={`إجمالي استقطاعات ${month}`} value={`${money(summary.monthTotal)} ج`} tone="gold" icon={Banknote} />
+          <Metric label="قسط السلفة" value={`${money(summary.monthInstallment)} ج`} tone="warn" icon={Wallet} />
+          <Metric label="كانتين الشهر" value={`${money(summary.canteenTotal)} ج`} tone="info" icon={Receipt} />
+          <Metric label="متبقي سلف" value={`${money(summary.loanRemaining)} ج`} tone="danger" icon={TrendingUp} />
+        </div>
+        <p className="muted">الاستقطاعات دي بتتخصم تلقائيًا من مرتب الشهر.</p>
+      </section>
+
+      <section className="panel">
+        <div className="panel-title"><Wallet size={20} /><h2>سلفي</h2></div>
+        <div className="list">
+          {loading && <p className="muted">جاري التحميل...</p>}
+          {!loading && loans.length === 0 && <p className="muted">لا توجد سلف مسجلة.</p>}
+          {loans.map((loan) => {
+            const schedule = installments.filter((i) => i.loan_id === loan.id);
+            const paid = schedule.filter((i) => i.due_month < todayIso().slice(0, 7)).reduce((s, i) => s + Number(i.amount), 0);
+            return (
+              <div className="list-row" key={loan.id}>
+                <div>
+                  <strong>سلفة {money(loan.amount)} ج</strong>
+                  <span>{loan.installments_count} قسط · بداية {loan.start_month}</span>
+                </div>
+                {loan.status === "active" ? (
+                  <p>مسدد: {money(paid)} ج · متبقي: {money(Math.max(0, loan.amount - paid))} ج</p>
+                ) : (
+                  <p><StatusBadge status="voided" /> {loan.void_reason || ""}</p>
+                )}
+                {loan.note && <p className="muted">{loan.note}</p>}
+                {loan.status === "active" && (
+                  <div className="table-wrap">
+                    <table>
+                      <thead><tr><th>الشهر</th><th>القسط</th><th>الحالة</th></tr></thead>
+                      <tbody>
+                        {schedule.map((i) => (
+                          <tr key={i.id}>
+                            <td dir="ltr">{i.due_month}</td>
+                            <td>{money(i.amount)} ج</td>
+                            <td><StatusBadge status={i.due_month < todayIso().slice(0, 7) ? "settled" : "pending"} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="grid two">
+        <section className="panel">
+          <div className="panel-title"><Receipt size={20} /><h2>كانتين {month}</h2></div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>التاريخ</th><th>الصنف</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+              <tbody>
+                {!loading && canteen.length === 0 && <tr><td colSpan="4">لا توجد مشتريات.</td></tr>}
+                {canteen.map((row) => (
+                  <tr key={row.id}>
+                    <td dir="ltr">{row.entry_date}</td>
+                    <td>{row.item}</td>
+                    <td>{money(row.amount)} ج</td>
+                    <td><StatusBadge status={row.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section className="panel">
+          <div className="panel-title"><Banknote size={20} /><h2>استقطاعات أخرى {month}</h2></div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th>الحالة</th></tr></thead>
+              <tbody>
+                {!loading && others.length === 0 && <tr><td colSpan="5">لا توجد استقطاعات.</td></tr>}
+                {others.map((row) => (
+                  <tr key={row.id}>
+                    <td dir="ltr">{row.entry_date}</td>
+                    <td>{deductionCategoryLabels[row.category] || row.category}</td>
+                    <td>{money(row.amount)} ج</td>
+                    <td className="note-cell">{row.note || "-"}</td>
+                    <td><StatusBadge status={row.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function DeductionsAdmin({ context, onToast }) {
+  const role = context?.role || "employee";
+  const isOwner = role === "owner";
+  const uid = useUid();
+  const [tab, setTab] = useState(isOwner ? "loans" : "canteen");
+  const [employees, setEmployees] = useState([]);
+  const [month, setMonth] = useState(() => todayIso().slice(0, 7));
+  const [empFilter, setEmpFilter] = useState("all");
+  const [loans, setLoans] = useState([]);
+  const [installments, setInstallments] = useState([]);
+  const [canteen, setCanteen] = useState([]);
+  const [others, setOthers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loanForm, setLoanForm] = useState({ employeeId: "", amount: "", installments: 3, startMonth: todayIso().slice(0, 7), note: "" });
+  const [canteenForm, setCanteenForm] = useState({ employeeId: "", item: "", amount: "", date: todayIso(), note: "" });
+  const [otherForm, setOtherForm] = useState({ employeeId: "", category: "damage", amount: "", date: todayIso(), note: "" });
+  const [busy, setBusy] = useState(false);
+  const range = useMemo(() => monthRangeFor(month), [month]);
+
+  useEffect(() => {
+    supabase.from("employees").select("id,name,active").eq("active", true).order("id").then(({ data }) => {
+      const list = data || [];
+      setEmployees(list);
+      if (list[0]) {
+        const first = String(list[0].id);
+        setLoanForm((f) => (f.employeeId ? f : { ...f, employeeId: first }));
+        setCanteenForm((f) => (f.employeeId ? f : { ...f, employeeId: first }));
+        setOtherForm((f) => (f.employeeId ? f : { ...f, employeeId: first }));
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [range.from, range.to, isOwner]);
+
+  async function loadData() {
+    setLoading(true);
+    const queries = [
+      supabase.from("canteen_entries").select("*").gte("entry_date", range.from).lte("entry_date", range.to).order("entry_date", { ascending: false }),
+      supabase.from("other_deductions").select("*").gte("entry_date", range.from).lte("entry_date", range.to).order("entry_date", { ascending: false }),
+    ];
+    if (isOwner) {
+      queries.push(supabase.from("emp_loans").select("*").order("created_at", { ascending: false }));
+      queries.push(supabase.from("emp_loan_installments").select("*").order("due_month"));
+    }
+    const [c, o, l, i] = await Promise.all(queries);
+    setCanteen(c.data || []);
+    setOthers(o.data || []);
+    if (isOwner) {
+      setLoans(l?.data || []);
+      setInstallments(i?.data || []);
+    }
+    setLoading(false);
+  }
+
+  const empName = useMemo(() => new Map(employees.map((e) => [e.id, e.name])), [employees]);
+  const canVoid = (row) =>
+    isOwner || (row.created_by === uid && row.entry_date === todayIso() && row.status === "active");
+
+  async function submitLoan(event) {
+    event.preventDefault();
+    setBusy(true);
+    const { data, error } = await supabase.rpc("add_loan_v1", {
+      p_employee_id: Number(loanForm.employeeId),
+      p_amount: Number(loanForm.amount),
+      p_installments: Number(loanForm.installments),
+      p_start_month: loanForm.startMonth,
+      p_note: loanForm.note || null,
+    });
+    setBusy(false);
+    if (error || data?.error) onToast(data?.message || "تعذر تسجيل السلفة.");
+    else {
+      onToast(`تم تسجيل السلفة — القسط الشهري ${money(data.installment)} ج${data.last_installment !== data.installment ? ` والأخير ${money(data.last_installment)} ج` : ""}.`);
+      setLoanForm((f) => ({ ...f, amount: "", note: "" }));
+      loadData();
+    }
+  }
+
+  async function submitCanteen(event) {
+    event.preventDefault();
+    setBusy(true);
+    const { data, error } = await supabase.rpc("add_canteen_entry_v1", {
+      p_employee_id: Number(canteenForm.employeeId),
+      p_item: canteenForm.item,
+      p_amount: Number(canteenForm.amount),
+      p_date: canteenForm.date,
+      p_note: canteenForm.note || null,
+    });
+    setBusy(false);
+    if (error || data?.error) onToast(data?.message || "تعذر تسجيل الكانتين.");
+    else {
+      onToast("تم تسجيل مشتريات الكانتين.");
+      setCanteenForm((f) => ({ ...f, item: "", amount: "", note: "" }));
+      loadData();
+    }
+  }
+
+  async function submitOther(event) {
+    event.preventDefault();
+    setBusy(true);
+    const { data, error } = await supabase.rpc("add_other_deduction_v1", {
+      p_employee_id: Number(otherForm.employeeId),
+      p_category: otherForm.category,
+      p_amount: Number(otherForm.amount),
+      p_date: otherForm.date,
+      p_note: otherForm.note || null,
+    });
+    setBusy(false);
+    if (error || data?.error) onToast(data?.message || "تعذر تسجيل الاستقطاع.");
+    else {
+      onToast("تم تسجيل الاستقطاع.");
+      setOtherForm((f) => ({ ...f, amount: "", note: "" }));
+      loadData();
+    }
+  }
+
+  function exportRows(kind) {
+    const source = kind === "canteen" ? canteen : others;
+    const rows = source.filter((r) => empFilter === "all" || String(r.employee_id) === empFilter);
+    const header = kind === "canteen"
+      ? ["التاريخ", "الموظف", "الصنف", "المبلغ", "ملاحظة", "سجّله", "الحالة"]
+      : ["التاريخ", "الموظف", "النوع", "المبلغ", "ملاحظة", "سجّله", "الحالة"];
+    const lines = rows.map((r) => [
+      r.entry_date,
+      empName.get(r.employee_id) || r.employee_id,
+      kind === "canteen" ? r.item : (deductionCategoryLabels[r.category] || r.category),
+      r.amount,
+      r.note || "",
+      r.created_by_name || "",
+      statusLabels[r.status] || r.status,
+    ].map(csvCell).join(","));
+    downloadTextFile(`${kind}-${month}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+  }
+
+  const employeeSelect = (value, onChange) => (
+    <select value={value} onChange={onChange} required>
+      {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+    </select>
+  );
+
+  const filteredCanteen = canteen.filter((r) => empFilter === "all" || String(r.employee_id) === empFilter);
+  const filteredOthers = others.filter((r) => empFilter === "all" || String(r.employee_id) === empFilter);
+  const filteredLoans = loans.filter((r) => empFilter === "all" || String(r.employee_id) === empFilter);
+
+  return (
+    <div className="stack">
+      <section className="panel">
+        <div className="panel-title between">
+          <div><Banknote size={20} /><h2>الاستقطاعات</h2></div>
+          <div className="toolbar">
+            <select value={empFilter} onChange={(e) => setEmpFilter(e.target.value)}>
+              <option value="all">كل الموظفين</option>
+              {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+            </select>
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
+          </div>
+        </div>
+        <div className="tabs compact-tabs">
+          {isOwner && <button className={cls(tab === "loans" && "active")} onClick={() => setTab("loans")}>سلف</button>}
+          <button className={cls(tab === "canteen" && "active")} onClick={() => setTab("canteen")}>كانتين</button>
+          <button className={cls(tab === "other" && "active")} onClick={() => setTab("other")}>أخرى</button>
+        </div>
+
+        {tab === "loans" && isOwner && (
+          <div className="stack">
+            <form className="form" onSubmit={submitLoan}>
+              <div className="form-grid">
+                <label>الموظف{employeeSelect(loanForm.employeeId, (e) => setLoanForm((f) => ({ ...f, employeeId: e.target.value })))}</label>
+                <label>المبلغ<input type="number" min="1" step="0.01" value={loanForm.amount} onChange={(e) => setLoanForm((f) => ({ ...f, amount: e.target.value }))} required placeholder="مثال: 3000" /></label>
+              </div>
+              <div className="form-grid">
+                <label>عدد الأقساط<input type="number" min="1" max="60" value={loanForm.installments} onChange={(e) => setLoanForm((f) => ({ ...f, installments: e.target.value }))} required /></label>
+                <label>شهر أول قسط<input type="month" value={loanForm.startMonth} onChange={(e) => setLoanForm((f) => ({ ...f, startMonth: e.target.value }))} required /></label>
+              </div>
+              <label>ملاحظة<input value={loanForm.note} onChange={(e) => setLoanForm((f) => ({ ...f, note: e.target.value }))} placeholder="اختياري" /></label>
+              <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل سلفة"}</button>
+              <p className="muted">القسط بيتخصم تلقائيًا من مرتب كل شهر بداية من شهر أول قسط.</p>
+            </form>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>الموظف</th><th>الأصل</th><th>الأقساط</th><th>مسدد</th><th>متبقي</th><th>بداية</th><th>الحالة</th><th>إجراء</th></tr></thead>
+                <tbody>
+                  {loading && <tr><td colSpan="8">جاري التحميل...</td></tr>}
+                  {!loading && filteredLoans.length === 0 && <tr><td colSpan="8">لا توجد سلف.</td></tr>}
+                  {!loading && filteredLoans.map((loan) => {
+                    const schedule = installments.filter((i) => i.loan_id === loan.id);
+                    const paid = loan.status === "active"
+                      ? schedule.filter((i) => i.due_month < todayIso().slice(0, 7)).reduce((s, i) => s + Number(i.amount), 0)
+                      : 0;
+                    return (
+                      <tr key={loan.id}>
+                        <td>{empName.get(loan.employee_id) || loan.employee_id}</td>
+                        <td>{money(loan.amount)} ج</td>
+                        <td>{loan.installments_count} × {money(schedule[0]?.amount || loan.amount / loan.installments_count)} ج</td>
+                        <td>{money(paid)} ج</td>
+                        <td><strong>{money(Math.max(0, loan.amount - paid))} ج</strong></td>
+                        <td dir="ltr">{loan.start_month}</td>
+                        <td><StatusBadge status={loan.status} /></td>
+                        <td>{loan.status === "active" ? <button className="danger-link" onClick={() => voidFinancial("loan", loan.id, onToast, loadData)}>إلغاء</button> : "-"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {tab === "canteen" && (
+          <div className="stack">
+            <form className="form" onSubmit={submitCanteen}>
+              <div className="form-grid">
+                <label>الموظف{employeeSelect(canteenForm.employeeId, (e) => setCanteenForm((f) => ({ ...f, employeeId: e.target.value })))}</label>
+                <label>الصنف<input value={canteenForm.item} onChange={(e) => setCanteenForm((f) => ({ ...f, item: e.target.value }))} required placeholder="مثال: مياه + شيبسي" /></label>
+              </div>
+              <div className="form-grid">
+                <label>المبلغ<input type="number" min="0.5" step="0.01" value={canteenForm.amount} onChange={(e) => setCanteenForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
+                <label>التاريخ<input type="date" value={canteenForm.date} onChange={(e) => setCanteenForm((f) => ({ ...f, date: e.target.value }))} required /></label>
+              </div>
+              <label>ملاحظة<input value={canteenForm.note} onChange={(e) => setCanteenForm((f) => ({ ...f, note: e.target.value }))} placeholder="اختياري" /></label>
+              <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل كانتين"}</button>
+            </form>
+            <div className="toolbar">
+              <button className="secondary" onClick={() => exportRows("canteen")} disabled={filteredCanteen.length === 0}>
+                <FileSpreadsheet size={16} /> Excel
+              </button>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>التاريخ</th><th>الموظف</th><th>الصنف</th><th>المبلغ</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
+                <tbody>
+                  {loading && <tr><td colSpan="7">جاري التحميل...</td></tr>}
+                  {!loading && filteredCanteen.length === 0 && <tr><td colSpan="7">لا توجد مشتريات في {month}.</td></tr>}
+                  {!loading && filteredCanteen.map((row) => (
+                    <tr key={row.id}>
+                      <td dir="ltr">{row.entry_date}</td>
+                      <td>{empName.get(row.employee_id) || row.employee_id}</td>
+                      <td>{row.item}</td>
+                      <td>{money(row.amount)} ج</td>
+                      <td>{row.created_by_name || "-"}</td>
+                      <td><StatusBadge status={row.status} /></td>
+                      <td>{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => voidFinancial("canteen", row.id, onToast, loadData)}>إلغاء</button> : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {tab === "other" && (
+          <div className="stack">
+            <form className="form" onSubmit={submitOther}>
+              <div className="form-grid">
+                <label>الموظف{employeeSelect(otherForm.employeeId, (e) => setOtherForm((f) => ({ ...f, employeeId: e.target.value })))}</label>
+                <label>النوع<select value={otherForm.category} onChange={(e) => setOtherForm((f) => ({ ...f, category: e.target.value }))}>{Object.entries(deductionCategoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              </div>
+              <div className="form-grid">
+                <label>المبلغ<input type="number" min="0.5" step="0.01" value={otherForm.amount} onChange={(e) => setOtherForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
+                <label>التاريخ<input type="date" value={otherForm.date} onChange={(e) => setOtherForm((f) => ({ ...f, date: e.target.value }))} required /></label>
+              </div>
+              <label>ملاحظة<input value={otherForm.note} onChange={(e) => setOtherForm((f) => ({ ...f, note: e.target.value }))} placeholder="اكتب السبب بوضوح" /></label>
+              <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل استقطاع"}</button>
+            </form>
+            <div className="toolbar">
+              <button className="secondary" onClick={() => exportRows("other")} disabled={filteredOthers.length === 0}>
+                <FileSpreadsheet size={16} /> Excel
+              </button>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>التاريخ</th><th>الموظف</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
+                <tbody>
+                  {loading && <tr><td colSpan="8">جاري التحميل...</td></tr>}
+                  {!loading && filteredOthers.length === 0 && <tr><td colSpan="8">لا توجد استقطاعات في {month}.</td></tr>}
+                  {!loading && filteredOthers.map((row) => (
+                    <tr key={row.id}>
+                      <td dir="ltr">{row.entry_date}</td>
+                      <td>{empName.get(row.employee_id) || row.employee_id}</td>
+                      <td>{deductionCategoryLabels[row.category] || row.category}</td>
+                      <td>{money(row.amount)} ج</td>
+                      <td className="note-cell">{row.note || "-"}</td>
+                      <td>{row.created_by_name || "-"}</td>
+                      <td><StatusBadge status={row.status} /></td>
+                      <td>{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => voidFinancial("other", row.id, onToast, loadData)}>إلغاء</button> : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ExpensesView({ context, onToast }) {
+  const role = context?.role || "employee";
+  const isOwner = role === "owner";
+  const uid = useUid();
+  const [month, setMonth] = useState(() => todayIso().slice(0, 7));
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({ date: todayIso(), category: "electricity", amount: "", description: "" });
+  const range = useMemo(() => monthRangeFor(month), [month]);
+
+  useEffect(() => {
+    loadData();
+  }, [range.from, range.to]);
+
+  async function loadData() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("company_expenses")
+      .select("*")
+      .gte("expense_date", range.from)
+      .lte("expense_date", range.to)
+      .order("expense_date", { ascending: false });
+    setRows(data || []);
+    setLoading(false);
+  }
+
+  const summary = useMemo(() => {
+    const active = rows.filter((r) => r.status === "active");
+    const total = active.reduce((sum, r) => sum + Number(r.amount), 0);
+    const unconfirmed = active.filter((r) => !r.confirmed_at).length;
+    const byCategory = active.reduce((acc, r) => {
+      acc.set(r.category, (acc.get(r.category) || 0) + Number(r.amount));
+      return acc;
+    }, new Map());
+    return { total, unconfirmed, byCategory };
+  }, [rows]);
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    const { data, error } = await supabase.rpc("add_company_expense_v1", {
+      p_date: form.date,
+      p_category: form.category,
+      p_amount: Number(form.amount),
+      p_description: form.description || null,
+    });
+    setBusy(false);
+    if (error || data?.error) onToast(data?.message || "تعذر تسجيل المصروف.");
+    else {
+      onToast(data.confirmed ? "تم تسجيل المصروف وتأكيده." : "تم تسجيل المصروف — في انتظار تأكيد الـ Owner.");
+      setForm((f) => ({ ...f, amount: "", description: "" }));
+      loadData();
+    }
+  }
+
+  async function confirmExpense(id) {
+    const { data, error } = await supabase.rpc("confirm_expense_v1", { p_id: id });
+    if (error || data?.error) onToast(data?.message || "تعذر التأكيد.");
+    else {
+      onToast("تم تأكيد المصروف.");
+      loadData();
+    }
+  }
+
+  function exportCsvFile() {
+    const header = ["التاريخ", "البند", "المبلغ", "الوصف", "سجّله", "مؤكد", "الحالة"];
+    const lines = rows.map((r) => [
+      r.expense_date,
+      expenseCategoryLabels[r.category] || r.category,
+      r.amount,
+      r.description || "",
+      r.created_by_name || "",
+      r.confirmed_at ? "نعم" : "لا",
+      statusLabels[r.status] || r.status,
+    ].map(csvCell).join(","));
+    downloadTextFile(`expenses-${month}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+  }
+
+  const canVoid = (row) =>
+    isOwner || (row.created_by === uid && row.expense_date === todayIso() && !row.confirmed_at && row.status === "active");
+
+  return (
+    <div className="stack">
+      <section className="panel">
+        <div className="panel-title between">
+          <div><Receipt size={20} /><h2>المصروفات</h2></div>
+          <div className="toolbar">
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <button className="secondary" onClick={exportCsvFile} disabled={rows.length === 0}>
+              <FileSpreadsheet size={16} /> Excel
+            </button>
+            <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
+          </div>
+        </div>
+        <div className="stats-grid compact-stats">
+          <Metric label={`إجمالي ${month}`} value={`${money(summary.total)} ج`} tone="gold" icon={Banknote} />
+          <Metric label="غير مؤكد" value={summary.unconfirmed} tone={summary.unconfirmed ? "warn" : "ok"} icon={AlertTriangle} />
+          <Metric label="عدد المصروفات" value={rows.filter((r) => r.status === "active").length} icon={Receipt} />
+        </div>
+        {summary.byCategory.size > 0 && (
+          <div className="stack">
+            {[...summary.byCategory.entries()].sort((a, b) => b[1] - a[1]).map(([category, value]) => (
+              <Bar key={category} label={expenseCategoryLabels[category] || category} value={value} max={Math.max(summary.total, 1)} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <form className="panel form" onSubmit={submit}>
+        <div className="panel-title"><Receipt size={20} /><h2>تسجيل مصروف</h2></div>
+        <div className="form-grid">
+          <label>التاريخ<input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} required /></label>
+          <label>البند<select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>{Object.entries(expenseCategoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        </div>
+        <div className="form-grid">
+          <label>المبلغ<input type="number" min="0.5" step="0.01" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
+          <label>الوصف<input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="مثال: فاتورة كهرباء يوليو" /></label>
+        </div>
+        <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل مصروف"}</button>
+        {!isOwner && <p className="muted">المصروف بيتسجل فورًا وبيظهر للـ Owner لتأكيده.</p>}
+      </form>
+
+      <section className="panel">
+        <div className="panel-title"><FileSpreadsheet size={20} /><h2>مصروفات {month}</h2></div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>التاريخ</th><th>البند</th><th>المبلغ</th><th>الوصف</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
+            <tbody>
+              {loading && <tr><td colSpan="7">جاري التحميل...</td></tr>}
+              {!loading && rows.length === 0 && <tr><td colSpan="7">لا توجد مصروفات في {month}.</td></tr>}
+              {!loading && rows.map((row) => (
+                <tr key={row.id}>
+                  <td dir="ltr">{row.expense_date}</td>
+                  <td>{expenseCategoryLabels[row.category] || row.category}</td>
+                  <td>{money(row.amount)} ج</td>
+                  <td className="note-cell">{row.description || "-"}</td>
+                  <td>{row.created_by_name || "-"}</td>
+                  <td>
+                    {row.status === "voided" ? <StatusBadge status="voided" /> : row.confirmed_at ? <StatusBadge status="confirmed" /> : <StatusBadge status="pending" />}
+                  </td>
+                  <td>
+                    <span className="approval-actions">
+                      {row.status === "active" && !row.confirmed_at && (
+                        isOwner
+                          ? <button onClick={() => confirmExpense(row.id)}>تأكيد</button>
+                          : <span className="badge">قرار Owner فقط</span>
+                      )}
+                      {row.status === "active" && canVoid(row) && (
+                        <button className="danger-link" onClick={() => voidFinancial("expense", row.id, onToast, loadData)}>إلغاء</button>
+                      )}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function PartnerLedgerView({ context, onToast }) {
+  const role = context?.role || "employee";
+  const isOwner = role === "owner";
+  const [entries, setEntries] = useState([]);
+  const [settlements, setSettlements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [directionFilter, setDirectionFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [form, setForm] = useState({ direction: "owed_to_us", kind: "invoice", amount: "", date: todayIso(), description: "", dueDate: "" });
+  const [settleFor, setSettleFor] = useState(null);
+  const [settleForm, setSettleForm] = useState({ amount: "", date: todayIso(), note: "" });
+  const [expanded, setExpanded] = useState(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+    const [e, s] = await Promise.all([
+      supabase.from("partner_ledger_entries").select("*").order("entry_date", { ascending: false }).order("id", { ascending: false }),
+      supabase.from("partner_settlements").select("*").order("created_at", { ascending: false }),
+    ]);
+    setEntries(e.data || []);
+    setSettlements(s.data || []);
+    setLoading(false);
+  }
+
+  const enriched = useMemo(() => {
+    const byEntry = settlements.reduce((acc, s) => {
+      const list = acc.get(s.entry_id) || [];
+      list.push(s);
+      acc.set(s.entry_id, list);
+      return acc;
+    }, new Map());
+    return entries.map((entry) => {
+      const list = byEntry.get(entry.id) || [];
+      const paid = list.filter((s) => s.status === "confirmed").reduce((sum, s) => sum + Number(s.amount), 0);
+      const remaining = Math.max(0, Number(entry.amount) - paid);
+      const derived = entry.status === "voided" ? "voided" : remaining <= 0 ? "settled" : paid > 0 ? "partial" : "open";
+      return { ...entry, settlements: list, paid, remaining, derived };
+    });
+  }, [entries, settlements]);
+
+  const totals = useMemo(() => {
+    const active = enriched.filter((e) => e.status === "active");
+    const toUs = active.filter((e) => e.direction === "owed_to_us").reduce((sum, e) => sum + e.remaining, 0);
+    const byUs = active.filter((e) => e.direction === "owed_by_us").reduce((sum, e) => sum + e.remaining, 0);
+    return { toUs, byUs, net: toUs - byUs };
+  }, [enriched]);
+
+  const pendingSettlements = useMemo(() => {
+    const nameByEntry = new Map(entries.map((e) => [e.id, e.description]));
+    return settlements
+      .filter((s) => s.status === "pending")
+      .map((s) => ({ ...s, entryDescription: nameByEntry.get(s.entry_id) || `قيد #${s.entry_id}` }));
+  }, [settlements, entries]);
+
+  const visible = enriched.filter((entry) => {
+    const matchesDirection = directionFilter === "all" || entry.direction === directionFilter;
+    const matchesStatus = statusFilter === "all" || entry.derived === statusFilter;
+    const matchesSearch = !search.trim() || (entry.description || "").toLowerCase().includes(search.trim().toLowerCase());
+    return matchesDirection && matchesStatus && matchesSearch;
+  });
+
+  async function submitEntry(event) {
+    event.preventDefault();
+    setBusy(true);
+    const { data, error } = await supabase.rpc("add_partner_entry_v1", {
+      p_direction: form.direction,
+      p_kind: form.kind,
+      p_amount: Number(form.amount),
+      p_date: form.date,
+      p_description: form.description,
+      p_due_date: form.dueDate || null,
+    });
+    setBusy(false);
+    if (error || data?.error) onToast(data?.message || "تعذر تسجيل القيد.");
+    else {
+      onToast("تم تسجيل القيد.");
+      setForm((f) => ({ ...f, amount: "", description: "", dueDate: "" }));
+      loadData();
+    }
+  }
+
+  async function submitSettlement(event, entryId) {
+    event.preventDefault();
+    setBusy(true);
+    const { data, error } = await supabase.rpc("add_partner_settlement_v1", {
+      p_entry_id: entryId,
+      p_amount: Number(settleForm.amount),
+      p_date: settleForm.date,
+      p_note: settleForm.note || null,
+    });
+    setBusy(false);
+    if (error || data?.error) onToast(data?.message || "تعذر تسجيل السداد.");
+    else {
+      onToast(data.confirmed ? "تم تسجيل السداد وتأكيده." : "تم تسجيل السداد — في انتظار تأكيد الـ Owner.");
+      setSettleFor(null);
+      setSettleForm({ amount: "", date: todayIso(), note: "" });
+      loadData();
+    }
+  }
+
+  async function decideSettlement(id, approve) {
+    const { data, error } = await supabase.rpc("decide_partner_settlement_v1", {
+      p_id: id,
+      p_approve: approve,
+      p_note: approve ? "تم التأكيد" : "تم الرفض",
+    });
+    if (error || data?.error) onToast(data?.message || "تعذر البت في السداد.");
+    else {
+      onToast(approve ? "تم تأكيد السداد." : "تم رفض السداد.");
+      loadData();
+    }
+  }
+
+  function exportEntries() {
+    const header = ["التاريخ", "الاتجاه", "النوع", "الوصف", "الأصل", "مسدد", "متبقي", "الحالة", "استحقاق", "سجّله"];
+    const lines = enriched.map((e) => [
+      e.entry_date,
+      partnerDirectionLabels[e.direction],
+      partnerKindLabels[e.kind],
+      e.description,
+      e.amount,
+      e.paid.toFixed(2),
+      e.remaining.toFixed(2),
+      statusLabels[e.derived] || e.derived,
+      e.due_date || "",
+      e.created_by_name || "",
+    ].map(csvCell).join(","));
+    downloadTextFile(`partner-ledger-${todayIso()}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+  }
+
+  function exportSettlements() {
+    const nameByEntry = new Map(entries.map((e) => [e.id, e.description]));
+    const header = ["التاريخ", "القيد", "المبلغ", "الحالة", "ملاحظة", "سجّله"];
+    const lines = settlements.map((s) => [
+      s.settle_date,
+      nameByEntry.get(s.entry_id) || s.entry_id,
+      s.amount,
+      statusLabels[s.status] || s.status,
+      s.note || "",
+      s.created_by_name || "",
+    ].map(csvCell).join(","));
+    downloadTextFile(`partner-settlements-${todayIso()}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+  }
+
+  return (
+    <div className="stack">
+      <section className="panel">
+        <div className="panel-title between">
+          <div><Scale size={20} /><h2>مديونية Air Ocean</h2></div>
+          <div className="toolbar">
+            <button className="secondary" onClick={exportEntries} disabled={entries.length === 0}><FileSpreadsheet size={16} /> القيود</button>
+            <button className="secondary" onClick={exportSettlements} disabled={settlements.length === 0}><FileSpreadsheet size={16} /> السدادات</button>
+            <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
+          </div>
+        </div>
+        <div className="stats-grid compact-stats">
+          <Metric label="لنا عندهم" value={`${money(totals.toUs)} ج`} tone="ok" icon={TrendingUp} />
+          <Metric label="علينا ليهم" value={`${money(totals.byUs)} ج`} tone="danger" icon={Banknote} />
+          <Metric label="الصافي" value={`${money(Math.abs(totals.net))} ج ${totals.net >= 0 ? "لنا" : "علينا"}`} tone={totals.net >= 0 ? "ok" : "warn"} icon={Scale} />
+          <Metric label="سدادات معلقة" value={pendingSettlements.length} tone={pendingSettlements.length ? "warn" : "ok"} icon={Bell} />
+        </div>
+        <p className="muted">كل القيود والسدادات محفوظة بالكامل — مفيش حاجة بتتحذف، والإلغاء بيتسجل بأسبابه.</p>
+      </section>
+
+      {pendingSettlements.length > 0 && (
+        <section className="panel">
+          <div className="panel-title"><Bell size={20} /><h2>سدادات تحتاج تأكيد</h2></div>
+          <div className="list">
+            {pendingSettlements.map((s) => (
+              <div className="approval-row" key={s.id}>
+                <div>
+                  <strong>{money(s.amount)} ج</strong>
+                  <span>{s.entryDescription} · {s.settle_date}</span>
+                  {s.note && <p>{s.note}</p>}
+                  <p className="muted">سجله: {s.created_by_name || "-"}</p>
+                </div>
+                <div className="approval-actions">
+                  {!isOwner && <span className="badge">قرار Owner فقط</span>}
+                  {isOwner && (
+                    <>
+                      <button onClick={() => decideSettlement(s.id, true)}>تأكيد</button>
+                      <button className="danger-link" onClick={() => decideSettlement(s.id, false)}>رفض</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <form className="panel form" onSubmit={submitEntry}>
+        <div className="panel-title"><Scale size={20} /><h2>تسجيل قيد جديد</h2></div>
+        <div className="form-grid">
+          <label>الاتجاه<select value={form.direction} onChange={(e) => setForm((f) => ({ ...f, direction: e.target.value }))}>{Object.entries(partnerDirectionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label>النوع<select value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))}>{Object.entries(partnerKindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        </div>
+        <div className="form-grid">
+          <label>المبلغ<input type="number" min="0.5" step="0.01" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
+          <label>التاريخ<input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} required /></label>
+        </div>
+        <label>الوصف<input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} required placeholder="مثال: فاتورة شحن يوليو / سلفة نقدية" /></label>
+        <label>تاريخ استحقاق (اختياري)<input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} /></label>
+        <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل القيد"}</button>
+      </form>
+
+      <section className="panel">
+        <div className="panel-title between">
+          <div><FileSpreadsheet size={20} /><h2>القيود</h2></div>
+          <div className="toolbar table-filters">
+            <div className="tabs compact-tabs no-margin">
+              <button className={cls(directionFilter === "all" && "active")} onClick={() => setDirectionFilter("all")}>الكل</button>
+              <button className={cls(directionFilter === "owed_to_us" && "active")} onClick={() => setDirectionFilter("owed_to_us")}>لنا عندهم</button>
+              <button className={cls(directionFilter === "owed_by_us" && "active")} onClick={() => setDirectionFilter("owed_by_us")}>علينا ليهم</button>
+            </div>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">كل الحالات</option>
+              <option value="open">مفتوح</option>
+              <option value="partial">سداد جزئي</option>
+              <option value="settled">مُسدد</option>
+              <option value="voided">ملغي</option>
+            </select>
+            <label className="search-field">
+              <Search size={16} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث في الوصف" />
+            </label>
+          </div>
+        </div>
+        <div className="list">
+          {loading && <p className="muted">جاري التحميل...</p>}
+          {!loading && visible.length === 0 && <p className="muted">لا توجد قيود مطابقة.</p>}
+          {!loading && visible.map((entry) => (
+            <div className="approval-row" key={entry.id}>
+              <div>
+                <strong>{entry.description}</strong>
+                <span>{partnerDirectionLabels[entry.direction]} · {partnerKindLabels[entry.kind]} · {entry.entry_date}</span>
+                <p>الأصل: {money(entry.amount)} ج · مسدد: {money(entry.paid)} ج · متبقي: <strong>{money(entry.remaining)} ج</strong></p>
+                {entry.due_date && <p className="muted">استحقاق: {entry.due_date}</p>}
+                {entry.status === "voided" && <p className="muted">سبب الإلغاء: {entry.void_reason || "-"}</p>}
+                {expanded === entry.id && entry.settlements.length > 0 && (
+                  <div className="list">
+                    {entry.settlements.map((s) => (
+                      <div className="list-row compact-row" key={s.id}>
+                        <div>
+                          <strong>{money(s.amount)} ج</strong>
+                          <span>{s.settle_date} · {s.created_by_name || "-"}</span>
+                        </div>
+                        <StatusBadge status={s.status} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {settleFor === entry.id && (
+                  <form className="form" onSubmit={(e) => submitSettlement(e, entry.id)}>
+                    <div className="form-grid">
+                      <label>مبلغ السداد<input type="number" min="0.5" step="0.01" max={entry.remaining} value={settleForm.amount} onChange={(e) => setSettleForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
+                      <label>التاريخ<input type="date" value={settleForm.date} onChange={(e) => setSettleForm((f) => ({ ...f, date: e.target.value }))} required /></label>
+                    </div>
+                    <label>ملاحظة<input value={settleForm.note} onChange={(e) => setSettleForm((f) => ({ ...f, note: e.target.value }))} placeholder="اختياري" /></label>
+                    <div className="actions-row">
+                      <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل السداد"}</button>
+                      <button type="button" className="secondary" onClick={() => setSettleFor(null)}>إلغاء</button>
+                    </div>
+                  </form>
+                )}
+              </div>
+              <div className="approval-actions">
+                <StatusBadge status={entry.derived} />
+                {entry.settlements.length > 0 && (
+                  <button className="secondary" type="button" onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}>
+                    {expanded === entry.id ? "إخفاء السدادات" : `السدادات (${entry.settlements.length})`}
+                  </button>
+                )}
+                {entry.status === "active" && entry.remaining > 0 && settleFor !== entry.id && (
+                  <button type="button" onClick={() => { setSettleFor(entry.id); setSettleForm({ amount: String(entry.remaining), date: todayIso(), note: "" }); }}>سداد</button>
+                )}
+                {entry.status === "active" && isOwner && (
+                  <button className="danger-link" type="button" onClick={() => voidFinancial("partner_entry", entry.id, onToast, loadData)}>إلغاء القيد</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function OwnerLedgerView({ onToast }) {
+  const [entries, setEntries] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({ person: "", direction: "lent", amount: "", date: todayIso(), note: "" });
+  const [payFor, setPayFor] = useState(null);
+  const [payForm, setPayForm] = useState({ amount: "", date: todayIso(), note: "" });
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+    const [e, p] = await Promise.all([
+      supabase.from("owner_ledger_entries").select("*").order("entry_date", { ascending: false }).order("id", { ascending: false }),
+      supabase.from("owner_ledger_payments").select("*").order("pay_date", { ascending: false }),
+    ]);
+    setEntries(e.data || []);
+    setPayments(p.data || []);
+    setLoading(false);
+  }
+
+  const enriched = useMemo(() => {
+    const byEntry = payments.reduce((acc, p) => {
+      const list = acc.get(p.entry_id) || [];
+      list.push(p);
+      acc.set(p.entry_id, list);
+      return acc;
+    }, new Map());
+    return entries.map((entry) => {
+      const list = byEntry.get(entry.id) || [];
+      const paid = list.reduce((sum, p) => sum + Number(p.amount), 0);
+      return { ...entry, payments: list, paid, remaining: Math.max(0, Number(entry.amount) - paid) };
+    });
+  }, [entries, payments]);
+
+  const byPerson = useMemo(() => {
+    const map = new Map();
+    enriched.forEach((entry) => {
+      const list = map.get(entry.person) || [];
+      list.push(entry);
+      map.set(entry.person, list);
+    });
+    return [...map.entries()];
+  }, [enriched]);
+
+  const totals = useMemo(() => {
+    const lent = enriched.filter((e) => e.direction === "lent").reduce((sum, e) => sum + e.remaining, 0);
+    const borrowed = enriched.filter((e) => e.direction === "borrowed").reduce((sum, e) => sum + e.remaining, 0);
+    return { lent, borrowed, net: lent - borrowed };
+  }, [enriched]);
+
+  async function submitEntry(event) {
+    event.preventDefault();
+    setBusy(true);
+    const { error } = await supabase.from("owner_ledger_entries").insert({
+      person: form.person.trim(),
+      direction: form.direction,
+      amount: Number(form.amount),
+      entry_date: form.date,
+      note: form.note.trim() || null,
+    });
+    setBusy(false);
+    if (error) onToast("تعذر التسجيل: " + error.message);
+    else {
+      onToast("تم التسجيل في الدفتر.");
+      setForm((f) => ({ ...f, person: "", amount: "", note: "" }));
+      loadData();
+    }
+  }
+
+  async function submitPayment(event, entryId) {
+    event.preventDefault();
+    setBusy(true);
+    const { error } = await supabase.from("owner_ledger_payments").insert({
+      entry_id: entryId,
+      amount: Number(payForm.amount),
+      pay_date: payForm.date,
+      note: payForm.note.trim() || null,
+    });
+    setBusy(false);
+    if (error) onToast("تعذر تسجيل الدفعة: " + error.message);
+    else {
+      onToast("تم تسجيل الدفعة.");
+      setPayFor(null);
+      setPayForm({ amount: "", date: todayIso(), note: "" });
+      loadData();
+    }
+  }
+
+  async function removeEntry(id) {
+    if (!confirm("تحذف القيد ده وكل دفعاته نهائيًا؟")) return;
+    const { error } = await supabase.from("owner_ledger_entries").delete().eq("id", id);
+    if (error) onToast("تعذر الحذف: " + error.message);
+    else {
+      onToast("تم الحذف.");
+      loadData();
+    }
+  }
+
+  async function removePayment(id) {
+    if (!confirm("تحذف الدفعة دي؟")) return;
+    const { error } = await supabase.from("owner_ledger_payments").delete().eq("id", id);
+    if (error) onToast("تعذر الحذف: " + error.message);
+    else {
+      onToast("تم حذف الدفعة.");
+      loadData();
+    }
+  }
+
+  return (
+    <div className="stack">
+      <section className="panel">
+        <div className="panel-title between">
+          <div><Wallet size={20} /><h2>الدفتر الشخصي</h2></div>
+          <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
+        </div>
+        <div className="stats-grid compact-stats">
+          <Metric label="سلّفته لناس" value={`${money(totals.lent)} ج`} tone="ok" icon={TrendingUp} />
+          <Metric label="عليّ لناس" value={`${money(totals.borrowed)} ج`} tone="danger" icon={Banknote} />
+          <Metric label="الصافي" value={`${money(Math.abs(totals.net))} ج ${totals.net >= 0 ? "ليك" : "عليك"}`} tone={totals.net >= 0 ? "ok" : "warn"} icon={Wallet} />
+        </div>
+        <p className="muted">الدفتر ده شخصي — محدش بيشوفه غيرك حتى الـ HR.</p>
+      </section>
+
+      <form className="panel form" onSubmit={submitEntry}>
+        <div className="panel-title"><Wallet size={20} /><h2>قيد جديد</h2></div>
+        <div className="form-grid">
+          <label>الاسم<input value={form.person} onChange={(e) => setForm((f) => ({ ...f, person: e.target.value }))} required placeholder="اسم الشخص" /></label>
+          <label>الاتجاه<select value={form.direction} onChange={(e) => setForm((f) => ({ ...f, direction: e.target.value }))}><option value="lent">سلّفته فلوس</option><option value="borrowed">استلفت منه</option></select></label>
+        </div>
+        <div className="form-grid">
+          <label>المبلغ<input type="number" min="0.5" step="0.01" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
+          <label>التاريخ<input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} required /></label>
+        </div>
+        <label>ملاحظة<input value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} placeholder="اختياري" /></label>
+        <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل"}</button>
+      </form>
+
+      {loading && <p className="muted">جاري التحميل...</p>}
+      {!loading && byPerson.length === 0 && (
+        <section className="panel"><p className="muted">الدفتر فاضي — سجّل أول قيد.</p></section>
+      )}
+      {byPerson.map(([person, personEntries]) => {
+        const personRemaining = personEntries.reduce((sum, e) => sum + (e.direction === "lent" ? e.remaining : -e.remaining), 0);
+        return (
+          <section className="panel" key={person}>
+            <div className="panel-title between">
+              <div><Wallet size={20} /><h2>{person}</h2></div>
+              <span className="badge">{personRemaining >= 0 ? `ليك ${money(personRemaining)} ج` : `عليك ${money(-personRemaining)} ج`}</span>
+            </div>
+            <div className="list">
+              {personEntries.map((entry) => (
+                <div className="list-row" key={entry.id}>
+                  <div>
+                    <strong>{entry.direction === "lent" ? "سلّفته" : "استلفت"} {money(entry.amount)} ج</strong>
+                    <span>{entry.entry_date}{entry.note ? ` · ${entry.note}` : ""}</span>
+                  </div>
+                  <p>سدد: {money(entry.paid)} ج · متبقي: <strong>{money(entry.remaining)} ج</strong> {entry.remaining <= 0 && <StatusBadge status="settled" />}</p>
+                  {entry.payments.length > 0 && (
+                    <div className="table-wrap">
+                      <table>
+                        <thead><tr><th>التاريخ</th><th>المبلغ</th><th>ملاحظة</th><th>إجراء</th></tr></thead>
+                        <tbody>
+                          {entry.payments.map((p) => (
+                            <tr key={p.id}>
+                              <td dir="ltr">{p.pay_date}</td>
+                              <td>{money(p.amount)} ج</td>
+                              <td className="note-cell">{p.note || "-"}</td>
+                              <td><button className="danger-link" onClick={() => removePayment(p.id)}>حذف</button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {payFor === entry.id ? (
+                    <form className="form" onSubmit={(e) => submitPayment(e, entry.id)}>
+                      <div className="form-grid">
+                        <label>المبلغ<input type="number" min="0.5" step="0.01" value={payForm.amount} onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
+                        <label>التاريخ<input type="date" value={payForm.date} onChange={(e) => setPayForm((f) => ({ ...f, date: e.target.value }))} required /></label>
+                      </div>
+                      <label>ملاحظة<input value={payForm.note} onChange={(e) => setPayForm((f) => ({ ...f, note: e.target.value }))} placeholder="اختياري" /></label>
+                      <div className="actions-row">
+                        <button className="primary" disabled={busy}>تسجيل الدفعة</button>
+                        <button type="button" className="secondary" onClick={() => setPayFor(null)}>إلغاء</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="actions-row">
+                      {entry.remaining > 0 && (
+                        <button className="secondary" type="button" onClick={() => { setPayFor(entry.id); setPayForm({ amount: String(entry.remaining), date: todayIso(), note: "" }); }}>
+                          تسجيل دفعة
+                        </button>
+                      )}
+                      <button className="danger-link" type="button" onClick={() => removeEntry(entry.id)}>حذف القيد</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
