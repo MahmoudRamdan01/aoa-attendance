@@ -35,6 +35,7 @@ import {
   Sun,
   Trash2,
   Wallet,
+  Zap,
   TrendingUp,
   UserCheck,
   UserPlus,
@@ -2378,6 +2379,33 @@ function renderMarkdown(md) {
   return blocks;
 }
 
+// Structured tables come straight from the Edge Function (built from DB rows,
+// never from the model) as { title, columns, rows, footer }. Rendered as a real
+// HTML table so numbers are always exact and never mangled markdown text.
+function renderTables(tables) {
+  if (!Array.isArray(tables) || tables.length === 0) return null;
+  return tables.map((t, ti) => (
+    <div className="chat-table-wrap" key={`st${ti}`}>
+      {t.title && <div className="chat-table-title">{t.title}</div>}
+      <table>
+        <thead>
+          <tr>{(t.columns || []).map((c, ci) => <th key={ci}>{c}</th>)}</tr>
+        </thead>
+        <tbody>
+          {(t.rows || []).map((r, ri) => (
+            <tr key={ri}>{(t.columns || []).map((_, ci) => <td key={ci}>{r[ci] ?? "—"}</td>)}</tr>
+          ))}
+        </tbody>
+        {Array.isArray(t.footer) && t.footer.length > 0 && (
+          <tfoot>
+            <tr>{t.footer.map((f, fi) => <td key={fi}>{f}</td>)}</tr>
+          </tfoot>
+        )}
+      </table>
+    </div>
+  ));
+}
+
 function AssistantView({ context }) {
   const role = context?.role || "employee";
   const isAdmin = role === "hr" || role === "owner";
@@ -2395,9 +2423,34 @@ function AssistantView({ context }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, busy]);
 
-  const suggestions = isAdmin
-    ? ["مين اتأخر النهارده؟", "إيه المعلقات اللي محتاجة قرار؟", "ملخص مصروفات الشهر", "ملخص مديونية Air Ocean"]
-    : ["سجلت حضور النهارده؟", "ملخص حضوري الشهر ده", "كام استقطاعاتي الشهر ده؟", "إيه حالة طلباتي؟"];
+  // Quick chips run in "direct" mode — the Edge Function executes one read tool
+  // and returns a ready table with NO LLM call, so they answer in well under a
+  // second. Role decides which chips show. (Free-typed questions still go
+  // through the model, which now short-circuits to the same deterministic table.)
+  const suggestions = useMemo(() => {
+    if (role === "owner") {
+      return [
+        { label: "ملخص المرتبات", direct: "payroll_summary" },
+        { label: "حضور النهارده", direct: "day_attendance" },
+        { label: "المعلقات المحتاجة قرار", direct: "pending_approvals" },
+        { label: "مديونية Air Ocean", direct: "partner_summary" },
+      ];
+    }
+    if (role === "hr") {
+      return [
+        { label: "حضور النهارده", direct: "day_attendance" },
+        { label: "المعلقات المحتاجة قرار", direct: "pending_approvals" },
+        { label: "مصروفات الشهر", direct: "expenses" },
+        { label: "مديونية Air Ocean", direct: "partner_summary" },
+      ];
+    }
+    return [
+      { label: "حضوري النهارده", direct: "my_today" },
+      { label: "ملخص حضوري الشهر", direct: "my_month_summary" },
+      { label: "استقطاعاتي الشهر ده", direct: "my_deductions" },
+      { label: "حالة طلباتي", direct: "my_requests" },
+    ];
+  }, [role]);
 
   async function callAssistant(payload) {
     const { data, error } = await supabase.functions.invoke("assistant", { body: payload });
@@ -2414,6 +2467,19 @@ function AssistantView({ context }) {
     return data || { reply: "رد فاضي.", actions: [], proposals: [] };
   }
 
+  function appendAssistant(data) {
+    setMessages((current) => [
+      ...current,
+      {
+        role: "assistant",
+        content: data.reply || "",
+        tables: data.tables || [],
+        actions: data.actions || [],
+        proposals: (data.proposals || []).map((p) => ({ ...p, state: "pending" })),
+      },
+    ]);
+  }
+
   async function send(text) {
     const question = (text ?? input).trim();
     if (!question || busy) return;
@@ -2423,18 +2489,20 @@ function AssistantView({ context }) {
     setBusy(true);
     const apiMessages = nextMessages
       .filter((m) => m.role === "user" || m.role === "assistant")
-      .slice(-12)
+      .slice(-8)
       .map((m) => ({ role: m.role, content: m.content }));
     const data = await callAssistant({ messages: apiMessages });
-    setMessages((current) => [
-      ...current,
-      {
-        role: "assistant",
-        content: data.reply || "",
-        actions: data.actions || [],
-        proposals: (data.proposals || []).map((p) => ({ ...p, state: "pending" })),
-      },
-    ]);
+    appendAssistant(data);
+    setBusy(false);
+  }
+
+  // Instant chip: runs one read tool server-side with no LLM round-trip.
+  async function sendDirect(tool, label) {
+    if (busy) return;
+    setMessages((current) => [...current, { role: "user", content: label }]);
+    setBusy(true);
+    const data = await callAssistant({ direct: { tool } });
+    appendAssistant(data);
     setBusy(false);
   }
 
@@ -2503,7 +2571,13 @@ function AssistantView({ context }) {
             <p>اسألني عن أي حاجة في السيستم — بجاوب من البيانات الحقيقية وأقدر أنفذ عمليات.</p>
             <div className="chat-suggestions">
               {suggestions.map((s) => (
-                <button key={s} type="button" onClick={() => send(s)}>{s}</button>
+                <button
+                  key={s.label}
+                  type="button"
+                  onClick={() => (s.direct ? sendDirect(s.direct, s.label) : send(s.label))}
+                >
+                  <Zap size={13} /> {s.label}
+                </button>
               ))}
             </div>
           </div>
@@ -2511,6 +2585,7 @@ function AssistantView({ context }) {
         {messages.map((m, i) => (
           <div key={i} className={cls("chat-bubble", m.role)}>
             <div className="chat-content">{m.role === "assistant" ? renderMarkdown(m.content) : m.content}</div>
+            {m.role === "assistant" && renderTables(m.tables)}
             {m.actions?.length > 0 && (
               <div className="chat-chips">
                 {m.actions.map((a, j) => (

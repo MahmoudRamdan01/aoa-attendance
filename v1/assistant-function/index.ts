@@ -1,9 +1,12 @@
 // ============================================================================
-// AOA Assistant — Supabase Edge Function
+// AOA Assistant — Supabase Edge Function (v7: deterministic tables + fast paths)
 // AI agent with role-gated tools over the attendance/financial system.
 // - Caller identity: the user's JWT → every data tool runs under THEIR RLS.
 // - Provider: any OpenAI-compatible endpoint (config in assistant_config).
 // - Sensitive actions return proposals; the client confirms via confirm_action.
+// - NUMBERS NEVER PASS THROUGH THE MODEL: read-tools render structured tables
+//   server-side (RENDERERS) and single-read questions skip the second LLM
+//   round entirely. body.direct = {tool, args} executes a read with NO LLM.
 // Deployed with verify_jwt=true (gateway rejects missing/invalid JWTs).
 // NOTE: this repo copy is a reference; the live function is deployed via MCP.
 // ============================================================================
@@ -36,6 +39,16 @@ const statusLabels: Record<string, string> = {
   present: "حاضر", late: "متأخر", absent: "غياب", leave: "أجازة",
   mission: "مأمورية", sick: "مرضي", pending: "معلّق", approved: "معتمد",
   rejected: "مرفوض", active: "ساري", voided: "ملغي", confirmed: "مؤكد",
+};
+const expenseLabels: Record<string, string> = {
+  water: "مياه", electricity: "كهرباء", gas: "غاز", internet: "إنترنت",
+  rent: "إيجار", maintenance: "صيانة", stationery: "أدوات مكتبية", other: "أخرى",
+};
+const deductionLabels: Record<string, string> = {
+  damage: "تلفيات", penalty: "جزاء", uniform: "زي", other: "أخرى",
+};
+const kindLabels: Record<string, string> = {
+  invoice: "فاتورة", loan: "سلفة", deal: "صفقة", other: "أخرى",
 };
 
 function todayCairo(): string {
@@ -360,6 +373,258 @@ const SENSITIVE: Record<string, { rpc: string; map: (a: Record<string, unknown>)
 };
 
 // ---------------------------------------------------------------------------
+// Deterministic rendering: read-tool results become {text, tables} in CODE so
+// the numbers shown to the user come straight from the database, never from
+// the model. tables render natively in the chat client.
+// ---------------------------------------------------------------------------
+type Table = { title?: string; columns: string[]; rows: (string | number | null)[][]; footer?: (string | number)[] };
+type Rendered = { text: string; tables: Table[] };
+
+const money = (n: unknown) => Number(n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+const hhmm = (v: unknown): string => {
+  const s = String(v ?? "");
+  if (!s) return "—";
+  if (/^\d{2}:\d{2}/.test(s)) return s.slice(0, 5);
+  if (s.includes("T")) return s.slice(11, 16);
+  return s;
+};
+const dash = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : String(v));
+
+const RENDERERS: Record<string, (r: any, today: string) => Rendered> = {
+  my_today(r) {
+    if (r?.info) return { text: r.info, tables: [] };
+    const parts = [`حضورك النهارده: ${statusLabels[r.status] ?? r.status}`];
+    if (r.check_in) parts.push(`دخول ${hhmm(r.check_in)}`);
+    if (r.check_out) parts.push(`انصراف ${hhmm(r.check_out)}`);
+    if (Number(r.late_minutes) > 0) parts.push(`تأخير ${r.late_minutes} دقيقة`);
+    if (Number(r.deduction_days) > 0) parts.push(`خصم ${r.deduction_days} يوم`);
+    return { text: parts.join(" — ") + ".", tables: [] };
+  },
+  my_month_summary(r) {
+    const rows = (r.rows ?? []).map((x: any) => [x.work_date, statusLabels[x.status] ?? x.status, hhmm(x.check_in), hhmm(x.check_out), Number(x.late_minutes || 0) || "—"]);
+    return {
+      text: `شهر ${r.month}: حضور ${r.present} يوم — تأخير ${r.late} مرة (${r.late_minutes_total} د) — غياب ${r.absent} — أجازات ${r.leave} — خصومات ${r.deduction_days_total} يوم.`,
+      tables: rows.length ? [{ title: "تفاصيل الشهر", columns: ["التاريخ", "الحالة", "دخول", "انصراف", "تأخير (د)"], rows }] : [],
+    };
+  },
+  my_deductions(r, today) {
+    const thisMonth = today.slice(0, 7);
+    const tables: Table[] = [];
+    const activeLoans = (r.loans ?? []).filter((l: any) => l.status === "active");
+    let installmentDue = 0;
+    if (activeLoans.length) {
+      const inst = (r.installments ?? []).filter((i: any) => activeLoans.some((l: any) => l.id === i.loan_id));
+      installmentDue = inst.filter((i: any) => i.due_month === thisMonth).reduce((s: number, i: any) => s + Number(i.amount), 0);
+      tables.push({
+        title: "أقساط السلف",
+        columns: ["شهر الاستحقاق", "المبلغ"],
+        rows: inst.map((i: any) => [i.due_month, money(i.amount)]),
+      });
+    }
+    const canteen = (r.canteen ?? []).filter((x: any) => x.status === "active");
+    const canteenTotal = canteen.reduce((s: number, x: any) => s + Number(x.amount), 0);
+    if (canteen.length) {
+      tables.push({ title: `كانتين ${r.month}`, columns: ["التاريخ", "الصنف", "المبلغ"], rows: canteen.map((x: any) => [x.entry_date, x.item, money(x.amount)]), footer: ["الإجمالي", "", money(canteenTotal)] });
+    }
+    const other = (r.other ?? []).filter((x: any) => x.status === "active");
+    const otherTotal = other.reduce((s: number, x: any) => s + Number(x.amount), 0);
+    if (other.length) {
+      tables.push({ title: `استقطاعات أخرى ${r.month}`, columns: ["التاريخ", "النوع", "المبلغ"], rows: other.map((x: any) => [x.entry_date, deductionLabels[x.category] ?? x.category, money(x.amount)]) });
+    }
+    const total = installmentDue + canteenTotal + otherTotal;
+    const text = total > 0
+      ? `استقطاعات ${r.month}: قسط سلفة ${money(installmentDue)} + كانتين ${money(canteenTotal)} + أخرى ${money(otherTotal)} = ${money(total)} ج.`
+      : `مفيش استقطاعات عليك في ${r.month}`;
+    return { text, tables };
+  },
+  my_requests(r) {
+    const tables: Table[] = [];
+    const perms = r.permissions ?? [];
+    const leaves = r.leaves ?? [];
+    if (perms.length) tables.push({ title: "الأذونات", columns: ["التاريخ", "الساعات", "الحالة", "السبب"], rows: perms.map((p: any) => [p.perm_date, p.hours_approved ?? p.hours_requested, statusLabels[p.status] ?? p.status, dash(p.reason)]) });
+    if (leaves.length) tables.push({ title: "الأجازات", columns: ["من", "إلى", "أيام", "الحالة", "السبب"], rows: leaves.map((l: any) => [l.from_date, l.to_date, l.days, statusLabels[l.status] ?? l.status, dash(l.reason)]) });
+    const pend = perms.filter((p: any) => p.status === "pending").length + leaves.filter((l: any) => l.status === "pending").length;
+    return { text: tables.length ? (pend ? `عندك ${pend} طلب لسه معلّق.` : "دي آخر طلباتك:") : "مفيش طلبات مسجلة ليك.", tables };
+  },
+  day_attendance(r) {
+    const b = r.board ?? [];
+    const present = b.filter((x: any) => x.check_in).length;
+    const late = b.filter((x: any) => x.status === "متأخر").length;
+    const absent = b.filter((x: any) => x.status === "غياب").length;
+    const none = b.filter((x: any) => x.status === "لم يسجل").length;
+    return {
+      text: `حضور يوم ${r.date}: ${present} حضروا (منهم ${late} متأخر) — غياب ${absent} — لسه مسجّلوش ${none}.`,
+      tables: b.length ? [{
+        title: `لوحة يوم ${r.date}`,
+        columns: ["الموظف", "الحالة", "دخول", "انصراف", "تأخير (د)", "ملاحظة"],
+        rows: b.map((x: any) => [x.name, x.status, hhmm(x.check_in), hhmm(x.check_out), Number(x.late_minutes || 0) || "—", dash(x.note)]),
+      }] : [],
+    };
+  },
+  attendance_summary(r) {
+    const per = [...(r.per_employee ?? [])].sort((a: any, b: any) => b.late - a.late || b.late_minutes - a.late_minutes);
+    const top = per.find((x: any) => x.late > 0);
+    return {
+      text: top
+        ? `من ${r.from} لـ ${r.to} — أكتر واحد اتأخر: ${top.name} (${top.late} مرة / ${top.late_minutes} دقيقة).`
+        : `من ${r.from} لـ ${r.to} — مفيش تأخيرات مسجلة`,
+      tables: per.length ? [{
+        title: "ملخص الحضور بالموظف",
+        columns: ["الموظف", "حضور", "تأخير", "دقايق التأخير", "غياب"],
+        rows: per.map((x: any) => [x.name, x.present, x.late, x.late_minutes, x.absent]),
+      }] : [],
+    };
+  },
+  list_employees(r) {
+    const rows = (r ?? []).map((e: any) => [e.id, e.name, e.active ? "نشط" : "موقوف", e.attendance_exempt ? "مرتبات فقط" : "حضور", `${dash(e.checkin_from)}–${dash(e.checkin_to)}`, `${dash(e.checkout_from)}–${dash(e.checkout_to)}`, e.leave_balance ?? "—"]);
+    return {
+      text: `${rows.length} موظف (${(r ?? []).filter((e: any) => e.active).length} نشط).`,
+      tables: rows.length ? [{ title: "الموظفين", columns: ["#", "الاسم", "الحالة", "النوع", "الحضور", "الانصراف", "رصيد أجازات"], rows }] : [],
+    };
+  },
+  pending_approvals(r) {
+    const tables: Table[] = [];
+    const perms = r.permissions ?? [];
+    const leaves = r.leaves ?? [];
+    const setts = r.partner_settlements ?? [];
+    const exps = r.unconfirmed_expenses ?? [];
+    if (perms.length) tables.push({ title: "أذونات معلقة", columns: ["#", "الموظف", "التاريخ", "ساعات", "السبب"], rows: perms.map((p: any) => [p.id, p.employees?.name ?? "—", p.perm_date, p.hours_requested, dash(p.reason)]) });
+    if (leaves.length) tables.push({ title: "أجازات معلقة", columns: ["#", "الموظف", "من", "إلى", "السبب"], rows: leaves.map((l: any) => [l.id, l.employees?.name ?? "—", l.from_date, l.to_date, dash(l.reason)]) });
+    if (setts.length) tables.push({ title: "سدادات مستنية تأكيد", columns: ["#", "المبلغ", "التاريخ", "سجّلها", "ملاحظة"], rows: setts.map((s: any) => [s.id, money(s.amount), s.settle_date, dash(s.created_by_name), dash(s.note)]) });
+    if (exps.length) tables.push({ title: "مصروفات غير مؤكدة", columns: ["#", "التاريخ", "البند", "المبلغ", "سجّلها"], rows: exps.map((e: any) => [e.id, e.expense_date, expenseLabels[e.category] ?? e.category, money(e.amount), dash(e.created_by_name)]) });
+    const text = tables.length
+      ? `المعلقات: ${perms.length} إذن — ${leaves.length} أجازة — ${setts.length} سداد — ${exps.length} مصروف غير مؤكد.`
+      : "مفيش حاجة معلقة محتاجة قرار";
+    return { text, tables };
+  },
+  expenses(r) {
+    const active = (r.rows ?? []).filter((x: any) => x.status === "active");
+    return {
+      text: `مصروفات ${r.month}: الإجمالي ${money(r.total)} ج${r.unconfirmed ? ` — منها ${r.unconfirmed} لسه مستنية تأكيد` : ""}.`,
+      tables: active.length ? [{
+        title: `مصروفات ${r.month}`,
+        columns: ["#", "التاريخ", "البند", "المبلغ", "الوصف", "الحالة"],
+        rows: active.map((x: any) => [x.id, x.expense_date, expenseLabels[x.category] ?? x.category, money(x.amount), dash(x.description), x.confirmed_at ? "مؤكد" : "مستني تأكيد"]),
+        footer: ["", "", "الإجمالي", money(r.total), "", ""],
+      }] : [],
+    };
+  },
+  partner_summary(r) {
+    const net = Number(r.total_owed_to_us) - Number(r.total_owed_by_us);
+    return {
+      text: `مديونية Air Ocean: لنا عندهم ${money(r.total_owed_to_us)} ج — علينا ليهم ${money(r.total_owed_by_us)} ج — الصافي ${money(Math.abs(net))} ج ${net >= 0 ? "لنا" : "علينا"}${r.pending_settlements ? ` — ${r.pending_settlements} سداد مستني تأكيد` : ""}.`,
+      tables: (r.entries ?? []).length ? [{
+        title: "القيود المفتوحة",
+        columns: ["#", "الاتجاه", "النوع", "الوصف", "المبلغ", "المسدد", "المتبقي", "التاريخ"],
+        rows: (r.entries ?? []).map((e: any) => [e.id, e.direction, kindLabels[e.kind] ?? e.kind, dash(e.description), money(e.amount), money(e.paid), money(e.remaining), e.date]),
+      }] : [],
+    };
+  },
+  payroll_summary(r) {
+    const rows = [...(r.rows ?? [])].sort((a: any, b: any) =>
+      (b.attendance_deduction + b.financial_deduction) - (a.attendance_deduction + a.financial_deduction) || String(a.name).localeCompare(String(b.name), "ar"));
+    const totalNet = rows.reduce((s: number, x: any) => s + Number(x.net), 0);
+    const totalSalary = rows.reduce((s: number, x: any) => s + Number(x.salary), 0);
+    return {
+      text: `مرتبات الفترة ${r.from} → ${r.to}: إجمالي المرتبات ${money(totalSalary)} ج — إجمالي الصافي ${money(totalNet)} ج لعدد ${rows.length} موظف.`,
+      tables: rows.length ? [{
+        title: "المرتبات والخصومات",
+        columns: ["الموظف", "المرتب", "أيام الخصم", "خصم الحضور", "استقطاعات مالية", "الصافي"],
+        rows: rows.map((x: any) => [x.name, money(x.salary), x.attendance_deduction_days, money(x.attendance_deduction), money(x.financial_deduction), money(x.net)]),
+        footer: ["الإجمالي", money(totalSalary), "", "", "", money(totalNet)],
+      }] : [],
+    };
+  },
+  loans_list(r) {
+    const rows = r ?? [];
+    const act = rows.filter((l: any) => l.status === "active");
+    const remaining = act.reduce((s: number, l: any) => s + Number(l.remaining), 0);
+    return {
+      text: rows.length ? `${act.length} سلفة سارية — إجمالي المتبقي ${money(remaining)} ج.` : "مفيش سلف مسجلة.",
+      tables: rows.length ? [{
+        title: "السلف",
+        columns: ["الموظف", "المبلغ", "أقساط", "البداية", "المسدد", "المتبقي", "الحالة"],
+        rows: rows.map((l: any) => [l.employee, money(l.amount), l.installments, l.start, money(l.paid), money(l.remaining), statusLabels[l.status] ?? l.status]),
+      }] : [],
+    };
+  },
+  owner_ledger(r) {
+    const rows = r ?? [];
+    const lent = rows.filter((x: any) => x.direction === "سلّفته").reduce((s: number, x: any) => s + Number(x.remaining), 0);
+    const borrowed = rows.filter((x: any) => x.direction === "استلفت منه").reduce((s: number, x: any) => s + Number(x.remaining), 0);
+    return {
+      text: rows.length ? `دفترك الشخصي: ليك بره ${money(lent)} ج — عليك ${money(borrowed)} ج.` : "الدفتر الشخصي فاضي.",
+      tables: rows.length ? [{
+        title: "الدفتر الشخصي",
+        columns: ["الشخص", "الاتجاه", "المبلغ", "المسدد", "المتبقي", "التاريخ", "ملاحظة"],
+        rows: rows.map((x: any) => [x.person, x.direction, money(x.amount), money(x.paid), money(x.remaining), x.date, dash(x.note)]),
+      }] : [],
+    };
+  },
+  db_select(r) {
+    if (!Array.isArray(r) || r.length === 0 || typeof r[0] !== "object") {
+      return { text: Array.isArray(r) && r.length === 0 ? "مفيش نتايج للاستعلام ده." : "", tables: [] };
+    }
+    const columns = Object.keys(r[0]).slice(0, 8);
+    const rows = r.slice(0, 60).map((row: any) => columns.map((k) => {
+      const v = row[k];
+      if (v === null || v === undefined) return "—";
+      if (typeof v === "object") return JSON.stringify(v).slice(0, 40);
+      return typeof v === "string" && statusLabels[v] ? statusLabels[v] : String(v);
+    }));
+    return { text: `لقيت ${r.length} صف.`, tables: [{ title: "نتيجة الاستعلام", columns, rows }] };
+  },
+};
+
+function safeRender(name: string, result: unknown, today: string): Rendered | null {
+  const fn = RENDERERS[name];
+  if (!fn) return null;
+  try { return fn(result, today); } catch { return null; }
+}
+
+// Read tools that ARE the answer: when a turn's first round calls only these
+// (successfully), we reply deterministically and never do a second LLM round.
+const SHORTCUT_TOOLS = new Set([
+  "payroll_summary", "day_attendance", "attendance_summary", "pending_approvals",
+  "expenses", "partner_summary", "loans_list", "owner_ledger",
+  "my_today", "my_month_summary", "my_deductions", "my_requests",
+]);
+
+// Non-sensitive action tools: successful round-0 actions also reply
+// deterministically (the RPCs return Arabic messages).
+const ACTION_LABELS: Record<string, (a: any, res: any) => string> = {
+  add_canteen: (a) => `اتسجل كانتين "${a.item}" بـ${money(a.amount)} ج`,
+  add_other_deduction: (a) => `اتسجل استقطاع ${deductionLabels[a.category] ?? a.category} بـ${money(a.amount)} ج`,
+  add_expense: (a) => `اتسجل مصروف ${expenseLabels[a.category] ?? a.category} بـ${money(a.amount)} ج (مستني تأكيد الـ Owner)`,
+  add_partner_entry: (a) => `اتسجل قيد مديونية ${money(a.amount)} ج`,
+  add_partner_settlement: (a) => `اتسجل سداد ${money(a.amount)} ج (مستني تأكيد الـ Owner)`,
+  send_notification: () => "الإشعار اتبعت",
+  set_hr_note: () => "الملاحظة اتسجلت",
+  mark_missing_checkouts: (_a, res) => res && typeof res === "object" && "updated" in res ? `راجعت الانصرافات — عدّلت ${res.updated} سجل` : "راجعت الانصرافات الناقصة",
+  request_permission: () => "طلب الإذن اتقدم — مستني موافقة الإدارة",
+  request_leave: () => "طلب الأجازة اتقدم — مستني موافقة الإدارة",
+};
+
+const hasArabic = (s: string) => /[؀-ۿ]/.test(s);
+
+// direct mode: chip-triggered reads that skip the LLM completely.
+const DIRECT_GATES: Record<string, (ctx: Ctx) => boolean> = {
+  my_today: (c) => !!c.employeeId,
+  my_month_summary: (c) => !!c.employeeId,
+  my_deductions: (c) => !!c.employeeId,
+  my_requests: (c) => !!c.employeeId,
+  day_attendance: (c) => c.role === "hr" || c.role === "owner",
+  attendance_summary: (c) => c.role === "hr" || c.role === "owner",
+  list_employees: (c) => c.role === "hr" || c.role === "owner",
+  pending_approvals: (c) => c.role === "hr" || c.role === "owner",
+  expenses: (c) => c.role === "hr" || c.role === "owner",
+  partner_summary: (c) => c.role === "hr" || c.role === "owner",
+  payroll_summary: (c) => c.role === "owner",
+  loans_list: (c) => c.role === "owner",
+  owner_ledger: (c) => c.role === "owner",
+};
+
+// ---------------------------------------------------------------------------
 // Tool schemas (OpenAI format), assembled per role.
 // ---------------------------------------------------------------------------
 function t(name: string, description: string, properties: Record<string, unknown> = {}, required: string[] = []) {
@@ -468,8 +733,10 @@ function systemPrompt(ctx: Ctx, roster: string): string {
 1. أي رقم أو معلومة عن الشركة لازم تيجي من الأدوات — ممنوع تخمّن أو تختلق. لو الأداة رجّعت فاضي قول "مش لاقي بيانات".
 2. الأدوات اللي عليها ⚠️ بترجع "بانتظار التأكيد" — قول للمستخدم إن العملية جاهزة ومستنية ضغطة "تنفيذ" اللي هتظهرله، ومتقولش إنها اتنفذت.
 3. صلاحياتك = صلاحيات المستخدم نفسه. لو موظف طلب حاجة إدارية اشرح بأدب إنها للإدارة فقط.
-4. لما تحتاج رقم موظف استخدم list_employees الأول — متفترضش الأرقام.
-5. المبالغ بالجنيه المصري. اعرض النتائج بشكل منظم ومختصر.
+4. لما تحتاج رقم موظف استخدم أرقام القائمة اللي فوق مباشرة — متفترضش أرقام من دماغك.
+5. المبالغ بالجنيه المصري.
+6. ممنوع تكتب جداول markdown في ردك نهائيًا — النظام بيعرض جداول منسقة تلقائيًا من نتايج الأدوات. اكتب خلاصة قصيرة (سطر أو اتنين) بس.
+7. خلّي تفكيرك الداخلي مختصر جدًا — سطر واحد يكفي — وبعده نفّذ على طول.
 
 معلومات النظام: الحضور بـ GPS (نطاق 1000م من مكتب العطارين) + QR يومي. نافذة الحضور العامة 08:00–11:00 والانصراف 16:00–19:00 (عبدالرحمن من 13:00/18:00، حبيبة 12:00–13:00/17:00–19:00). التأخير >15 دقيقة: أول مرة في الشهر إنذار وبعدها خصم ربع يوم. الأذونات: 3 شهريًا غير متتالية (ساعة أو ساعتين). الأجازات: يومين شهريًا غير متتاليين بموظف بديل، من رصيد سنوي. السلف بأقساط شهرية بتتخصم من المرتب تلقائيًا هي والكانتين والاستقطاعات. المصروفات وسدادات المديونية بيأكدها الـ Owner. صافي المرتب = المرتب − خصم الغياب/التأخير − الاستقطاعات المالية.`;
 }
@@ -494,6 +761,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
     }
 
+    const body = await req.json();
     const { data: myCtx } = await userClient.rpc("get_my_context_v1");
     const role: Role = (myCtx?.role as Role) ?? "employee";
     const ctx: Ctx = {
@@ -503,20 +771,27 @@ Deno.serve(async (req: Request) => {
       userId: userData.user.id,
       client: userClient,
     };
-
+    const today = todayCairo();
     const service = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-    // Rate limit: 20 messages/minute/user
-    const { count } = await service.from("assistant_logs").select("id", { count: "exact", head: true })
-      .eq("user_id", ctx.userId).gte("created_at", new Date(Date.now() - 60_000).toISOString());
-    if ((count ?? 0) >= 20) {
-      return new Response(JSON.stringify({ error: "rate_limited", reply: "استنى شوية — عدد كبير من الرسائل في وقت قصير." }), { status: 429, headers: cors });
+    // -------- direct mode: a chip tapped in the UI → run ONE read tool with
+    // no LLM at all. Deterministic text + table straight from the database.
+    if (body.direct) {
+      const { tool, args = {} } = body.direct as { tool: string; args?: Record<string, unknown> };
+      const gate = DIRECT_GATES[tool];
+      if (!gate) return new Response(JSON.stringify({ error: "bad_tool", reply: "الأداة دي مش متاحة للتشغيل المباشر." }), { status: 400, headers: cors });
+      if (!gate(ctx)) return new Response(JSON.stringify({ error: "forbidden", reply: "دي مش متاحة لدورك." }), { status: 403, headers: cors });
+      const result = await runTool(tool, args, ctx);
+      const failed = !!(result && typeof result === "object" && "error" in (result as Record<string, unknown>));
+      const rendered = failed ? null : safeRender(tool, result, today);
+      const reply = failed ? `❌ ${(result as any).error}` : (rendered?.text || "تمام ✅");
+      await service.from("assistant_logs").insert({
+        user_id: ctx.userId, role: ctx.role, question: `[مباشر] ${tool}`,
+        reply_summary: reply.slice(0, 500), tools_used: [{ name: tool, ok: !failed, direct: true }],
+        duration_ms: Date.now() - started,
+      });
+      return new Response(JSON.stringify({ reply, tables: rendered?.tables ?? [], actions: [{ name: tool, ok: !failed }], proposals: [] }), { headers: cors });
     }
-
-    const { data: cfgRow } = await service.from("assistant_config").select("*").eq("id", 1).single();
-    if (!cfgRow) return new Response(JSON.stringify({ error: "no_config" }), { status: 500, headers: cors });
-
-    const body = await req.json();
 
     // -------- confirm_action: execute a previously proposed sensitive action
     if (body.confirm_action) {
@@ -533,7 +808,18 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ result, summary: def.summary(args) }), { headers: cors });
     }
 
-    // -------- normal chat turn
+    // -------- normal chat turn (rate limit counts LLM turns only)
+    const [{ count }, { data: cfgRow }] = await Promise.all([
+      service.from("assistant_logs").select("id", { count: "exact", head: true })
+        .eq("user_id", ctx.userId).gte("created_at", new Date(Date.now() - 60_000).toISOString())
+        .not("question", "ilike", "[مباشر]%"),
+      service.from("assistant_config").select("*").eq("id", 1).single(),
+    ]);
+    if ((count ?? 0) >= 20) {
+      return new Response(JSON.stringify({ error: "rate_limited", reply: "استنى شوية — عدد كبير من الرسائل في وقت قصير." }), { status: 429, headers: cors });
+    }
+    if (!cfgRow) return new Response(JSON.stringify({ error: "no_config" }), { status: 500, headers: cors });
+
     // For admins, inject the active roster so employee lookups don't need a
     // separate tool round (Dahl is flaky on multi-round loops — single-round wins).
     let roster = "";
@@ -545,7 +831,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const history = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+    const history = Array.isArray(body.messages) ? body.messages.slice(-8) : [];
     const userQuestion = history.length ? String(history[history.length - 1]?.content ?? "") : "";
     const messages: Array<Record<string, unknown>> = [
       { role: "system", content: systemPrompt(ctx, roster) },
@@ -554,37 +840,37 @@ Deno.serve(async (req: Request) => {
     const tools = toolsForRole(ctx.role, !!ctx.employeeId);
     const executed: Array<{ name: string; ok: boolean; summary: string }> = [];
     const proposals: Array<{ name: string; args: Record<string, unknown>; summary: string }> = [];
+    const allTables: Table[] = [];
     let reply = "";
     let retriedNoTools = false;
 
-    for (let round = 0; round < (cfgRow.max_tool_rounds ?? 5); round++) {
-      const resp = await fetch(`${cfgRow.base_url}/chat/completions`, {
+    // A timeout/abort REJECTS fetch — never let that bubble into a 500.
+    const llmFetch = (payload: unknown): Promise<Response | null> =>
+      fetch(`${cfgRow.base_url}/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${cfgRow.api_key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: cfgRow.model,
-          temperature: Number(cfgRow.temperature ?? 0.2),
-          max_tokens: cfgRow.max_tokens ?? 3000,
-          messages,
-          tools,
-          tool_choice: "auto",
-        }),
-        signal: AbortSignal.timeout(110_000),
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(55_000),
+      }).catch(() => null);
+
+    for (let round = 0; round < (cfgRow.max_tool_rounds ?? 5); round++) {
+      const resp = await llmFetch({
+        model: cfgRow.model,
+        temperature: Number(cfgRow.temperature ?? 0.2),
+        max_tokens: cfgRow.max_tokens ?? 3000,
+        messages,
+        tools,
+        tool_choice: "auto",
       });
-      if (!resp.ok) {
-        const errText = (await resp.text()).slice(0, 300);
-        console.error("LLM error", resp.status, errText);
+      if (!resp || !resp.ok) {
+        if (resp) console.error("LLM error", resp.status, (await resp.text()).slice(0, 300));
+        else console.error("LLM timeout/unreachable");
         // If we already gathered tool results, do one no-tools retry so the
         // user gets a real answer instead of a generic failure.
         if (executed.length > 0 && !retriedNoTools) {
           retriedNoTools = true;
-          messages.push({ role: "system", content: "لخّص إجابتك النهائية للمستخدم من نتائج الأدوات اللي فوق. لو الأداة رجعت خطأ صلاحية، قول إن ده مش متاح لدوره. متستخدمش أدوات تاني." });
-          const r2 = await fetch(`${cfgRow.base_url}/chat/completions`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${cfgRow.api_key}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ model: cfgRow.model, temperature: 0.2, max_tokens: cfgRow.max_tokens ?? 3000, messages }),
-            signal: AbortSignal.timeout(110_000),
-          }).catch(() => null);
+          messages.push({ role: "system", content: "لخّص إجابتك النهائية للمستخدم من نتائج الأدوات اللي فوق بدون أي جدول markdown. لو الأداة رجعت خطأ صلاحية، قول إن ده مش متاح لدوره. متستخدمش أدوات تاني." });
+          const r2 = await llmFetch({ model: cfgRow.model, temperature: 0.2, max_tokens: cfgRow.max_tokens ?? 3000, messages });
           if (r2?.ok) {
             const d2 = await r2.json();
             reply = cleanReply(d2.choices?.[0]?.message?.content ?? "");
@@ -594,8 +880,8 @@ Deno.serve(async (req: Request) => {
         // with a provider error when the action itself went through.
         if (!reply) {
           reply = executed.some((e) => e.ok)
-            ? "تمام، نفّذت اللي طلبته ✅ — بس النموذج مش متاح دلوقتي عشان يلخّص، راجع النتيجة في الأعلى."
-            : "تعذر الوصول لنموذج الذكاء الاصطناعي دلوقتي. حاول تاني بعد شوية.";
+            ? (allTables.length ? "دي النتيجة من البيانات مباشرة" : "تمام، نفّذت اللي طلبته ✅")
+            : "النموذج واخد وقت أطول من الطبيعي — جرب تاني، أو استخدم الأزرار السريعة لنتيجة فورية.";
         }
         break;
       }
@@ -613,6 +899,7 @@ Deno.serve(async (req: Request) => {
         // blocks bloat context (a cause of 400s) — strip them from the replay.
         const cleanContent = cleanReply(msg.content ?? "");
         messages.push({ role: "assistant", content: cleanContent, tool_calls: toolCalls });
+        const roundCalls: Array<{ name: string; args: any; result: any; ok: boolean; rendered: Rendered | null; sensitive: boolean }> = [];
         for (const tc of toolCalls) {
           const name = tc.function?.name ?? "";
           let args: Record<string, unknown> = {};
@@ -621,15 +908,49 @@ Deno.serve(async (req: Request) => {
           if (SENSITIVE[name]) {
             const summary = SENSITIVE[name].summary(args);
             proposals.push({ name, args, summary });
+            roundCalls.push({ name, args, result: null, ok: true, rendered: null, sensitive: true });
             resultStr = JSON.stringify({ status: "awaiting_user_confirmation", summary, note: "العملية محضّرة — المستخدم لازم يدوس زرار تنفيذ اللي ظاهر له. متقولش إنها اتنفذت." });
           } else {
-            const result = await runTool(name, args, ctx);
+            // Role-gate reads even if the model hallucinates a call outside its
+            // schema — otherwise RLS returns empty rows and the table shows zeros.
+            const result = DIRECT_GATES[name] && !DIRECT_GATES[name](ctx)
+              ? { error: "دي مش متاحة لدورك." }
+              : await runTool(name, args, ctx);
+            const ok = !(result && typeof result === "object" && "error" in (result as Record<string, unknown>));
+            const rendered = ok ? safeRender(name, result, today) : null;
+            if (rendered && rendered.tables.length && allTables.length < 4) allTables.push(...rendered.tables.slice(0, 4 - allTables.length));
+            roundCalls.push({ name, args, result, ok, rendered, sensitive: false });
+            executed.push({ name, ok, summary: ok ? `تم تنفيذ ${name}` : `فشل ${name}` });
             resultStr = JSON.stringify(result ?? null);
             if (resultStr.length > 6000) resultStr = resultStr.slice(0, 6000) + "…(اتقطع — كمّل بفلاتر أدق)";
-            const ok = !(result && typeof result === "object" && "error" in (result as Record<string, unknown>));
-            executed.push({ name, ok, summary: ok ? `تم تنفيذ ${name}` : `فشل ${name}` });
           }
           messages.push({ role: "tool", tool_call_id: tc.id, content: resultStr });
+        }
+
+        // -------- deterministic short-circuits (round 0 only) --------
+        if (round === 0 && !roundCalls.some((rc) => rc.sensitive)) {
+          // (a) pure read-report turn: the rendered result IS the answer.
+          const allReads = roundCalls.every((rc) => SHORTCUT_TOOLS.has(rc.name) && rc.ok && rc.rendered);
+          if (allReads && roundCalls.length > 0 && roundCalls.length <= 2) {
+            reply = roundCalls.map((rc) => rc.rendered!.text).filter(Boolean).join("\n");
+            break;
+          }
+          // (b) pure action turn with Arabic (business) outcomes: confirm from
+          // the RPC's own message — no LLM needed to say "done".
+          const allActions = roundCalls.every((rc) => ACTION_LABELS[rc.name]);
+          const outcomesArabic = roundCalls.every((rc) => {
+            if (rc.ok) return true;
+            const msg = String((rc.result as any)?.message ?? (rc.result as any)?.error ?? "");
+            return hasArabic(msg);
+          });
+          if (allActions && roundCalls.length > 0 && outcomesArabic) {
+            reply = roundCalls.map((rc) => {
+              if (!rc.ok) return `❌ ${(rc.result as any)?.message ?? (rc.result as any)?.error}`;
+              const resMsg = (rc.result as any)?.message;
+              return `✅ ${typeof resMsg === "string" && resMsg ? resMsg : ACTION_LABELS[rc.name](rc.args, rc.result)}`;
+            }).join("\n");
+            break;
+          }
         }
         continue;
       }
@@ -648,7 +969,7 @@ Deno.serve(async (req: Request) => {
       duration_ms: Date.now() - started,
     });
 
-    return new Response(JSON.stringify({ reply, actions: executed, proposals }), { headers: cors });
+    return new Response(JSON.stringify({ reply, actions: executed, proposals, tables: allTables }), { headers: cors });
   } catch (e) {
     console.error("assistant error", e);
     return new Response(JSON.stringify({ error: "internal", reply: "حصل خطأ غير متوقع — حاول تاني." }), { status: 500, headers: cors });

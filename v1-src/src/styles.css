@@ -1540,6 +1540,19 @@
   background: rgba(127, 127, 127, 0.05);
 }
 
+.chat-table-wrap tfoot td {
+  font-weight: 800;
+  border-top: 2px solid var(--line);
+  background: var(--panel);
+}
+
+.chat-table-title {
+  font-weight: 800;
+  font-size: 13px;
+  padding: 8px 12px 0;
+  color: var(--muted);
+}
+
 /* ---------- AI Assistant chat ---------- */
 .chat-panel {
   display: flex;
@@ -1579,6 +1592,9 @@
 }
 
 .chat-suggestions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--line);
   background: var(--panel-soft);
   color: var(--ink);
@@ -1587,6 +1603,10 @@
   font-size: 13px;
   font-weight: 700;
   transition: background-color 0.15s ease;
+}
+
+.chat-suggestions button svg {
+  color: var(--brand);
 }
 
 .chat-suggestions button:hover {
