@@ -366,6 +366,39 @@ function t(name: string, description: string, properties: Record<string, unknown
   return { type: "function", function: { name, description, parameters: { type: "object", properties, required } } };
 }
 
+// MiniMax sometimes emits its NATIVE tool-call format as plain text content
+// instead of the structured `tool_calls` field. Parse it so the agent stays
+// robust to both formats (and the XML never leaks to the user).
+function coerce(v: string): unknown {
+  const s = v.trim();
+  if (/^-?\d+$/.test(s)) return parseInt(s, 10);
+  if (/^-?\d+\.\d+$/.test(s)) return parseFloat(s);
+  if (s === "true") return true;
+  if (s === "false") return false;
+  if (s === "null") return null;
+  return s;
+}
+function parseNativeToolCalls(content: string) {
+  const calls: Array<{ id: string; type: string; function: { name: string; arguments: string } }> = [];
+  const invokeRe = /<invoke name="([^"]+)">([\s\S]*?)<\/invoke>/g;
+  let m: RegExpExecArray | null;
+  while ((m = invokeRe.exec(content)) !== null) {
+    const params: Record<string, unknown> = {};
+    const paramRe = /<parameter name="([^"]+)">([\s\S]*?)<\/parameter>/g;
+    let pm: RegExpExecArray | null;
+    while ((pm = paramRe.exec(m[2])) !== null) params[pm[1]] = coerce(pm[2]);
+    calls.push({ id: `native_${calls.length}`, type: "function", function: { name: m[1], arguments: JSON.stringify(params) } });
+  }
+  return calls;
+}
+function cleanReply(text: string): string {
+  return String(text ?? "")
+    .replace(/<think>[\s\S]*?<\/think>/g, "")
+    .replace(/<minimax:tool_call>[\s\S]*?<\/minimax:tool_call>/g, "")
+    .replace(/<invoke name=[\s\S]*?<\/invoke>/g, "")
+    .trim();
+}
+
 function toolsForRole(role: Role, hasPortal: boolean) {
   const month = { type: "string", description: "الشهر YYYY-MM (الافتراضي الشهر الحالي)" };
   const date = { type: "string", description: "التاريخ YYYY-MM-DD (الافتراضي النهارده)" };
@@ -425,11 +458,11 @@ function toolsForRole(role: Role, hasPortal: boolean) {
   return tools;
 }
 
-function systemPrompt(ctx: Ctx): string {
+function systemPrompt(ctx: Ctx, roster: string): string {
   const roleAr = ctx.role === "owner" ? "المالك (Owner)" : ctx.role === "hr" ? "مسؤول HR" : "موظف";
   return `انت "مساعد Air Ocean Line" — مساعد ذكي داخل نظام الحضور والموارد البشرية للشركة. بتتكلم عربي مصري واضح ومختصر.
 
-المستخدم الحالي: ${ctx.name} — دوره: ${roleAr}. تاريخ اليوم: ${todayCairo()} (توقيت القاهرة). يوم الراحة الأسبوعي: الجمعة.
+المستخدم الحالي: ${ctx.name} — دوره: ${roleAr}. تاريخ اليوم: ${todayCairo()} (توقيت القاهرة). يوم الراحة الأسبوعي: الجمعة.${roster}
 
 قواعد صارمة:
 1. أي رقم أو معلومة عن الشركة لازم تيجي من الأدوات — ممنوع تخمّن أو تختلق. لو الأداة رجّعت فاضي قول "مش لاقي بيانات".
@@ -501,16 +534,28 @@ Deno.serve(async (req: Request) => {
     }
 
     // -------- normal chat turn
+    // For admins, inject the active roster so employee lookups don't need a
+    // separate tool round (Dahl is flaky on multi-round loops — single-round wins).
+    let roster = "";
+    if (ctx.role === "hr" || ctx.role === "owner") {
+      const { data: emps } = await ctx.client.from("employees").select("id,name,active").eq("active", true).order("id");
+      if (emps?.length) {
+        roster = "\n\nأرقام الموظفين (استخدمها مباشرة بدون ما تنادي list_employees): " +
+          emps.map((e) => `${e.name}=${e.id}`).join("، ") + ".";
+      }
+    }
+
     const history = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
     const userQuestion = history.length ? String(history[history.length - 1]?.content ?? "") : "";
     const messages: Array<Record<string, unknown>> = [
-      { role: "system", content: systemPrompt(ctx) },
+      { role: "system", content: systemPrompt(ctx, roster) },
       ...history,
     ];
     const tools = toolsForRole(ctx.role, !!ctx.employeeId);
     const executed: Array<{ name: string; ok: boolean; summary: string }> = [];
     const proposals: Array<{ name: string; args: Record<string, unknown>; summary: string }> = [];
     let reply = "";
+    let retriedNoTools = false;
 
     for (let round = 0; round < (cfgRow.max_tool_rounds ?? 5); round++) {
       const resp = await fetch(`${cfgRow.base_url}/chat/completions`, {
@@ -528,16 +573,47 @@ Deno.serve(async (req: Request) => {
       });
       if (!resp.ok) {
         const errText = (await resp.text()).slice(0, 300);
-        reply = `تعذر الوصول لنموذج الذكاء الاصطناعي (${resp.status}). حاول تاني بعد شوية.`;
         console.error("LLM error", resp.status, errText);
+        // If we already gathered tool results, do one no-tools retry so the
+        // user gets a real answer instead of a generic failure.
+        if (executed.length > 0 && !retriedNoTools) {
+          retriedNoTools = true;
+          messages.push({ role: "system", content: "لخّص إجابتك النهائية للمستخدم من نتائج الأدوات اللي فوق. لو الأداة رجعت خطأ صلاحية، قول إن ده مش متاح لدوره. متستخدمش أدوات تاني." });
+          const r2 = await fetch(`${cfgRow.base_url}/chat/completions`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${cfgRow.api_key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: cfgRow.model, temperature: 0.2, max_tokens: cfgRow.max_tokens ?? 3000, messages }),
+            signal: AbortSignal.timeout(110_000),
+          }).catch(() => null);
+          if (r2?.ok) {
+            const d2 = await r2.json();
+            reply = cleanReply(d2.choices?.[0]?.message?.content ?? "");
+          }
+        }
+        // If a write already succeeded, report success — don't scare the user
+        // with a provider error when the action itself went through.
+        if (!reply) {
+          reply = executed.some((e) => e.ok)
+            ? "تمام، نفّذت اللي طلبته ✅ — بس النموذج مش متاح دلوقتي عشان يلخّص، راجع النتيجة في الأعلى."
+            : "تعذر الوصول لنموذج الذكاء الاصطناعي دلوقتي. حاول تاني بعد شوية.";
+        }
         break;
       }
       const data = await resp.json();
       const msg = data.choices?.[0]?.message ?? {};
 
-      if (Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
-        messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
-        for (const tc of msg.tool_calls) {
+      // Accept both structured tool_calls and MiniMax's native XML format.
+      let toolCalls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
+      if (toolCalls.length === 0 && typeof msg.content === "string" && msg.content.includes("<invoke name=")) {
+        toolCalls = parseNativeToolCalls(msg.content);
+      }
+
+      if (toolCalls.length > 0) {
+        // Replay hygiene: Dahl/vLLM rejects null content; <think> + native XML
+        // blocks bloat context (a cause of 400s) — strip them from the replay.
+        const cleanContent = cleanReply(msg.content ?? "");
+        messages.push({ role: "assistant", content: cleanContent, tool_calls: toolCalls });
+        for (const tc of toolCalls) {
           const name = tc.function?.name ?? "";
           let args: Record<string, unknown> = {};
           try { args = JSON.parse(tc.function?.arguments || "{}"); } catch { /* keep {} */ }
@@ -558,7 +634,7 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      reply = String(msg.content ?? "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+      reply = cleanReply(msg.content ?? "");
       break;
     }
 
