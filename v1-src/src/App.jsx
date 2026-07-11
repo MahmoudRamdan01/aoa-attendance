@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import QRCodeLib from "qrcode";
 import {
   Activity,
@@ -129,6 +129,7 @@ const MENU = [
   { id: "requests", ar: "الطلبات", en: "Requests", icon: CalendarDays, kind: "employee" },
   { id: "notifications", ar: "الإشعارات", en: "Alerts", icon: Bell, kind: "all" },
   { id: "training", ar: "التدريب", en: "Training", icon: GraduationCap, kind: "all" },
+  { id: "assistant", ar: "المساعد الذكي", en: "AI Assistant", icon: Sparkles, kind: "all" },
   { id: "deductions", ar: "الاستقطاعات", en: "Deductions", icon: Banknote, kind: "all" },
   { id: "expenses", ar: "المصروفات", en: "Expenses", icon: Receipt, kind: "admin" },
   { id: "partner", ar: "مديونية Air Ocean", en: "Partner Ledger", icon: Scale, kind: "admin" },
@@ -629,6 +630,7 @@ function App() {
             )}
             {activeView === "notifications" && <NotificationsView context={context} onToast={setToast} />}
             {activeView === "training" && <TrainingView context={context} />}
+            {activeView === "assistant" && <AssistantView context={context} />}
             {activeView === "deductions" && <DeductionsView context={context} onToast={setToast} />}
             {activeView === "expenses" && isAdmin && <ExpensesView context={context} onToast={setToast} />}
             {activeView === "partner" && isAdmin && <PartnerLedgerView context={context} onToast={setToast} />}
@@ -2237,6 +2239,205 @@ function TrainingView({ context }) {
         </section>
       ))}
     </div>
+  );
+}
+
+// ===================== AI Assistant =====================
+
+const ASSISTANT_STORAGE_KEY = "aoa:v1:assistantChat";
+
+function loadChat() {
+  try {
+    return JSON.parse(sessionStorage.getItem(ASSISTANT_STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function AssistantView({ context }) {
+  const role = context?.role || "employee";
+  const isAdmin = role === "hr" || role === "owner";
+  const [messages, setMessages] = useState(loadChat);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(ASSISTANT_STORAGE_KEY, JSON.stringify(messages.slice(-30)));
+    } catch {
+      /* storage full */
+    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, busy]);
+
+  const suggestions = isAdmin
+    ? ["مين اتأخر النهارده؟", "إيه المعلقات اللي محتاجة قرار؟", "ملخص مصروفات الشهر", "ملخص مديونية Air Ocean"]
+    : ["سجلت حضور النهارده؟", "ملخص حضوري الشهر ده", "كام استقطاعاتي الشهر ده؟", "إيه حالة طلباتي؟"];
+
+  async function callAssistant(payload) {
+    const { data, error } = await supabase.functions.invoke("assistant", { body: payload });
+    if (error) {
+      let message = "تعذر الوصول للمساعد — حاول تاني.";
+      try {
+        const body = await error.context?.json?.();
+        if (body?.reply) message = body.reply;
+      } catch {
+        /* keep default */
+      }
+      return { reply: message, actions: [], proposals: [], failed: true };
+    }
+    return data || { reply: "رد فاضي.", actions: [], proposals: [] };
+  }
+
+  async function send(text) {
+    const question = (text ?? input).trim();
+    if (!question || busy) return;
+    setInput("");
+    const nextMessages = [...messages, { role: "user", content: question }];
+    setMessages(nextMessages);
+    setBusy(true);
+    const apiMessages = nextMessages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .slice(-12)
+      .map((m) => ({ role: m.role, content: m.content }));
+    const data = await callAssistant({ messages: apiMessages });
+    setMessages((current) => [
+      ...current,
+      {
+        role: "assistant",
+        content: data.reply || "",
+        actions: data.actions || [],
+        proposals: (data.proposals || []).map((p) => ({ ...p, state: "pending" })),
+      },
+    ]);
+    setBusy(false);
+  }
+
+  async function confirmProposal(messageIndex, proposalIndex) {
+    const proposal = messages[messageIndex]?.proposals?.[proposalIndex];
+    if (!proposal || proposal.state !== "pending" || busy) return;
+    setBusy(true);
+    const data = await callAssistant({ confirm_action: { name: proposal.name, args: proposal.args } });
+    const failed = data.failed || data.result?.error;
+    setMessages((current) => {
+      const copy = current.map((m, i) =>
+        i === messageIndex
+          ? { ...m, proposals: m.proposals.map((p, j) => (j === proposalIndex ? { ...p, state: failed ? "failed" : "done" } : p)) }
+          : m
+      );
+      return [
+        ...copy,
+        {
+          role: "assistant",
+          content: failed
+            ? `❌ ${data.result?.message || data.result?.error || "فشل التنفيذ."}`
+            : `✅ تم التنفيذ: ${data.summary || proposal.summary}`,
+          actions: [],
+          proposals: [],
+        },
+      ];
+    });
+    setBusy(false);
+  }
+
+  function dismissProposal(messageIndex, proposalIndex) {
+    setMessages((current) =>
+      current.map((m, i) =>
+        i === messageIndex
+          ? { ...m, proposals: m.proposals.map((p, j) => (j === proposalIndex ? { ...p, state: "dismissed" } : p)) }
+          : m
+      )
+    );
+  }
+
+  function clearChat() {
+    if (!confirm("تمسح المحادثة؟")) return;
+    setMessages([]);
+    try {
+      sessionStorage.removeItem(ASSISTANT_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <section className="panel chat-panel">
+      <div className="panel-title between">
+        <div><Sparkles size={20} /><h2>المساعد الذكي</h2></div>
+        <div className="toolbar">
+          {messages.length > 0 && (
+            <button className="secondary" onClick={clearChat}><Trash2 size={15} /> مسح</button>
+          )}
+        </div>
+      </div>
+
+      <div className="chat-messages">
+        {messages.length === 0 && (
+          <div className="chat-empty">
+            <Sparkles size={34} />
+            <p>اسألني عن أي حاجة في السيستم — بجاوب من البيانات الحقيقية وأقدر أنفذ عمليات.</p>
+            <div className="chat-suggestions">
+              {suggestions.map((s) => (
+                <button key={s} type="button" onClick={() => send(s)}>{s}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} className={cls("chat-bubble", m.role)}>
+            <div className="chat-content">{m.content}</div>
+            {m.actions?.length > 0 && (
+              <div className="chat-chips">
+                {m.actions.map((a, j) => (
+                  <span key={j} className={cls("chat-chip", a.ok === false && "failed")}>
+                    {a.ok === false ? "✗" : "✓"} {a.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            {m.proposals?.map((p, j) => (
+              <div key={j} className={cls("chat-proposal", p.state)}>
+                <p><AlertTriangle size={15} /> {p.summary}</p>
+                {p.state === "pending" && (
+                  <div className="actions-row">
+                    <button className="primary" disabled={busy} onClick={() => confirmProposal(i, j)}>تنفيذ</button>
+                    <button className="secondary" onClick={() => dismissProposal(i, j)}>تجاهل</button>
+                  </div>
+                )}
+                {p.state === "done" && <span className="status-badge confirmed">تم التنفيذ</span>}
+                {p.state === "failed" && <span className="status-badge rejected">فشل</span>}
+                {p.state === "dismissed" && <span className="status-badge voided">اتجاهلت</span>}
+              </div>
+            ))}
+          </div>
+        ))}
+        {busy && (
+          <div className="chat-bubble assistant">
+            <div className="chat-typing"><span /><span /><span /></div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      <form
+        className="chat-input-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="اكتب سؤالك أو طلبك..."
+          disabled={busy}
+        />
+        <button className="primary" disabled={busy || !input.trim()} type="submit">
+          <Send size={17} />
+        </button>
+      </form>
+    </section>
   );
 }
 

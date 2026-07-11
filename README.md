@@ -69,6 +69,7 @@ Run these in Supabase SQL Editor **in order** (all are idempotent, safe to re-ru
 6. `v1/supabase-financial-migration.sql` — financial modules: employee loans + installments, canteen, other deductions, company expenses (owner-confirmed), Air Ocean partner ledger with owner-confirmed settlements, owner personal ledger. RLS keeps loans + owner ledger hidden from HR.
 7. `v1/supabase-v1-ops-update.sql` — company GPS fix (real coords + 1000m radius), attendance windows (global 08–11 / 16–19, per-employee overrides), `employees.attendance_exempt` payroll-only flag, salary updates, one-time deduction reset, `notify_team()` + auto team notifications (late arrivals, approved leaves) + notifications realtime publication.
 8. `v1/supabase-v1-exempt-guard.sql` — exempt employees are blocked from check-in/out and never auto-marked absent.
+9. `v1/supabase-v1-assistant.sql` — AI assistant config + logs tables (insert the LLM API key manually — never commit it). The agent itself is the `assistant` Supabase Edge Function (source in `v1/assistant-function/index.ts`), called from the "المساعد الذكي" section with the user's JWT so RLS/RPC guards cap what it can do.
 
 ### ⚠️ Rotate all PINs (mandatory)
 
