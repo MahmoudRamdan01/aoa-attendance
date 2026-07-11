@@ -115,7 +115,9 @@ begin
 end $$;
 revoke execute on function notify_team(text,text) from public, anon, authenticated;
 
--- Late arrival → automatic notification to the whole team
+-- Late arrival → notify management only (HR + Owner). NOT the whole team:
+-- peers must not see each other's lateness. The employee already gets their
+-- own late notice from the check-in RPC. (See migration late_notify_admins_only.)
 create or replace function trg_notify_late()
 returns trigger language plpgsql security definer set search_path=public as $$
 declare
@@ -124,8 +126,8 @@ begin
   if new.status = 'late' and new.check_in is not null
      and (tg_op = 'INSERT' or old.status is distinct from 'late') then
     select name into v_name from employees where id = new.employee_id;
-    perform notify_team(
-      'تأخير اليوم',
+    perform notify_admins(
+      'تأخير موظف',
       coalesce(v_name, 'موظف') || ' وصل متأخر ' || coalesce(new.late_minutes,0)::text || ' دقيقة النهارده.'
     );
   end if;

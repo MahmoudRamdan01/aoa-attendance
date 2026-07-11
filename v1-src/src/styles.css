@@ -1467,6 +1467,79 @@
 
 
 
+
+/* ---------- Assistant markdown ---------- */
+.chat-content > *:first-child { margin-top: 0; }
+.chat-content > *:last-child { margin-bottom: 0; }
+
+.chat-content p {
+  margin: 6px 0;
+}
+
+.chat-content .chat-heading {
+  font-weight: 800;
+  font-size: 15px;
+  margin: 10px 0 6px;
+}
+
+.chat-content code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.9em;
+  background: rgba(127, 127, 127, 0.16);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.chat-content .chat-list {
+  margin: 6px 0;
+  padding-inline-start: 20px;
+}
+
+.chat-content .chat-list li {
+  margin: 3px 0;
+}
+
+.chat-content hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 10px 0;
+}
+
+.chat-table-wrap {
+  overflow-x: auto;
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.chat-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.chat-table-wrap th {
+  background: var(--panel);
+  text-align: right;
+  font-weight: 800;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--line);
+}
+
+.chat-table-wrap td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chat-table-wrap tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.chat-table-wrap tbody tr:nth-child(even) {
+  background: rgba(127, 127, 127, 0.05);
+}
+
 /* ---------- AI Assistant chat ---------- */
 .chat-panel {
   display: flex;

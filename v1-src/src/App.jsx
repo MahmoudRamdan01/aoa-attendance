@@ -2254,6 +2254,130 @@ function loadChat() {
   }
 }
 
+// Inline formatting: **bold** → <strong>, `code` → <code>.
+function renderInline(text, keyPrefix) {
+  const nodes = [];
+  const regex = /\*\*([^*]+)\*\*|`([^`]+)`/g;
+  let last = 0;
+  let match;
+  let i = 0;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) nodes.push(text.slice(last, match.index));
+    if (match[1] != null) nodes.push(<strong key={`${keyPrefix}-b${i}`}>{match[1]}</strong>);
+    else nodes.push(<code key={`${keyPrefix}-c${i}`}>{match[2]}</code>);
+    last = match.index + match[0].length;
+    i += 1;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+}
+
+// Lightweight markdown → React (headings, tables, bullet lists, bold). Enough
+// for the assistant's replies; avoids pulling in a full markdown dependency.
+function renderMarkdown(md) {
+  const lines = String(md || "").split("\n");
+  const blocks = [];
+  let i = 0;
+  let key = 0;
+
+  const isTableSep = (line) => /^\s*\|?[\s:|-]+\|?\s*$/.test(line) && line.includes("-");
+  const splitRow = (line) =>
+    line.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Table: a `|` header row followed by a separator row.
+    if (line.trim().startsWith("|") && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+      const header = splitRow(line);
+      const rows = [];
+      i += 2;
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        rows.push(splitRow(lines[i]));
+        i += 1;
+      }
+      blocks.push(
+        <div className="chat-table-wrap" key={`t${key++}`}>
+          <table>
+            <thead>
+              <tr>{header.map((h, hi) => <th key={hi}>{renderInline(h, `h${key}-${hi}`)}</th>)}</tr>
+            </thead>
+            <tbody>
+              {rows.map((r, ri) => (
+                <tr key={ri}>{header.map((_, ci) => <td key={ci}>{renderInline(r[ci] ?? "", `d${key}-${ri}-${ci}`)}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    // Heading.
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) {
+      blocks.push(<p className="chat-heading" key={`hd${key++}`}>{renderInline(h[2], `hd${key}`)}</p>);
+      i += 1;
+      continue;
+    }
+
+    // Bullet list.
+    if (/^\s*[-*]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*[-*]\s+/, ""));
+        i += 1;
+      }
+      blocks.push(
+        <ul className="chat-list" key={`ul${key++}`}>
+          {items.map((it, ii) => <li key={ii}>{renderInline(it, `li${key}-${ii}`)}</li>)}
+        </ul>
+      );
+      continue;
+    }
+
+    // Horizontal rule → skip (used as a visual divider in replies).
+    if (/^\s*-{3,}\s*$/.test(line)) {
+      blocks.push(<hr key={`hr${key++}`} />);
+      i += 1;
+      continue;
+    }
+
+    // Blank line.
+    if (!line.trim()) {
+      i += 1;
+      continue;
+    }
+
+    // Paragraph: gather consecutive plain lines.
+    const para = [line];
+    i += 1;
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !lines[i].trim().startsWith("|") &&
+      !/^(#{1,4})\s/.test(lines[i]) &&
+      !/^\s*[-*]\s+/.test(lines[i]) &&
+      !/^\s*-{3,}\s*$/.test(lines[i])
+    ) {
+      para.push(lines[i]);
+      i += 1;
+    }
+    blocks.push(
+      <p key={`p${key++}`}>
+        {para.map((pl, pi) => (
+          <span key={pi}>
+            {renderInline(pl, `p${key}-${pi}`)}
+            {pi < para.length - 1 && <br />}
+          </span>
+        ))}
+      </p>
+    );
+  }
+
+  return blocks;
+}
+
 function AssistantView({ context }) {
   const role = context?.role || "employee";
   const isAdmin = role === "hr" || role === "owner";
@@ -2386,7 +2510,7 @@ function AssistantView({ context }) {
         )}
         {messages.map((m, i) => (
           <div key={i} className={cls("chat-bubble", m.role)}>
-            <div className="chat-content">{m.content}</div>
+            <div className="chat-content">{m.role === "assistant" ? renderMarkdown(m.content) : m.content}</div>
             {m.actions?.length > 0 && (
               <div className="chat-chips">
                 {m.actions.map((a, j) => (
