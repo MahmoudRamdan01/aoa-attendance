@@ -768,10 +768,8 @@ function EmployeeToday({ context, onToast }) {
   }
 
   async function attendance(kind) {
-    if (!normalizeQr(qr)) {
-      onToast("اكتب كود QR قبل تحديد الموقع.");
-      return;
-    }
+    // QR is optional now — attendance works with GPS alone. If a code is typed
+    // and the admin has turned QR back on (qr_required), the server validates it.
     setBusy(kind);
     let loc = null;
     try {
@@ -849,12 +847,12 @@ function EmployeeToday({ context, onToast }) {
           <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={todayRecord?.check_out?.slice(0, 5) || "لم يسجل"} />
         </div>
         <label className="field">
-          كود QR اليومي
+          كود QR اليومي (اختياري)
           <input
             dir="ltr"
             value={qr}
             onChange={(e) => setQr(e.target.value.toUpperCase())}
-            placeholder="اكتب أو امسح كود اليوم"
+            placeholder="اختياري — تقدر تسجل بالموقع بس"
             autoCapitalize="characters"
             autoComplete="one-time-code"
           />
@@ -902,7 +900,7 @@ function EmployeeToday({ context, onToast }) {
         <ul className="rules">
           <li>التسجيل مرة حضور ومرة انصراف يوميًا.</li>
           <li>لازم تكون داخل {companyLocation.radiusMeters} متر من موقع الشركة.</li>
-          <li>كود QR يتغير يوميًا ويظهر عند HR/Owner.</li>
+          <li>كود QR اختياري — تقدر تسجل بالموقع لوحده (بيظهر عند HR/Owner لو حبيت تستخدمه).</li>
           <li>لو النت قطع، العملية تتحفظ وتتزامن عند رجوعه.</li>
         </ul>
       </section>

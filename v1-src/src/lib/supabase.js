@@ -17,8 +17,8 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 export const COMPANY_LOCATION = {
   label: "Air Ocean Line - Alexandria",
-  lat: 31.2272073,
-  lng: 29.9597824,
+  lat: 31.1985266,
+  lng: 29.9039409,
   radiusMeters: 1000,
 };
 
