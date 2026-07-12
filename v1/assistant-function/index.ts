@@ -1,14 +1,13 @@
 // ============================================================================
-// AOA Assistant — Supabase Edge Function (v7: deterministic tables + fast paths)
+// AOA Assistant — Supabase Edge Function (v10: per-user chat + multi-provider + SSE)
 // AI agent with role-gated tools over the attendance/financial system.
 // - Caller identity: the user's JWT → every data tool runs under THEIR RLS.
-// - Provider: any OpenAI-compatible endpoint (config in assistant_config).
-// - Sensitive actions return proposals; the client confirms via confirm_action.
-// - NUMBERS NEVER PASS THROUGH THE MODEL: read-tools render structured tables
-//   server-side (RENDERERS) and single-read questions skip the second LLM
-//   round entirely. body.direct = {tool, args} executes a read with NO LLM.
-// Deployed with verify_jwt=true (gateway rejects missing/invalid JWTs).
-// NOTE: this repo copy is a reference; the live function is deployed via MCP.
+// - Two clients: user-scoped (chat_*/prefs, RLS enforced) + service-role
+//   (provider config + assistant_logs only). Secrets come from Deno.env.
+// - Providers chosen server-side (client hint only); Qwen = read-only tools,
+//   fallback to Dahl before first token. Numbers render from DB, never model.
+// - Normal chat replies as SSE (meta/delta/done) with durable partial saves;
+//   direct chips + confirm_action reply as JSON. verify_jwt=true.
 // ============================================================================
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
 
@@ -742,6 +741,206 @@ function systemPrompt(ctx: Ctx, roster: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// v10: provider resolution (secrets from env), tool scoping, persistence, SSE.
+// ---------------------------------------------------------------------------
+const DEFAULT_DAHL_BASE = "https://inference.dahl.global/v1";
+
+interface ProviderRT {
+  key: string; base_url: string; api_key: string; model: string;
+  headers: Record<string, string>; tool_scope: string; streaming: boolean;
+}
+
+// Secrets NEVER come from the DB — only from Deno.env. The providers table is
+// non-sensitive config; base_url_ref names the env var holding the URL.
+function buildRuntime(p: any, cfgRow: any): ProviderRT | null {
+  if (!p) return null;
+  const env = (k: string) => Deno.env.get(k) || "";
+  if (p.key === "dahl") {
+    return {
+      key: "dahl",
+      base_url: env("DAHL_BASE_URL") || cfgRow?.base_url || DEFAULT_DAHL_BASE,
+      api_key: env("DAHL_API_KEY") || cfgRow?.api_key || "", // env-first; temp DB fallback
+      model: p.model, headers: {}, tool_scope: p.tool_scope, streaming: p.streaming,
+    };
+  }
+  if (p.key === "ollama") {
+    const base = env(p.base_url_ref || "OLLAMA_BASE_URL");
+    if (!base) return null; // not configured → caller falls back to dahl
+    const headers: Record<string, string> = {};
+    if (env("CF_ACCESS_CLIENT_ID")) headers["CF-Access-Client-Id"] = env("CF_ACCESS_CLIENT_ID");
+    if (env("CF_ACCESS_CLIENT_SECRET")) headers["CF-Access-Client-Secret"] = env("CF_ACCESS_CLIENT_SECRET");
+    return { key: "ollama", base_url: base, api_key: env("OLLAMA_API_KEY") || "ollama", model: p.model, headers, tool_scope: p.tool_scope, streaming: p.streaming };
+  }
+  const base = env(p.base_url_ref || "");
+  if (!base) return null;
+  return { key: p.key, base_url: base, api_key: env(`${String(p.key).toUpperCase()}_API_KEY`), model: p.model, headers: {}, tool_scope: p.tool_scope, streaming: p.streaming };
+}
+
+// Server-side provider choice — the client's provider_hint is only a hint.
+async function resolveProvider(service: SupabaseClient, cfgRow: any, role: Role, hint?: string) {
+  const { data: provs } = await service.from("assistant_providers").select("*");
+  const byKey: Record<string, any> = {};
+  for (const p of provs ?? []) byKey[p.key] = p;
+  const defKey = cfgRow?.default_provider_key || "dahl";
+  const allowed = (p: any) => p && p.enabled && Array.isArray(p.allowed_roles) && p.allowed_roles.includes(role);
+  let chosen = hint ? byKey[hint] : null;
+  let fallback = false;
+  if (!allowed(chosen)) { if (hint && hint !== defKey) fallback = true; chosen = byKey[defKey] ?? byKey["dahl"]; }
+  let rt = buildRuntime(chosen, cfgRow);
+  if (!rt) { rt = buildRuntime(byKey["dahl"], cfgRow)!; fallback = true; } // e.g. ollama unconfigured
+  const dahlRT = buildRuntime(byKey["dahl"], cfgRow)!;
+  return { rt, dahlRT, fallback };
+}
+
+// Qwen (read_only scope) only gets read tools — never direct/sensitive writes.
+const READ_ONLY_TOOLS = new Set([
+  "my_today", "my_month_summary", "my_deductions", "my_requests",
+  "day_attendance", "attendance_summary", "list_employees", "pending_approvals",
+  "expenses", "partner_summary", "db_select", "payroll_summary", "loans_list", "owner_ledger",
+]);
+function scopedTools(role: Role, hasPortal: boolean, scope: string) {
+  const all = toolsForRole(role, hasPortal) as any[];
+  if (scope !== "read_only") return all;
+  return all.filter((t) => READ_ONLY_TOOLS.has(t.function?.name));
+}
+
+const enc = new TextEncoder();
+function sse(event: string, data: unknown) {
+  return enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+// ---- persistence (user-scoped client → RLS enforced) ----
+async function ensureConversation(uc: SupabaseClient, convId: string | undefined, firstText: string, providerKey: string): Promise<string | null> {
+  if (convId) {
+    const { data } = await uc.from("chat_conversations").select("id").eq("id", convId).maybeSingle();
+    if (data?.id) return data.id;
+  }
+  const title = ((firstText || "محادثة جديدة").trim().split(/\s+/).slice(0, 6).join(" ").slice(0, 80)) || "محادثة جديدة";
+  const { data, error } = await uc.from("chat_conversations").insert({ title, provider_key: providerKey }).select("id").single();
+  return error ? null : data.id;
+}
+// idempotent insert: unique(conversation_id, client_message_id). 23505 ⇒ duplicate.
+async function saveUserMessage(uc: SupabaseClient, convId: string, text: string, clientMsgId: string | undefined, providerKey: string): Promise<boolean> {
+  const { error } = await uc.from("chat_messages").insert({
+    conversation_id: convId, role: "user", content: text,
+    client_message_id: clientMsgId ?? null, status: "completed", provider_key: providerKey,
+  });
+  if (error && (error as any).code === "23505") return false;
+  return !error;
+}
+async function createAssistantRow(uc: SupabaseClient, convId: string, generationId: string, providerKey: string): Promise<number | null> {
+  const { data, error } = await uc.from("chat_messages").insert({
+    conversation_id: convId, role: "assistant", content: "", status: "generating",
+    generation_id: generationId, provider_key: providerKey,
+  }).select("id").single();
+  return error ? null : data.id;
+}
+async function patchMessage(uc: SupabaseClient, id: number, patch: Record<string, unknown>) {
+  try { await uc.from("chat_messages").update(patch).eq("id", id); } catch { /* best-effort */ }
+}
+async function touchConversation(uc: SupabaseClient, convId: string, providerKey: string) {
+  try { await uc.from("chat_conversations").update({ last_message_at: new Date().toISOString(), provider_key: providerKey }).eq("id", convId); } catch { /**/ }
+}
+
+// One streamed model round. Emits user-facing prose deltas via onDelta (after
+// confirming it's prose — not tool-call XML / thinking). Returns the round's
+// tool calls (structured or MiniMax-native), the clean content, and flags.
+async function streamRound(
+  rt: ProviderRT, payload: any, opts: { firstByteMs: number; totalMs: number },
+  reqSignal: AbortSignal | undefined, onDelta: (t: string) => void,
+): Promise<{ ok: boolean; status?: number; toolCalls: any[]; content: string; finish: string; aborted: boolean }> {
+  const ctrl = new AbortController();
+  const onAbort = () => ctrl.abort();
+  reqSignal?.addEventListener("abort", onAbort);
+  let firstTimer: number | undefined = setTimeout(() => ctrl.abort(), opts.firstByteMs);
+  let totalTimer: number | undefined;
+  const cleanup = () => { if (firstTimer) clearTimeout(firstTimer); if (totalTimer) clearTimeout(totalTimer); reqSignal?.removeEventListener("abort", onAbort); };
+
+  let resp: Response | null = null;
+  try {
+    resp = await fetch(`${rt.base_url}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${rt.api_key}`, "Content-Type": "application/json", ...rt.headers },
+      body: JSON.stringify({ ...payload, stream: true }),
+      signal: ctrl.signal,
+    });
+  } catch {
+    cleanup();
+    return { ok: false, toolCalls: [], content: "", finish: "", aborted: reqSignal?.aborted ?? false };
+  }
+  if (!resp.ok || !resp.body) { const st = resp?.status; cleanup(); return { ok: false, status: st, toolCalls: [], content: "", finish: "", aborted: false }; }
+
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  const toolAcc: any[] = [];
+  let content = "";
+  let finish = "";
+  let gotFirst = false;
+  let prose: boolean | null = null; // null=undecided, true=emit, false=hold (tool/xml)
+  let emitted = 0;
+
+  const decideAndEmit = () => {
+    if (prose === false) return;
+    const clean = content.replace(/<think>[\s\S]*?<\/think>/g, "");
+    if (prose === null) {
+      const t = clean.trimStart();
+      if (!t) return;
+      if (/^<(invoke|minimax|think)/i.test(t)) { prose = false; return; }
+      if (t.length >= 12 || t.includes("\n")) { prose = true; }
+      else return;
+    }
+    if (prose === true && clean.length > emitted) { onDelta(clean.slice(emitted)); emitted = clean.length; }
+  };
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!gotFirst) { gotFirst = true; if (firstTimer) clearTimeout(firstTimer); firstTimer = undefined; totalTimer = setTimeout(() => ctrl.abort(), opts.totalMs); }
+      buf += dec.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line.startsWith("data:")) continue;
+        const d = line.slice(5).trim();
+        if (d === "[DONE]") { finish = finish || "stop"; continue; }
+        let j: any; try { j = JSON.parse(d); } catch { continue; }
+        const ch = j.choices?.[0]; const delta = ch?.delta ?? {};
+        if (ch?.finish_reason) finish = ch.finish_reason;
+        if (Array.isArray(delta.tool_calls)) {
+          for (const tc of delta.tool_calls) {
+            const i = tc.index ?? 0;
+            toolAcc[i] = toolAcc[i] || { id: "", type: "function", function: { name: "", arguments: "" } };
+            if (tc.id) toolAcc[i].id = tc.id;
+            if (tc.function?.name) toolAcc[i].function.name += tc.function.name;
+            if (tc.function?.arguments) toolAcc[i].function.arguments += tc.function.arguments;
+          }
+        }
+        if (typeof delta.content === "string" && delta.content) { content += delta.content; decideAndEmit(); }
+        // delta.reasoning (MiniMax thinking) is intentionally ignored.
+      }
+    }
+  } catch { /* aborted / network drop */ }
+  cleanup();
+
+  const aborted = reqSignal?.aborted ?? false;
+  // Never got a first byte (connect / first-token timeout) → treat as failure
+  // so the caller can fall back to Dahl (Ollama path).
+  if (!gotFirst) return { ok: false, toolCalls: [], content: "", finish: "", aborted };
+  let toolCalls = toolAcc.filter(Boolean);
+  // Parse MiniMax native <invoke> XML from RAW content (cleanReply strips it).
+  if (toolCalls.length === 0 && content.includes("<invoke name=")) toolCalls = parseNativeToolCalls(content);
+  const cleanContent = cleanReply(content);
+  // flush any un-emitted prose tail
+  if (toolCalls.length === 0) {
+    if (prose === null && cleanContent.trim()) onDelta(cleanContent);
+    else if (prose === true && cleanContent.length > emitted) onDelta(cleanContent.slice(emitted));
+  }
+  return { ok: true, toolCalls, content: cleanContent, finish, aborted };
+}
+
+// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 Deno.serve(async (req: Request) => {
@@ -778,6 +977,7 @@ Deno.serve(async (req: Request) => {
     // no LLM at all. Deterministic text + table straight from the database.
     if (body.direct) {
       const { tool, args = {} } = body.direct as { tool: string; args?: Record<string, unknown> };
+      const label = String(body.label ?? tool);
       const gate = DIRECT_GATES[tool];
       if (!gate) return new Response(JSON.stringify({ error: "bad_tool", reply: "الأداة دي مش متاحة للتشغيل المباشر." }), { status: 400, headers: cors });
       if (!gate(ctx)) return new Response(JSON.stringify({ error: "forbidden", reply: "دي مش متاحة لدورك." }), { status: 403, headers: cors });
@@ -785,12 +985,24 @@ Deno.serve(async (req: Request) => {
       const failed = !!(result && typeof result === "object" && "error" in (result as Record<string, unknown>));
       const rendered = failed ? null : safeRender(tool, result, today);
       const reply = failed ? `❌ ${(result as any).error}` : (rendered?.text || "تمام ✅");
+      const tables = rendered?.tables ?? [];
+      const actions = [{ name: tool, ok: !failed }];
+      // persist (user-scoped → RLS): chip appears in the conversation history.
+      const convId = await ensureConversation(userClient, body.conversation_id, label, "direct");
+      if (convId) {
+        await saveUserMessage(userClient, convId, label, body.client_message_id, "direct");
+        await userClient.from("chat_messages").insert({
+          conversation_id: convId, role: "assistant", content: reply,
+          tables, actions, status: "completed", provider_key: "direct",
+        });
+        await touchConversation(userClient, convId, "direct");
+      }
       await service.from("assistant_logs").insert({
         user_id: ctx.userId, role: ctx.role, question: `[مباشر] ${tool}`,
         reply_summary: reply.slice(0, 500), tools_used: [{ name: tool, ok: !failed, direct: true }],
         duration_ms: Date.now() - started,
       });
-      return new Response(JSON.stringify({ reply, tables: rendered?.tables ?? [], actions: [{ name: tool, ok: !failed }], proposals: [] }), { headers: cors });
+      return new Response(JSON.stringify({ reply, tables, actions, proposals: [], conversation_id: convId }), { headers: cors });
     }
 
     // -------- confirm_action: execute a previously proposed sensitive action
@@ -833,143 +1045,154 @@ Deno.serve(async (req: Request) => {
 
     const history = Array.isArray(body.messages) ? body.messages.slice(-8) : [];
     const userQuestion = history.length ? String(history[history.length - 1]?.content ?? "") : "";
-    const messages: Array<Record<string, unknown>> = [
-      { role: "system", content: systemPrompt(ctx, roster) },
-      ...history,
-    ];
-    const tools = toolsForRole(ctx.role, !!ctx.employeeId);
-    const executed: Array<{ name: string; ok: boolean; summary: string }> = [];
-    const proposals: Array<{ name: string; args: Record<string, unknown>; summary: string }> = [];
-    const allTables: Table[] = [];
-    let reply = "";
-    let retriedNoTools = false;
 
-    // A timeout/abort REJECTS fetch — never let that bubble into a 500.
-    const llmFetch = (payload: unknown): Promise<Response | null> =>
-      fetch(`${cfgRow.base_url}/chat/completions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${cfgRow.api_key}`, "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(55_000),
-      }).catch(() => null);
+    // Provider chosen server-side — the client's provider_hint is only a hint.
+    const { rt: initRT, dahlRT, fallback: initFallback } = await resolveProvider(service, cfgRow, ctx.role, body.provider_hint);
+    const reqSignal = req.signal;
 
-    for (let round = 0; round < (cfgRow.max_tool_rounds ?? 5); round++) {
-      const resp = await llmFetch({
-        model: cfgRow.model,
-        temperature: Number(cfgRow.temperature ?? 0.2),
-        max_tokens: cfgRow.max_tokens ?? 3000,
-        messages,
-        tools,
-        tool_choice: "auto",
-      });
-      if (!resp || !resp.ok) {
-        if (resp) console.error("LLM error", resp.status, (await resp.text()).slice(0, 300));
-        else console.error("LLM timeout/unreachable");
-        // If we already gathered tool results, do one no-tools retry so the
-        // user gets a real answer instead of a generic failure.
-        if (executed.length > 0 && !retriedNoTools) {
-          retriedNoTools = true;
-          messages.push({ role: "system", content: "لخّص إجابتك النهائية للمستخدم من نتائج الأدوات اللي فوق بدون أي جدول markdown. لو الأداة رجعت خطأ صلاحية، قول إن ده مش متاح لدوره. متستخدمش أدوات تاني." });
-          const r2 = await llmFetch({ model: cfgRow.model, temperature: 0.2, max_tokens: cfgRow.max_tokens ?? 3000, messages });
-          if (r2?.ok) {
-            const d2 = await r2.json();
-            reply = cleanReply(d2.choices?.[0]?.message?.content ?? "");
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (ev: string, d: unknown) => { try { controller.enqueue(sse(ev, d)); } catch { /* stream closed */ } };
+        let runtime = initRT;
+        let fallback = initFallback;
+        const generationId = crypto.randomUUID();
+        let convId: string | null = null;
+        let asstId: number | null = null;
+        let full = "";
+        let lastSave = Date.now();
+        let finalStatus = "completed";
+        const tables: Table[] = [];
+        const executed: Array<{ name: string; ok: boolean }> = [];
+        const proposals: Array<{ name: string; args: Record<string, unknown>; summary: string }> = [];
+        let reply = "";
+
+        try {
+          convId = await ensureConversation(userClient, body.conversation_id, userQuestion, runtime.key);
+          if (convId) {
+            await saveUserMessage(userClient, convId, userQuestion, body.client_message_id, runtime.key);
+            asstId = await createAssistantRow(userClient, convId, generationId, runtime.key);
           }
-        }
-        // If a write already succeeded, report success — don't scare the user
-        // with a provider error when the action itself went through.
-        if (!reply) {
-          reply = executed.some((e) => e.ok)
-            ? (allTables.length ? "دي النتيجة من البيانات مباشرة" : "تمام، نفّذت اللي طلبته ✅")
-            : "النموذج واخد وقت أطول من الطبيعي — جرب تاني، أو استخدم الأزرار السريعة لنتيجة فورية.";
-        }
-        break;
-      }
-      const data = await resp.json();
-      const msg = data.choices?.[0]?.message ?? {};
+          send("meta", { conversation_id: convId, generation_id: generationId, provider_used: runtime.key, fallback });
 
-      // Accept both structured tool_calls and MiniMax's native XML format.
-      let toolCalls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
-      if (toolCalls.length === 0 && typeof msg.content === "string" && msg.content.includes("<invoke name=")) {
-        toolCalls = parseNativeToolCalls(msg.content);
-      }
+          const onDelta = (t: string) => {
+            if (!t) return;
+            full += t;
+            send("delta", { text: t });
+            // durable partial save (throttled) so a disconnect keeps the text.
+            if (asstId && Date.now() - lastSave > 1500) { lastSave = Date.now(); patchMessage(userClient, asstId, { content: full, status: "generating" }); }
+          };
 
-      if (toolCalls.length > 0) {
-        // Replay hygiene: Dahl/vLLM rejects null content; <think> + native XML
-        // blocks bloat context (a cause of 400s) — strip them from the replay.
-        const cleanContent = cleanReply(msg.content ?? "");
-        messages.push({ role: "assistant", content: cleanContent, tool_calls: toolCalls });
-        const roundCalls: Array<{ name: string; args: any; result: any; ok: boolean; rendered: Rendered | null; sensitive: boolean }> = [];
-        for (const tc of toolCalls) {
-          const name = tc.function?.name ?? "";
-          let args: Record<string, unknown> = {};
-          try { args = JSON.parse(tc.function?.arguments || "{}"); } catch { /* keep {} */ }
-          let resultStr: string;
-          if (SENSITIVE[name]) {
-            const summary = SENSITIVE[name].summary(args);
-            proposals.push({ name, args, summary });
-            roundCalls.push({ name, args, result: null, ok: true, rendered: null, sensitive: true });
-            resultStr = JSON.stringify({ status: "awaiting_user_confirmation", summary, note: "العملية محضّرة — المستخدم لازم يدوس زرار تنفيذ اللي ظاهر له. متقولش إنها اتنفذت." });
-          } else {
-            // Role-gate reads even if the model hallucinates a call outside its
-            // schema — otherwise RLS returns empty rows and the table shows zeros.
-            const result = DIRECT_GATES[name] && !DIRECT_GATES[name](ctx)
-              ? { error: "دي مش متاحة لدورك." }
-              : await runTool(name, args, ctx);
-            const ok = !(result && typeof result === "object" && "error" in (result as Record<string, unknown>));
-            const rendered = ok ? safeRender(name, result, today) : null;
-            if (rendered && rendered.tables.length && allTables.length < 4) allTables.push(...rendered.tables.slice(0, 4 - allTables.length));
-            roundCalls.push({ name, args, result, ok, rendered, sensitive: false });
-            executed.push({ name, ok, summary: ok ? `تم تنفيذ ${name}` : `فشل ${name}` });
-            resultStr = JSON.stringify(result ?? null);
-            if (resultStr.length > 6000) resultStr = resultStr.slice(0, 6000) + "…(اتقطع — كمّل بفلاتر أدق)";
-          }
-          messages.push({ role: "tool", tool_call_id: tc.id, content: resultStr });
-        }
+          const messages: Array<Record<string, unknown>> = [
+            { role: "system", content: systemPrompt(ctx, roster) },
+            ...history,
+          ];
+          let tools = scopedTools(ctx.role, !!ctx.employeeId, runtime.tool_scope);
+          const maxRounds = cfgRow.max_tool_rounds ?? 5;
 
-        // -------- deterministic short-circuits (round 0 only) --------
-        if (round === 0 && !roundCalls.some((rc) => rc.sensitive)) {
-          // (a) pure read-report turn: the rendered result IS the answer.
-          const allReads = roundCalls.every((rc) => SHORTCUT_TOOLS.has(rc.name) && rc.ok && rc.rendered);
-          if (allReads && roundCalls.length > 0 && roundCalls.length <= 2) {
-            reply = roundCalls.map((rc) => rc.rendered!.text).filter(Boolean).join("\n");
+          for (let round = 0; round < maxRounds; round++) {
+            if (reqSignal.aborted) { finalStatus = "stopped"; reply = full; break; }
+            const res = await streamRound(runtime, {
+              model: runtime.model, temperature: Number(cfgRow.temperature ?? 0.2),
+              max_tokens: cfgRow.max_tokens ?? 3000, messages, tools, tool_choice: "auto",
+            }, { firstByteMs: runtime.key === "ollama" ? 15000 : 20000, totalMs: 60000 }, reqSignal, onDelta);
+
+            if (res.aborted || reqSignal.aborted) { finalStatus = "stopped"; reply = full; break; }
+
+            if (!res.ok) {
+              // provider failure BEFORE any token → fall back to Dahl once.
+              // (Never switch after streaming has begun.)
+              if (round === 0 && runtime.key !== "dahl" && !full) {
+                runtime = dahlRT; fallback = true;
+                tools = scopedTools(ctx.role, !!ctx.employeeId, runtime.tool_scope);
+                send("meta", { provider_used: "dahl", fallback: true });
+                round--; continue;
+              }
+              reply = full || (executed.some((e) => e.ok) ? "تمام، نفّذت اللي طلبته ✅" : "النموذج واخد وقت أطول من الطبيعي — جرب تاني، أو استخدم الأزرار السريعة لنتيجة فورية.");
+              finalStatus = full ? "completed" : "failed";
+              break;
+            }
+
+            if (res.toolCalls.length > 0) {
+              messages.push({ role: "assistant", content: res.content ?? "", tool_calls: res.toolCalls });
+              const roundCalls: Array<{ name: string; args: any; result: any; ok: boolean; rendered: Rendered | null; sensitive: boolean }> = [];
+              for (const tc of res.toolCalls) {
+                const name = tc.function?.name ?? "";
+                let args: Record<string, unknown> = {};
+                try { args = JSON.parse(tc.function?.arguments || "{}"); } catch { /* keep {} */ }
+                let resultStr: string;
+                if (SENSITIVE[name]) {
+                  const summary = SENSITIVE[name].summary(args);
+                  proposals.push({ name, args, summary });
+                  roundCalls.push({ name, args, result: null, ok: true, rendered: null, sensitive: true });
+                  resultStr = JSON.stringify({ status: "awaiting_user_confirmation", summary, note: "العملية محضّرة — المستخدم لازم يدوس زرار تنفيذ. متقولش إنها اتنفذت." });
+                } else {
+                  // Role-gate reads even if the model hallucinates a call outside its scope.
+                  const result = DIRECT_GATES[name] && !DIRECT_GATES[name](ctx)
+                    ? { error: "دي مش متاحة لدورك." }
+                    : await runTool(name, args, ctx);
+                  const ok = !(result && typeof result === "object" && "error" in (result as Record<string, unknown>));
+                  const rendered = ok ? safeRender(name, result, today) : null;
+                  if (rendered && rendered.tables.length && tables.length < 4) tables.push(...rendered.tables.slice(0, 4 - tables.length));
+                  roundCalls.push({ name, args, result, ok, rendered, sensitive: false });
+                  executed.push({ name, ok });
+                  resultStr = JSON.stringify(result ?? null);
+                  if (resultStr.length > 6000) resultStr = resultStr.slice(0, 6000) + "…(اتقطع — كمّل بفلاتر أدق)";
+                }
+                messages.push({ role: "tool", tool_call_id: tc.id, content: resultStr });
+              }
+
+              // deterministic short-circuits (round 0) — answer from CODE, no model prose.
+              if (round === 0 && !roundCalls.some((rc) => rc.sensitive)) {
+                const allReads = roundCalls.every((rc) => SHORTCUT_TOOLS.has(rc.name) && rc.ok && rc.rendered);
+                if (allReads && roundCalls.length > 0 && roundCalls.length <= 2) {
+                  reply = roundCalls.map((rc) => rc.rendered!.text).filter(Boolean).join("\n");
+                  send("delta", { text: reply }); full = reply; break;
+                }
+                const allActions = roundCalls.every((rc) => ACTION_LABELS[rc.name]);
+                const outcomesArabic = roundCalls.every((rc) => rc.ok || hasArabic(String((rc.result as any)?.message ?? (rc.result as any)?.error ?? "")));
+                if (allActions && roundCalls.length > 0 && outcomesArabic) {
+                  reply = roundCalls.map((rc) => rc.ok
+                    ? `✅ ${typeof (rc.result as any)?.message === "string" && (rc.result as any).message ? (rc.result as any).message : ACTION_LABELS[rc.name](rc.args, rc.result)}`
+                    : `❌ ${(rc.result as any)?.message ?? (rc.result as any)?.error}`).join("\n");
+                  send("delta", { text: reply }); full = reply; break;
+                }
+              }
+              continue;
+            }
+
+            // no tool calls → the prose was already streamed live via onDelta.
+            reply = res.content || full;
+            finalStatus = reqSignal.aborted ? "stopped" : "completed";
             break;
           }
-          // (b) pure action turn with Arabic (business) outcomes: confirm from
-          // the RPC's own message — no LLM needed to say "done".
-          const allActions = roundCalls.every((rc) => ACTION_LABELS[rc.name]);
-          const outcomesArabic = roundCalls.every((rc) => {
-            if (rc.ok) return true;
-            const msg = String((rc.result as any)?.message ?? (rc.result as any)?.error ?? "");
-            return hasArabic(msg);
+
+          if (!reply && proposals.length > 0) { reply = "جهزتلك العملية — راجعها ودوس تنفيذ."; send("delta", { text: reply }); full = reply; }
+          if (!reply && !full) { reply = "معرفتش أكمل الرد — جرب تاني أو بسّط السؤال."; send("delta", { text: reply }); full = reply; }
+          if (!reply) reply = full;
+
+          send("result", { tables, actions: executed, proposals });
+          send("done", { status: finalStatus, provider_used: runtime.key, fallback });
+
+          if (asstId) await patchMessage(userClient, asstId, { content: reply || full, tables, actions: executed, proposals, status: finalStatus, provider_key: runtime.key });
+          if (convId) await touchConversation(userClient, convId, runtime.key);
+          await service.from("assistant_logs").insert({
+            user_id: ctx.userId, role: ctx.role, question: userQuestion.slice(0, 500),
+            reply_summary: (reply || full).slice(0, 500),
+            tools_used: [...executed.map((e) => ({ name: e.name, ok: e.ok })), ...proposals.map((p) => ({ name: p.name, proposed: true })), { provider: runtime.key, fallback }],
+            duration_ms: Date.now() - started,
           });
-          if (allActions && roundCalls.length > 0 && outcomesArabic) {
-            reply = roundCalls.map((rc) => {
-              if (!rc.ok) return `❌ ${(rc.result as any)?.message ?? (rc.result as any)?.error}`;
-              const resMsg = (rc.result as any)?.message;
-              return `✅ ${typeof resMsg === "string" && resMsg ? resMsg : ACTION_LABELS[rc.name](rc.args, rc.result)}`;
-            }).join("\n");
-            break;
-          }
+        } catch (e) {
+          console.error("stream error", e);
+          const st = reqSignal.aborted ? "stopped" : "failed";
+          try { send("done", { status: st }); } catch { /* closed */ }
+          if (asstId) await patchMessage(userClient, asstId, { content: full, status: st });
+        } finally {
+          try { controller.close(); } catch { /* already closed */ }
         }
-        continue;
-      }
-
-      reply = cleanReply(msg.content ?? "");
-      break;
-    }
-
-    if (!reply && proposals.length === 0) reply = "معرفتش أكمل الرد — جرب تاني أو بسّط السؤال.";
-    if (!reply && proposals.length > 0) reply = "جهزتلك العملية — راجعها ودوس تنفيذ.";
-
-    await service.from("assistant_logs").insert({
-      user_id: ctx.userId, role: ctx.role, question: userQuestion.slice(0, 500),
-      reply_summary: reply.slice(0, 500),
-      tools_used: [...executed.map((e) => ({ name: e.name, ok: e.ok })), ...proposals.map((p) => ({ name: p.name, proposed: true }))],
-      duration_ms: Date.now() - started,
+      },
     });
 
-    return new Response(JSON.stringify({ reply, actions: executed, proposals, tables: allTables }), { headers: cors });
+    return new Response(stream, { headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
   } catch (e) {
     console.error("assistant error", e);
     return new Response(JSON.stringify({ error: "internal", reply: "حصل خطأ غير متوقع — حاول تاني." }), { status: 500, headers: cors });
