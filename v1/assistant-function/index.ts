@@ -321,6 +321,23 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx): P
       const { data, error } = await c.rpc("request_leave_v1", { p_from: args.from, p_to: args.to, p_cover: args.cover_employee_id, p_reason: args.reason });
       return error ? { error: error.message } : data;
     }
+    // ---- RAG: agentic hybrid retrieval over the company knowledge base ----
+    case "kb_search": {
+      const q = String(args.query ?? "").trim();
+      if (!q) return { error: "اكتب سؤال للبحث." };
+      const emb = await embedText(q);
+      // ctx.client (user JWT) → kb_search_v1 derives role and filters by visibility.
+      const { data, error } = await c.rpc("kb_search_v1", {
+        p_embedding: emb ? vecLiteral(emb) : null,
+        p_query: q,
+        p_k: Math.min(Number(args.k ?? 6), 10),
+      });
+      if (error) return { error: error.message };
+      return {
+        query: q,
+        passages: (data ?? []).map((r: any) => ({ source: r.source, title: r.title, text: r.content, meta: r.metadata })),
+      };
+    }
     default:
       return { error: `أداة غير معروفة: ${name}` };
   }
@@ -668,6 +685,12 @@ function toolsForRole(role: Role, hasPortal: boolean) {
   const date = { type: "string", description: "التاريخ YYYY-MM-DD (الافتراضي النهارده)" };
   const tools: unknown[] = [];
 
+  // RAG search — available to every role (results are already role-filtered).
+  tools.push(
+    t("kb_search", "بحث دلالي في معرفة الشركة: السياسات والقواعد، وأسباب الأجازات/الأذونات، والملاحظات النصية، والمصروفات ومديونية Air Ocean. استخدمه لأي سؤال عن 'ليه' أو 'إيه سياسة/قاعدة' أو تلخيص ملاحظات أو أسباب. النتايج مفلترة حسب صلاحية المستخدم.",
+      { query: { type: "string", description: "السؤال أو الكلمات المفتاحية" }, k: { type: "integer" } }, ["query"]),
+  );
+
   if (hasPortal) {
     tools.push(
       t("my_today", "سجل حضوري النهارده"),
@@ -736,6 +759,7 @@ function systemPrompt(ctx: Ctx, roster: string): string {
 5. المبالغ بالجنيه المصري.
 6. ممنوع تكتب جداول markdown في ردك نهائيًا — النظام بيعرض جداول منسقة تلقائيًا من نتايج الأدوات. اكتب خلاصة قصيرة (سطر أو اتنين) بس.
 7. خلّي تفكيرك الداخلي مختصر جدًا — سطر واحد يكفي — وبعده نفّذ على طول.
+8. للأسئلة عن السياسات/القواعد أو "ليه؟" أو أسباب الأجازات والأذونات أو تلخيص الملاحظات النصية — استخدم kb_search، وابنِ إجابتك من المقاطع اللي رجعت بس واذكر المصدر (النوع + صاحبه/تاريخه لو موجود). لو مفيش نتيجة قول "مش لاقي معلومة عن ده". للأرقام والحسابات استخدم الأدوات المهيكلة مش kb_search.
 
 معلومات النظام: الحضور بـ GPS (نطاق 1000م من مكتب العطارين) + QR يومي. نافذة الحضور العامة 08:00–11:00 والانصراف 16:00–19:00 (عبدالرحمن من 13:00/18:00، حبيبة 12:00–13:00/17:00–19:00). التأخير >15 دقيقة: أول مرة في الشهر إنذار وبعدها خصم ربع يوم. الأذونات: 3 شهريًا غير متتالية (ساعة أو ساعتين). الأجازات: يومين شهريًا غير متتاليين بموظف بديل، من رصيد سنوي. السلف بأقساط شهرية بتتخصم من المرتب تلقائيًا هي والكانتين والاستقطاعات. المصروفات وسدادات المديونية بيأكدها الـ Owner. صافي المرتب = المرتب − خصم الغياب/التأخير − الاستقطاعات المالية.`;
 }
@@ -794,6 +818,7 @@ async function resolveProvider(service: SupabaseClient, cfgRow: any, role: Role,
 
 // Qwen (read_only scope) only gets read tools — never direct/sensitive writes.
 const READ_ONLY_TOOLS = new Set([
+  "kb_search",
   "my_today", "my_month_summary", "my_deductions", "my_requests",
   "day_attendance", "attendance_summary", "list_employees", "pending_approvals",
   "expenses", "partner_summary", "db_select", "payroll_summary", "loans_list", "owner_ledger",
@@ -808,6 +833,19 @@ const enc = new TextEncoder();
 function sse(event: string, data: unknown) {
   return enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
+
+// ---- RAG embeddings: Supabase Edge Runtime built-in gte-small (384d) ----
+// In-runtime, no external service. Swap to Ollama bge-m3 later for better Arabic.
+let _embedSession: any = null;
+async function embedText(text: string): Promise<number[] | null> {
+  try {
+    // @ts-ignore Supabase global is provided by the edge runtime
+    if (!_embedSession) _embedSession = new Supabase.ai.Session("gte-small");
+    const out = await _embedSession.run((text || "").slice(0, 2000), { mean_pool: true, normalize: true });
+    return Array.isArray(out) ? (out as number[]) : null;
+  } catch (e) { console.error("embed error", e); return null; }
+}
+const vecLiteral = (arr: number[]) => "[" + arr.join(",") + "]";
 
 // ---- persistence (user-scoped client → RLS enforced) ----
 async function ensureConversation(uc: SupabaseClient, convId: string | undefined, firstText: string, providerKey: string): Promise<string | null> {
@@ -1018,6 +1056,23 @@ Deno.serve(async (req: Request) => {
         tools_used: [{ name, args, confirmed: true }], duration_ms: Date.now() - started,
       });
       return new Response(JSON.stringify({ result, summary: def.summary(args) }), { headers: cors });
+    }
+
+    // -------- rag maintenance (owner-only): re-sync free-text → chunks, then
+    // embed any pending chunks with gte-small. Lexical search works immediately;
+    // this backfills the semantic vectors.
+    if (body.rag_maintenance) {
+      if (ctx.role !== "owner") return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: cors });
+      const { data: sync } = await ctx.client.rpc("kb_sync_v1");
+      const { data: pending } = await service.from("kb_chunks").select("id,content").is("embedding", null).limit(400);
+      let embedded = 0;
+      for (const row of pending ?? []) {
+        const emb = await embedText(row.content as string);
+        if (emb) { const { error } = await service.from("kb_chunks").update({ embedding: vecLiteral(emb) }).eq("id", row.id); if (!error) embedded++; }
+      }
+      const { count: total } = await service.from("kb_chunks").select("id", { count: "exact", head: true });
+      const { count: stillPending } = await service.from("kb_chunks").select("id", { count: "exact", head: true }).is("embedding", null);
+      return new Response(JSON.stringify({ sync, embedded, total, pending: stillPending }), { headers: cors });
     }
 
     // -------- normal chat turn (rate limit counts LLM turns only)
