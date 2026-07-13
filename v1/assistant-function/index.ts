@@ -1284,6 +1284,58 @@ function resolveMoneyArgs(name: string, args: Record<string, unknown>, text: str
 }
 
 // ---------------------------------------------------------------------------
+// Deterministic money-write pre-router. MiniMax often NARRATES a confirmation
+// instead of calling the write tool (so no card appears). For clear money
+// commands we build the proposal in code — the confirm card always shows and
+// the numbers/employee are exact. Unclear cases fall through to the LLM.
+// ---------------------------------------------------------------------------
+function parseInstallments(text: string): number | null {
+  const t = String(text ?? "").replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+  const m = t.match(/(\d+)\s*(?:شهور|شهر|اشهر|أشهر|قسط|اقساط|أقساط)/);
+  if (m) return Math.min(Math.max(Number(m[1]), 1), 60);
+  if (/قسطين|شهرين/.test(t)) return 2;
+  return null;
+}
+const LEDGER_STOP = new Set(["اكتب", "سجل", "دون", "دوّن", "مديونية", "مديونيه", "سلفة", "سلفه", "سلفت", "استلفت", "دفتر", "شخصي", "الشخصي", "على", "من", "في", "بمبلغ", "جنيه", "ج", "ليا", "ليه", "عليا", "علي", "قيد", "الدفتر", "مبلغ", "انه", "إنه", "له"]);
+function extractPerson(text: string): string | null {
+  const norm = String(text ?? "").replace(/[ً-ْ]/g, "");
+  const toks = norm.split(/[^ء-ي]+/).filter(Boolean).filter((w) => !LEDGER_STOP.has(w));
+  if (!toks.length) return null;
+  toks[0] = toks[0].replace(/^(لل|ل|و|ب|ك|ف)/, "");
+  const person = toks.filter(Boolean).join(" ").trim();
+  return person.length >= 2 ? person : null;
+}
+// Returns a proposal {name, args, summary} to show as a confirm card, or null.
+function preRouteWrite(
+  history: any[], emps: Array<{ id: number; name: string }>, role: Role, today: string,
+): { name: string; args: Record<string, unknown>; summary: string } | null {
+  if (role !== "hr" && role !== "owner") return null;
+  if (!history.length) return null;
+  const cur = String(history[history.length - 1]?.content ?? "");
+  if (!cur.trim()) return null;
+  const amt = parseAmount(cur);
+  const emp = findSoleEmployee(cur, emps);
+  const mk = (name: string, args: Record<string, unknown>) => ({ name, args, summary: SENSITIVE[name].summary(args) });
+  // Owner personal ledger: مديونية/سلفة لشخص بره الفريق (owner only, free-text person).
+  if (role === "owner" && /مديوني|الدفتر الشخصي|دفتر شخصي/.test(cur) && amt != null && !emp) {
+    const person = extractPerson(cur);
+    if (person) {
+      const dir = /استلفت|علي\b|عليا|عليّ/.test(cur) ? "borrowed" : "lent";
+      return mk("add_owner_ledger", { person, direction: dir, amount: amt });
+    }
+  }
+  if (!emp || amt == null) return null;
+  const base = { employee_id: emp.id, _name: emp.name, amount: amt };
+  if (/سلف/.test(cur)) return mk("add_loan", { ...base, installments: parseInstallments(cur) ?? 1, start_month: today.slice(0, 7) });
+  if (/كانتين/.test(cur)) return mk("add_canteen", { ...base, item: "كانتين" });
+  if (/خصم|استقطاع|جزاء|غرامة|تلفيات|تلفان|كسر|زي\b/.test(cur)) {
+    const category = /جزاء|غرامة/.test(cur) ? "penalty" : /تلفيات|تلفان|كسر/.test(cur) ? "damage" : /زي\b/.test(cur) ? "uniform" : "other";
+    return mk("add_other_deduction", { ...base, category });
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 Deno.serve(async (req: Request) => {
@@ -1435,6 +1487,27 @@ Deno.serve(async (req: Request) => {
             asstId = await createAssistantRow(userClient, convId, generationId, runtime.key);
           }
           send("meta", { conversation_id: convId, generation_id: generationId, provider_used: runtime.key, fallback });
+
+          // Deterministic money-write: build the confirm-card proposal in code
+          // (the model tends to narrate instead of calling the tool).
+          const wr = preRouteWrite(history, rosterEmps, ctx.role, today);
+          if (wr) {
+            reply = `⚠️ ${wr.summary}\nراجع وادوس "تنفيذ" للتأكيد.`;
+            full = reply;
+            proposals.push(wr);
+            send("delta", { text: reply });
+            send("result", { tables: [], actions: [], proposals });
+            send("done", { status: "completed", provider_used: runtime.key, fallback });
+            if (asstId) await patchMessage(userClient, asstId, { content: reply, proposals, status: "completed", provider_key: runtime.key });
+            if (convId) await touchConversation(userClient, convId, runtime.key);
+            await service.from("assistant_logs").insert({
+              user_id: ctx.userId, role: ctx.role, question: userQuestion.slice(0, 500),
+              reply_summary: reply.slice(0, 500),
+              tools_used: [{ name: wr.name, proposed: true, preroute: true }],
+              duration_ms: Date.now() - started,
+            });
+            return;
+          }
 
           // Deterministic pre-route: admin questions naming exactly ONE employee
           // are answered straight from the DB (skip the flaky LLM tool choice);
