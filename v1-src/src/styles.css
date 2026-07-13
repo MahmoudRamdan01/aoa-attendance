@@ -1939,3 +1939,28 @@ a.secondary {
     break-inside: avoid;
   }
 }
+
+/* ===== Employees page + shared bits (v19 UI additions) ===== */
+.badge.ok { background: rgba(16,185,129,0.14); color: var(--green); border-color: rgba(16,185,129,0.4); }
+.badge.danger { background: rgba(239,68,68,0.14); color: var(--red); border-color: rgba(239,68,68,0.4); }
+.badge.muted { background: var(--panel-soft); color: var(--muted); border-color: var(--line); }
+
+.field-search { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-soft); margin-bottom: 12px; color: var(--muted); }
+.field-search input { flex: 1; border: 0; background: transparent; outline: none; color: var(--ink); font-size: 15px; font-weight: 600; }
+.field-inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.field-inline input { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--panel-soft); color: var(--ink); font-weight: 700; }
+
+.emp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.emp-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-soft); cursor: pointer; text-align: right; transition: border-color .15s, transform .1s; }
+.emp-card:hover { border-color: var(--gold); transform: translateY(-1px); }
+.emp-card > svg:last-child { color: var(--muted); flex-shrink: 0; }
+.emp-avatar { width: 42px; height: 42px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--brand-soft); color: var(--gold); font-weight: 900; font-size: 18px; flex-shrink: 0; }
+.emp-card-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.emp-card-body strong { font-weight: 800; color: var(--ink); }
+.emp-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+
+.seg-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 8px 18px; font-weight: 800; color: var(--muted); cursor: pointer; }
+.seg button.active { background: var(--gold); color: #1a1a1a; }
+.seg-row select { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--panel-soft); color: var(--ink); font-weight: 700; }
