@@ -1313,6 +1313,8 @@ function preRouteWrite(
   if (!history.length) return null;
   const cur = String(history[history.length - 1]?.content ?? "");
   if (!cur.trim()) return null;
+  // Don't hijack QUESTIONS (do NOT create a write from "سلفته كام؟" / "اتسددت؟").
+  if (/[؟?]|\bكام\b|\bهل\b|امتى|إمتى|فين|ازاي|إزاي|اتسدد|اتخصم|ليه|باقي|عليه كام/.test(cur)) return null;
   const amt = parseAmount(cur);
   const emp = findSoleEmployee(cur, emps);
   const mk = (name: string, args: Record<string, unknown>) => ({ name, args, summary: SENSITIVE[name].summary(args) });
