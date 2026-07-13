@@ -321,6 +321,69 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx): P
       const { data, error } = await c.rpc("request_leave_v1", { p_from: args.from, p_to: args.to, p_cover: args.cover_employee_id, p_reason: args.reason });
       return error ? { error: error.message } : data;
     }
+    case "employee_report": {
+      let empId = args.employee_id ? Number(args.employee_id) : null;
+      if (!empId && args.name) {
+        const { data: e } = await c.from("employees").select("id,name").ilike("name", `%${String(args.name)}%`).limit(1).maybeSingle();
+        empId = e?.id ?? null;
+      }
+      if (!empId) return { error: "محددتش الموظف — اكتب اسمه أو رقمه." };
+      const from = (args.from as string) || mr.from;
+      const to = (args.to as string) || mr.to;
+      const [emp, att, cant, oth, inst, leaves, perms] = await Promise.all([
+        c.from("employees").select("id,name,leave_balance").eq("id", empId).maybeSingle(),
+        c.from("attendance").select("work_date,status,check_in,check_out,late_minutes,deduction_days,employee_note,hr_note").eq("employee_id", empId).gte("work_date", from).lte("work_date", to).order("work_date"),
+        c.from("canteen_entries").select("entry_date,item,amount").eq("employee_id", empId).eq("status", "active").gte("entry_date", from).lte("entry_date", to),
+        c.from("other_deductions").select("entry_date,category,amount,note").eq("employee_id", empId).eq("status", "active").gte("entry_date", from).lte("entry_date", to),
+        c.from("emp_loan_installments").select("due_month,amount,loan:emp_loans!inner(status)").eq("employee_id", empId).eq("loan.status", "active").gte("due_month", from.slice(0, 7)).lte("due_month", to.slice(0, 7)),
+        c.from("leave_requests").select("from_date,to_date,days,status,reason").eq("employee_id", empId).gte("from_date", from).lte("from_date", to).order("from_date"),
+        c.from("permissions").select("perm_date,hours_requested,hours_approved,status,reason").eq("employee_id", empId).gte("perm_date", from).lte("perm_date", to).order("perm_date"),
+      ]);
+      if (!emp.data) return { error: "الموظف غير موجود." };
+      return {
+        employee: emp.data.name, employee_id: empId, from, to, leave_balance: emp.data.leave_balance,
+        attendance: att.data ?? [], canteen: cant.data ?? [], other: oth.data ?? [], installments: inst.data ?? [],
+        leaves: leaves.data ?? [], permissions: perms.data ?? [],
+      };
+    }
+    case "requests_overview": {
+      // requests can be for FUTURE dates (leaves/permissions booked ahead), so
+      // when no period is given the window is unbounded — never clip at today.
+      const from = (args.from as string) || "2020-01-01";
+      const to = (args.to as string) || "2099-12-31";
+      const [lv, pm, emp] = await Promise.all([
+        c.from("leave_requests").select("employee_id,from_date,to_date,days,status").gte("from_date", from).lte("from_date", to),
+        c.from("permissions").select("employee_id,perm_date,hours_requested,hours_approved,status").gte("perm_date", from).lte("perm_date", to),
+        c.from("employees").select("id,name"),
+      ]);
+      const names = new Map((emp.data ?? []).map((e) => [e.id, e.name]));
+      const per = new Map<number, { name: string; lv_req: number; lv_appr: number; lv_days: number; lv_rej: number; pm_req: number; pm_appr: number; pm_hours: number }>();
+      const g = (id: number) => { let x = per.get(id); if (!x) { x = { name: names.get(id) ?? `#${id}`, lv_req: 0, lv_appr: 0, lv_days: 0, lv_rej: 0, pm_req: 0, pm_appr: 0, pm_hours: 0 }; per.set(id, x); } return x; };
+      const lvRows = lv.data ?? []; const pmRows = pm.data ?? [];
+      for (const l of lvRows) { const x = g(l.employee_id); x.lv_req++; if (l.status === "approved") { x.lv_appr++; x.lv_days += Number(l.days || 0); } else if (l.status === "rejected") x.lv_rej++; }
+      for (const p of pmRows) { const x = g(p.employee_id); x.pm_req++; if (p.status === "approved") { x.pm_appr++; x.pm_hours += Number(p.hours_approved ?? p.hours_requested ?? 0); } }
+      return {
+        from, to,
+        leaves: {
+          requested: lvRows.length,
+          approved: lvRows.filter((l) => l.status === "approved").length,
+          rejected: lvRows.filter((l) => l.status === "rejected").length,
+          pending: lvRows.filter((l) => l.status === "pending").length,
+          approved_days: lvRows.filter((l) => l.status === "approved").reduce((s, l) => s + Number(l.days || 0), 0),
+          requesters: new Set(lvRows.map((l) => l.employee_id)).size,
+          takers: new Set(lvRows.filter((l) => l.status === "approved").map((l) => l.employee_id)).size,
+        },
+        permissions: {
+          requested: pmRows.length,
+          approved: pmRows.filter((p) => p.status === "approved").length,
+          rejected: pmRows.filter((p) => p.status === "rejected").length,
+          pending: pmRows.filter((p) => p.status === "pending").length,
+          approved_hours: pmRows.filter((p) => p.status === "approved").reduce((s, p) => s + Number(p.hours_approved ?? p.hours_requested ?? 0), 0),
+          requesters: new Set(pmRows.map((p) => p.employee_id)).size,
+        },
+        per_employee: [...per.values()],
+      };
+    }
     // ---- RAG: agentic hybrid retrieval over the company knowledge base ----
     case "kb_search": {
       const q = String(args.query ?? "").trim();
@@ -349,7 +412,37 @@ const SENSITIVE: Record<string, { rpc: string; map: (a: Record<string, unknown>)
   add_loan: {
     rpc: "add_loan_v1",
     map: (a) => ({ p_employee_id: a.employee_id, p_amount: a.amount, p_installments: a.installments, p_start_month: a.start_month, p_note: a.note ?? null }),
-    summary: (a) => `تسجيل سلفة ${a.amount} ج للموظف #${a.employee_id} على ${a.installments} قسط بداية ${a.start_month}`,
+    summary: (a) => `تسجيل سلفة ${money(a.amount)} ج لـ ${a._name ?? "#" + a.employee_id} على ${a.installments} قسط بداية ${a.start_month}`,
+  },
+  add_canteen: {
+    rpc: "add_canteen_entry_v1",
+    map: (a) => ({ p_employee_id: a.employee_id, p_item: a.item, p_amount: a.amount, p_date: a.date ?? todayCairo(), p_note: a.note ?? null }),
+    summary: (a) => `تسجيل كانتين "${a.item}" بـ ${money(a.amount)} ج على ${a._name ?? "#" + a.employee_id}`,
+  },
+  add_other_deduction: {
+    rpc: "add_other_deduction_v1",
+    map: (a) => ({ p_employee_id: a.employee_id, p_category: a.category, p_amount: a.amount, p_date: a.date ?? todayCairo(), p_note: a.note ?? null }),
+    summary: (a) => `تسجيل استقطاع ${deductionLabels[a.category as string] ?? a.category} بـ ${money(a.amount)} ج على ${a._name ?? "#" + a.employee_id}`,
+  },
+  add_expense: {
+    rpc: "add_company_expense_v1",
+    map: (a) => ({ p_date: a.date ?? todayCairo(), p_category: a.category, p_amount: a.amount, p_description: a.description ?? null }),
+    summary: (a) => `تسجيل مصروف ${expenseLabels[a.category as string] ?? a.category} بـ ${money(a.amount)} ج`,
+  },
+  add_partner_entry: {
+    rpc: "add_partner_entry_v1",
+    map: (a) => ({ p_direction: a.direction, p_kind: a.kind, p_amount: a.amount, p_date: a.date ?? todayCairo(), p_description: a.description, p_due_date: a.due_date ?? null }),
+    summary: (a) => `تسجيل قيد مديونية ${a.direction === "owed_to_us" ? "لنا عندهم" : "علينا ليهم"} ${money(a.amount)} ج${a.description ? ` — ${a.description}` : ""}`,
+  },
+  add_partner_settlement: {
+    rpc: "add_partner_settlement_v1",
+    map: (a) => ({ p_entry_id: a.entry_id, p_amount: a.amount, p_date: a.date ?? todayCairo(), p_note: a.note ?? null }),
+    summary: (a) => `تسجيل سداد ${money(a.amount)} ج على قيد المديونية #${a.entry_id}`,
+  },
+  add_owner_ledger: {
+    rpc: "add_owner_ledger_v1",
+    map: (a) => ({ p_person: a.person, p_direction: a.direction ?? "lent", p_amount: a.amount, p_date: a.date ?? todayCairo(), p_note: a.note ?? null }),
+    summary: (a) => `${a.direction === "borrowed" ? "تسجيل إني استلفت من" : "تسجيل مديونية على"} ${a.person} بمبلغ ${money(a.amount)} ج في الدفتر الشخصي`,
   },
   decide_permission: {
     rpc: "decide_permission_v1",
@@ -384,7 +477,12 @@ const SENSITIVE: Record<string, { rpc: string; map: (a: Record<string, unknown>)
   reset_attendance_day: {
     rpc: "reset_attendance_day_v1",
     map: (a) => ({ p_employee_id: a.employee_id, p_date: a.date, p_reason: a.reason ?? "تصحيح عبر المساعد" }),
-    summary: (a) => `مسح سجل يوم ${a.date} للموظف #${a.employee_id}`,
+    summary: (a) => `مسح سجل يوم ${a.date} لـ ${a._name ?? "#" + a.employee_id}`,
+  },
+  set_salary: {
+    rpc: "set_salary_v1",
+    map: (a) => ({ p_employee_id: a.employee_id, p_monthly_salary: a.amount }),
+    summary: (a) => `تعديل المرتب الشهري لـ ${a._name ?? "#" + a.employee_id} لـ ${money(a.amount)} ج`,
   },
 };
 
@@ -568,14 +666,81 @@ const RENDERERS: Record<string, (r: any, today: string) => Rendered> = {
     const rows = r ?? [];
     const lent = rows.filter((x: any) => x.direction === "سلّفته").reduce((s: number, x: any) => s + Number(x.remaining), 0);
     const borrowed = rows.filter((x: any) => x.direction === "استلفت منه").reduce((s: number, x: any) => s + Number(x.remaining), 0);
+    // Per-person totals (merge different spellings: مصطفي فورة/فوره → واحد).
+    const per = new Map<string, { name: string; net: number }>();
+    for (const x of rows) {
+      const key = normalizeArabicName(x.person);
+      const cur = per.get(key) ?? { name: x.person, net: 0 };
+      cur.net += (x.direction === "سلّفته" ? 1 : -1) * Number(x.remaining);
+      per.set(key, cur);
+    }
+    const people = [...per.values()].filter((p) => Math.abs(p.net) > 0.001).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+    const tables: Table[] = [];
+    if (people.length) tables.push({
+      title: "إجمالي كل شخص",
+      columns: ["الشخص", "المتبقي", "لصالح مين"],
+      rows: people.map((p) => [p.name, money(Math.abs(p.net)), p.net >= 0 ? "ليك" : "عليك"]),
+    });
+    if (rows.length) tables.push({
+      title: "كل القيود",
+      columns: ["الشخص", "الاتجاه", "المبلغ", "المسدد", "المتبقي", "التاريخ", "ملاحظة"],
+      rows: rows.map((x: any) => [x.person, x.direction, money(x.amount), money(x.paid), money(x.remaining), x.date, dash(x.note)]),
+    });
     return {
-      text: rows.length ? `دفترك الشخصي: ليك بره ${money(lent)} ج — عليك ${money(borrowed)} ج.` : "الدفتر الشخصي فاضي.",
-      tables: rows.length ? [{
-        title: "الدفتر الشخصي",
-        columns: ["الشخص", "الاتجاه", "المبلغ", "المسدد", "المتبقي", "التاريخ", "ملاحظة"],
-        rows: rows.map((x: any) => [x.person, x.direction, money(x.amount), money(x.paid), money(x.remaining), x.date, dash(x.note)]),
-      }] : [],
+      text: rows.length ? `دفترك الشخصي: ليك بره ${money(lent)} ج — عليك ${money(borrowed)} ج — ${people.length} شخص.` : "الدفتر الشخصي فاضي.",
+      tables,
     };
+  },
+  employee_report(r) {
+    const att = r.attendance ?? [];
+    const present = att.filter((x: any) => x.check_in).length;
+    const late = att.filter((x: any) => x.status === "late").length;
+    const absent = att.filter((x: any) => x.status === "absent").length;
+    const cantTotal = (r.canteen ?? []).reduce((s: number, x: any) => s + Number(x.amount), 0);
+    const othTotal = (r.other ?? []).reduce((s: number, x: any) => s + Number(x.amount), 0);
+    const instTotal = (r.installments ?? []).reduce((s: number, x: any) => s + Number(x.amount), 0);
+    const dedTotal = cantTotal + othTotal + instTotal;
+    const tables: Table[] = [];
+    const dedRows = [
+      ...(r.installments ?? []).map((x: any) => ["قسط سلفة", x.due_month, money(x.amount)]),
+      ...(r.canteen ?? []).map((x: any) => [`كانتين: ${x.item}`, x.entry_date, money(x.amount)]),
+      ...(r.other ?? []).map((x: any) => [deductionLabels[x.category] ?? x.category, x.entry_date, money(x.amount)]),
+    ];
+    if (dedRows.length) tables.push({ title: "الخصومات والاستقطاعات", columns: ["النوع", "التاريخ/الشهر", "المبلغ"], rows: dedRows, footer: ["الإجمالي", "", money(dedTotal)] });
+    const reqRows = [
+      ...(r.leaves ?? []).map((l: any) => ["أجازة", l.from_date === l.to_date ? l.from_date : `${l.from_date} → ${l.to_date}`, statusLabels[l.status] ?? l.status, dash(l.reason)]),
+      ...(r.permissions ?? []).map((p: any) => ["إذن", p.perm_date, statusLabels[p.status] ?? p.status, dash(p.reason)]),
+    ];
+    if (reqRows.length) tables.push({ title: "الأجازات والأذونات", columns: ["النوع", "التاريخ", "الحالة", "السبب"], rows: reqRows });
+    if (att.length) tables.push({
+      title: "الحضور", columns: ["التاريخ", "الحالة", "دخول", "انصراف", "تأخير(د)", "ملاحظة"],
+      rows: att.map((x: any) => [x.work_date, statusLabels[x.status] ?? x.status, hhmm(x.check_in), hhmm(x.check_out), Number(x.late_minutes || 0) || "—", dash(x.employee_note || x.hr_note)]),
+    });
+    const lv = r.leaves ?? [];
+    const pm = r.permissions ?? [];
+    const lvAppr = lv.filter((l: any) => l.status === "approved");
+    const lvRej = lv.filter((l: any) => l.status === "rejected").length;
+    const lvPend = lv.filter((l: any) => l.status === "pending").length;
+    const lvDays = lvAppr.reduce((s: number, l: any) => s + Number(l.days || 0), 0);
+    const pmAppr = pm.filter((p: any) => p.status === "approved").length;
+    const pmRej = pm.filter((p: any) => p.status === "rejected").length;
+    const pmPend = pm.filter((p: any) => p.status === "pending").length;
+    const text = `ريبورت ${r.employee} (${r.from} → ${r.to}): حضور ${present} — تأخير ${late} — غياب ${absent}. إجمالي الخصومات ${money(dedTotal)} ج.\nالأجازات: ${lv.length} طلب (${lvAppr.length} اتوافق = ${lvDays} يوم، ${lvRej} اترفض، ${lvPend} معلّق). الأذونات: ${pm.length} طلب (${pmAppr} اتوافق، ${pmRej} اترفض، ${pmPend} معلّق). رصيد الأجازات: ${dash(r.leave_balance)}.`;
+    return { text, tables };
+  },
+  requests_overview(r) {
+    const L = r.leaves ?? {}; const P = r.permissions ?? {};
+    const rows = [...(r.per_employee ?? [])]
+      .filter((x: any) => x.lv_req || x.pm_req)
+      .sort((a: any, b: any) => (b.lv_appr - a.lv_appr) || (b.lv_req - a.lv_req) || (b.pm_appr - a.pm_appr));
+    const tables: Table[] = [];
+    if (rows.length) tables.push({
+      title: "الأجازات والأذونات بالموظف",
+      columns: ["الموظف", "طلب أجازة", "أجازة متوافقة", "أيام مأخوذة", "طلب إذن", "إذن متوافق", "ساعات إذن"],
+      rows: rows.map((x: any) => [x.name, x.lv_req, x.lv_appr, x.lv_days, x.pm_req, x.pm_appr, x.pm_hours]),
+    });
+    const text = `من ${r.from} لـ ${r.to} — الأجازات: ${L.requested} طلب من ${L.requesters} موظف، اتوافق ${L.approved} (${L.takers} موظف / ${L.approved_days} يوم مأخوذة)، اترفض ${L.rejected}، معلّق ${L.pending}. الأذونات: ${P.requested} طلب من ${P.requesters} موظف، اتوافق ${P.approved} (${P.approved_hours} ساعة)، اترفض ${P.rejected}، معلّق ${P.pending}.`;
+    return { text, tables };
   },
   db_select(r) {
     if (!Array.isArray(r) || r.length === 0 || typeof r[0] !== "object") {
@@ -602,18 +767,15 @@ function safeRender(name: string, result: unknown, today: string): Rendered | nu
 // (successfully), we reply deterministically and never do a second LLM round.
 const SHORTCUT_TOOLS = new Set([
   "payroll_summary", "day_attendance", "attendance_summary", "pending_approvals",
-  "expenses", "partner_summary", "loans_list", "owner_ledger",
+  "expenses", "partner_summary", "loans_list", "owner_ledger", "employee_report", "requests_overview",
   "my_today", "my_month_summary", "my_deductions", "my_requests",
 ]);
 
 // Non-sensitive action tools: successful round-0 actions also reply
 // deterministically (the RPCs return Arabic messages).
+// NOTE: money-writes (add_canteen/add_other_deduction/add_expense/add_partner_*)
+// moved to SENSITIVE (confirm card) — they no longer auto-execute in round 0.
 const ACTION_LABELS: Record<string, (a: any, res: any) => string> = {
-  add_canteen: (a) => `اتسجل كانتين "${a.item}" بـ${money(a.amount)} ج`,
-  add_other_deduction: (a) => `اتسجل استقطاع ${deductionLabels[a.category] ?? a.category} بـ${money(a.amount)} ج`,
-  add_expense: (a) => `اتسجل مصروف ${expenseLabels[a.category] ?? a.category} بـ${money(a.amount)} ج (مستني تأكيد الـ Owner)`,
-  add_partner_entry: (a) => `اتسجل قيد مديونية ${money(a.amount)} ج`,
-  add_partner_settlement: (a) => `اتسجل سداد ${money(a.amount)} ج (مستني تأكيد الـ Owner)`,
   send_notification: () => "الإشعار اتبعت",
   set_hr_note: () => "الملاحظة اتسجلت",
   mark_missing_checkouts: (_a, res) => res && typeof res === "object" && "updated" in res ? `راجعت الانصرافات — عدّلت ${res.updated} سجل` : "راجعت الانصرافات الناقصة",
@@ -635,6 +797,8 @@ const DIRECT_GATES: Record<string, (ctx: Ctx) => boolean> = {
   pending_approvals: (c) => c.role === "hr" || c.role === "owner",
   expenses: (c) => c.role === "hr" || c.role === "owner",
   partner_summary: (c) => c.role === "hr" || c.role === "owner",
+  employee_report: (c) => c.role === "hr" || c.role === "owner",
+  requests_overview: (c) => c.role === "hr" || c.role === "owner",
   payroll_summary: (c) => c.role === "owner",
   loans_list: (c) => c.role === "owner",
   owner_ledger: (c) => c.role === "owner",
@@ -716,11 +880,13 @@ function toolsForRole(role: Role, hasPortal: boolean) {
         filters: { type: "array", items: { type: "object", properties: { column: { type: "string" }, op: { type: "string", enum: ["eq", "gte", "lte", "like"] }, value: {} }, required: ["column", "op", "value"] } },
         order: { type: "string" }, ascending: { type: "boolean" }, limit: { type: "integer" },
       }, ["table"]),
-      t("add_canteen", "تسجيل مشتريات كانتين على موظف (تتخصم من مرتبه)", { employee_id: { type: "integer" }, item: { type: "string" }, amount: { type: "number" }, date, note: { type: "string" } }, ["employee_id", "item", "amount"]),
-      t("add_other_deduction", "تسجيل استقطاع (تلفيات/جزاء/زي/أخرى)", { employee_id: { type: "integer" }, category: { type: "string", enum: ["damage", "penalty", "uniform", "other"] }, amount: { type: "number" }, date, note: { type: "string" } }, ["employee_id", "category", "amount"]),
-      t("add_expense", "تسجيل مصروف شركة", { date, category: { type: "string", enum: ["water", "electricity", "gas", "internet", "rent", "maintenance", "stationery", "other"] }, amount: { type: "number" }, description: { type: "string" } }, ["category", "amount"]),
-      t("add_partner_entry", "تسجيل قيد مديونية Air Ocean", { direction: { type: "string", enum: ["owed_to_us", "owed_by_us"], description: "owed_to_us = لنا عندهم" }, kind: { type: "string", enum: ["invoice", "loan", "deal", "other"] }, amount: { type: "number" }, date, description: { type: "string" }, due_date: { type: "string" } }, ["direction", "kind", "amount", "description"]),
-      t("add_partner_settlement", "تسجيل سداد على قيد مديونية (يفضل معلق لحد تأكيد الـ Owner)", { entry_id: { type: "integer" }, amount: { type: "number" }, date, note: { type: "string" } }, ["entry_id", "amount"]),
+      t("employee_report", "ريبورت مفصّل عن موظف واحد في فترة: حضوره وتأخيره وغيابه وخصوماته (سلف/كانتين/أخرى) وأجازاته وأذوناته (المقدّمة والمتوافقة والمرفوضة) وملاحظاته. مرّر name أو employee_id، و from/to (الافتراضي الشهر الحالي). استخدمه لأي سؤال عن موظف بالاسم زي 'خصومات ندى الشهر ده' أو 'ريبورت عن فلان'.", { employee_id: { type: "integer" }, name: { type: "string" }, from: { type: "string" }, to: { type: "string" } }),
+      t("requests_overview", "إحصائية جماعية للأجازات والأذونات للفريق كله في فترة: مين طلب، كام طلب، كام اتوافق، كام اتاخد فعليًا (أيام الأجازات المعتمدة)، كام اترفض وكام معلّق، والأذونات وساعاتها. استخدمه لأي سؤال جماعي زي 'مين اخد أجازة'، 'كام واحد طلب/اتوافق'، 'إحصائية الأذونات'. لو مفيش تاريخ بيحسب كل الفترات.", { from: { type: "string" }, to: { type: "string" } }),
+      t("add_canteen", "⚠️ تسجيل مشتريات كانتين على موظف (تتخصم من مرتبه — يحتاج تأكيد المستخدم)", { employee_id: { type: "integer" }, item: { type: "string" }, amount: { type: "number" }, date, note: { type: "string" } }, ["employee_id", "item", "amount"]),
+      t("add_other_deduction", "⚠️ تسجيل استقطاع (تلفيات/جزاء/زي/أخرى — يحتاج تأكيد المستخدم)", { employee_id: { type: "integer" }, category: { type: "string", enum: ["damage", "penalty", "uniform", "other"] }, amount: { type: "number" }, date, note: { type: "string" } }, ["employee_id", "category", "amount"]),
+      t("add_expense", "⚠️ تسجيل مصروف شركة (يحتاج تأكيد المستخدم)", { date, category: { type: "string", enum: ["water", "electricity", "gas", "internet", "rent", "maintenance", "stationery", "other"] }, amount: { type: "number" }, description: { type: "string" } }, ["category", "amount"]),
+      t("add_partner_entry", "⚠️ تسجيل قيد مديونية Air Ocean (يحتاج تأكيد المستخدم)", { direction: { type: "string", enum: ["owed_to_us", "owed_by_us"], description: "owed_to_us = لنا عندهم" }, kind: { type: "string", enum: ["invoice", "loan", "deal", "other"] }, amount: { type: "number" }, date, description: { type: "string" }, due_date: { type: "string" } }, ["direction", "kind", "amount", "description"]),
+      t("add_partner_settlement", "⚠️ تسجيل سداد على قيد مديونية (يحتاج تأكيد المستخدم)", { entry_id: { type: "integer" }, amount: { type: "number" }, date, note: { type: "string" } }, ["entry_id", "amount"]),
       t("send_notification", "إرسال إشعار للفريق كله أو لموظف", { scope: { type: "string", enum: ["team", "employee"] }, employee_id: { type: "integer" }, title: { type: "string" }, body: { type: "string" } }, ["scope", "title", "body"]),
       t("set_hr_note", "كتابة ملاحظة إدارية على يوم موظف", { employee_id: { type: "integer" }, date, note: { type: "string" } }, ["employee_id", "note"]),
       t("mark_missing_checkouts", "مراجعة سجلات بدون انصراف ليوم", { date }),
@@ -732,7 +898,8 @@ function toolsForRole(role: Role, hasPortal: boolean) {
     tools.push(
       t("payroll_summary", "ملخص المرتبات والصافي بعد كل الخصومات لفترة", { from: { type: "string" }, to: { type: "string" } }),
       t("loans_list", "كل السلف وأرصدتها"),
-      t("owner_ledger", "الدفتر الشخصي: مين سالف ومين سدد"),
+      t("owner_ledger", "الدفتر الشخصي: مين سالف ومين سدد وإجمالي كل شخص"),
+      t("add_owner_ledger", "⚠️ تسجيل قيد في الدفتر الشخصي للـ Owner (سلفة لشخص أو مديونية عليك — يحتاج تأكيد المستخدم). direction=lent يعني سلّفته/ليك عنده، borrowed يعني استلفت/عليك.", { person: { type: "string" }, direction: { type: "string", enum: ["lent", "borrowed"] }, amount: { type: "number" }, date: { type: "string" }, note: { type: "string" } }, ["person", "amount"]),
       t("add_loan", "⚠️ تسجيل سلفة بأقساط (يحتاج تأكيد المستخدم)", { employee_id: { type: "integer" }, amount: { type: "number" }, installments: { type: "integer" }, start_month: { type: "string", description: "YYYY-MM" }, note: { type: "string" } }, ["employee_id", "amount", "installments", "start_month"]),
       t("decide_permission", "⚠️ الموافقة/الرفض على طلب إذن (يحتاج تأكيد المستخدم)", { id: { type: "integer" }, approve: { type: "boolean" }, hours_approved: { type: "integer", enum: [1, 2] }, note: { type: "string" } }, ["id", "approve"]),
       t("decide_leave", "⚠️ الموافقة/الرفض على طلب أجازة (يحتاج تأكيد المستخدم)", { id: { type: "integer" }, approve: { type: "boolean" }, note: { type: "string" } }, ["id", "approve"]),
@@ -740,6 +907,7 @@ function toolsForRole(role: Role, hasPortal: boolean) {
       t("decide_partner_settlement", "⚠️ تأكيد/رفض سداد مديونية (يحتاج تأكيد المستخدم)", { id: { type: "integer" }, approve: { type: "boolean" }, note: { type: "string" } }, ["id", "approve"]),
       t("void_financial", "⚠️ إلغاء سجل مالي بسبب (يحتاج تأكيد المستخدم)", { kind: { type: "string", enum: ["loan", "canteen", "other", "expense", "partner_entry", "partner_settlement"] }, id: { type: "integer" }, reason: { type: "string" } }, ["kind", "id", "reason"]),
       t("reset_attendance_day", "⚠️ مسح سجل حضور يوم لموظف (يحتاج تأكيد المستخدم)", { employee_id: { type: "integer" }, date: { type: "string" }, reason: { type: "string" } }, ["employee_id", "date"]),
+      t("set_salary", "⚠️ تعديل/تحديد المرتب الشهري لموظف — Owner فقط (يحتاج تأكيد المستخدم). المبلغ هو المرتب الجديد بالكامل بالجنيه.", { employee_id: { type: "integer" }, amount: { type: "number", description: "المرتب الشهري الجديد بالجنيه" } }, ["employee_id", "amount"]),
     );
   }
   return tools;
@@ -760,6 +928,9 @@ function systemPrompt(ctx: Ctx, roster: string): string {
 6. ممنوع تكتب جداول markdown في ردك نهائيًا — النظام بيعرض جداول منسقة تلقائيًا من نتايج الأدوات. اكتب خلاصة قصيرة (سطر أو اتنين) بس.
 7. خلّي تفكيرك الداخلي مختصر جدًا — سطر واحد يكفي — وبعده نفّذ على طول.
 8. للأسئلة عن السياسات/القواعد أو "ليه؟" أو أسباب الأجازات والأذونات أو تلخيص الملاحظات النصية — استخدم kb_search، وابنِ إجابتك من المقاطع اللي رجعت بس واذكر المصدر (النوع + صاحبه/تاريخه لو موجود). لو مفيش نتيجة قول "مش لاقي معلومة عن ده". للأرقام والحسابات استخدم الأدوات المهيكلة مش kb_search.
+9. أي سؤال عن موظف واحد بالاسم (خصوماته، حضوره، أجازاته، أذوناته، أو "ريبورت/تقرير عن فلان") استخدم employee_report مباشرة بالاسم. لو المستخدم طلب "ريبورت" من غير ما يحدد فترة، اسأله عايز من تاريخ لتاريخ الأول؛ لو حدد شهر استخدم أوله وآخره. متستخدمش db_select للخصومات — employee_report بيجمعها كلها.
+10. لو الـ Owner طلب تعديل مرتب: "غيّر مرتب فلان لـ X" مرّر amount=X. لو قال "زوّد مرتب فلان بـ X" أو "%": هات المرتب الحالي الأول (payroll_summary أو list) واحسب الجديد ومرّره كـ amount. set_salary للـ Owner بس وبتأكيد.
+11. للأسئلة الجماعية عن الأجازات والأذونات (مين اخد أجازة، كام واحد طلب/اتوافق فعليًا، إحصائية الأذونات وساعاتها) استخدم requests_overview — بيجمع الأرقام من الداتا مباشرة. متستخدمش kb_search للأرقام دي.
 
 معلومات النظام: الحضور بـ GPS (نطاق 1000م من مكتب العطارين) + QR يومي. نافذة الحضور العامة 08:00–11:00 والانصراف 16:00–19:00 (عبدالرحمن من 13:00/18:00، حبيبة 12:00–13:00/17:00–19:00). التأخير >15 دقيقة: أول مرة في الشهر إنذار وبعدها خصم ربع يوم. الأذونات: 3 شهريًا غير متتالية (ساعة أو ساعتين). الأجازات: يومين شهريًا غير متتاليين بموظف بديل، من رصيد سنوي. السلف بأقساط شهرية بتتخصم من المرتب تلقائيًا هي والكانتين والاستقطاعات. المصروفات وسدادات المديونية بيأكدها الـ Owner. صافي المرتب = المرتب − خصم الغياب/التأخير − الاستقطاعات المالية.`;
 }
@@ -822,6 +993,7 @@ const READ_ONLY_TOOLS = new Set([
   "my_today", "my_month_summary", "my_deductions", "my_requests",
   "day_attendance", "attendance_summary", "list_employees", "pending_approvals",
   "expenses", "partner_summary", "db_select", "payroll_summary", "loans_list", "owner_ledger",
+  "employee_report", "requests_overview",
 ]);
 function scopedTools(role: Role, hasPortal: boolean, scope: string) {
   const all = toolsForRole(role, hasPortal) as any[];
@@ -979,6 +1151,139 @@ async function streamRound(
 }
 
 // ---------------------------------------------------------------------------
+// Deterministic pre-router (admin single-employee queries). MiniMax is flaky at
+// choosing employee_report, so when a question names exactly ONE known employee
+// and asks about their record we answer from the DB directly; a full "report"
+// with no period asks the user for a date range first (as the owner requested).
+// ---------------------------------------------------------------------------
+const AR_MONTHS: Record<string, number> = {
+  "يناير": 1, "فبراير": 2, "مارس": 3, "ابريل": 4, "أبريل": 4, "مايو": 5, "يونيو": 6, "يونيه": 6,
+  "يوليو": 7, "يوليه": 7, "اغسطس": 8, "أغسطس": 8, "سبتمبر": 9, "اكتوبر": 10, "أكتوبر": 10, "نوفمبر": 11, "ديسمبر": 12,
+};
+function parsePeriod(text: string, today: string): { from: string; to: string } | null {
+  const y = today.slice(0, 4);
+  const iso = text.match(/\d{4}-\d{2}-\d{2}/g);
+  if (iso && iso.length >= 2) { const s = [...iso].sort(); return { from: s[0], to: s[s.length - 1] }; }
+  const m = text.match(/(?:شهر|لشهر|الشهر)\s*0*(\d{1,2})/);
+  if (m) { const mo = Number(m[1]); if (mo >= 1 && mo <= 12) return monthRange(`${y}-${String(mo).padStart(2, "0")}`); }
+  for (const [nm, mo] of Object.entries(AR_MONTHS)) if (text.includes(nm)) return monthRange(`${y}-${String(mo).padStart(2, "0")}`);
+  if (/الشهر\s*(ده|دا|الحالي|الحالى)/.test(text)) return monthRange(today.slice(0, 7));
+  if (/الشهر\s*(اللي\s*فات|الماضي|السابق)/.test(text)) {
+    const d = new Date(`${today.slice(0, 7)}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() - 1);
+    return monthRange(d.toISOString().slice(0, 7));
+  }
+  return null;
+}
+function nameRegex(name: string): RegExp {
+  const esc = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // optional Arabic proclitic (ل/و/ب/ك/ف) before the name; letter boundaries around it.
+  return new RegExp(`(?:^|[^\\p{L}])[لوبكف]?${esc}(?![\\p{L}])`, "u");
+}
+function findSoleEmployee(text: string, emps: Array<{ id: number; name: string }>): { id: number; name: string } | null {
+  const hits = emps.filter((e) => e.name && nameRegex(e.name).test(text));
+  return hits.length === 1 ? hits[0] : null;
+}
+const RE_FACET = /خصوم|استقطاع|سلف|كانتين|حضور|غياب|تأخير|تاخير|أجاز|اجاز|أذون|اذون|إذن|اذن|ريبورت|تقرير|تفاصيل|كل\s*حاج|كل\s*بيانات|بياناته|بياناتها|سجل/u;
+const RE_REPORT = /ريبورت|تقرير|كل\s*حاج|كل\s*بيانات|تفاصيل/u;
+const RE_ACTION = /ابعت|إبعت|ابعتل|سجّل|اضف|أضف|ضيف|احسب|اخصم|اعمل|عدّل|عدل|غيّر|غير|نبّه|نبه|اعتمد|وافق|ارفض|امسح|احذف|قدّم|علّم|حط\s/u;
+function preRoute(
+  history: any[], emps: Array<{ id: number; name: string }>, role: Role, today: string,
+): { tool: string; args: Record<string, unknown> } | { ask: string } | null {
+  if (role !== "hr" && role !== "owner") return null;
+  if (!emps.length || !history.length) return null;
+  const cur = String(history[history.length - 1]?.content ?? "");
+  if (!cur.trim() || RE_ACTION.test(cur)) return null;
+  const emp = findSoleEmployee(cur, emps);
+  const period = parsePeriod(cur, today);
+  if (emp && RE_FACET.test(cur)) {
+    if (period) return { tool: "employee_report", args: { employee_id: emp.id, from: period.from, to: period.to } };
+    if (RE_REPORT.test(cur)) return { ask: `تمام، ريبورت كامل عن ${emp.name}. عايزه من تاريخ لتاريخ؟ اكتبلي الفترة — مثلاً «شهر 7» أو «من 2026-07-01 لـ 2026-07-31».` };
+    return { tool: "employee_report", args: { employee_id: emp.id } };
+  }
+  // team-wide aggregate: leaves/permissions "how many / who" questions (no single employee named)
+  if (!emp && /اجاز|أجاز|اذون|أذون|إذن/.test(cur) && /مين|كام|عدد|احصائ|إحصائ|الناس|قائمة|list/i.test(cur)) {
+    const p2 = parsePeriod(cur, today);
+    return { tool: "requests_overview", args: p2 ? { from: p2.from, to: p2.to } : {} };
+  }
+  // follow-up: a bare period after we asked for a range (prev assistant msg named one employee)
+  if (!emp && period) {
+    for (let i = history.length - 2; i >= 0 && i >= history.length - 5; i--) {
+      const msg = history[i];
+      if (msg?.role === "assistant" && /من تاريخ لتاريخ|اكتبلي الفترة/.test(String(msg.content ?? ""))) {
+        const e2 = findSoleEmployee(String(msg.content ?? ""), emps);
+        if (e2) return { tool: "employee_report", args: { employee_id: e2.id, from: period.from, to: period.to } };
+      }
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic money-write parsing. MiniMax mis-transcribes amounts ("ألف
+// وخمسمية" → 15000) and employees, so for every financial write we re-derive
+// the employee (from the roster) and the amount (digits + Arabic number words)
+// from the user's own text and override the model — then a confirm card shows
+// the resolved values before anything commits.
+// ---------------------------------------------------------------------------
+function normalizeArabicName(s: unknown): string {
+  return String(s ?? "")
+    .replace(/[ً-ْ]/g, "")      // strip tashkeel
+    .replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي")
+    .replace(/\s+/g, " ").trim();
+}
+// Arabic number WORDS → value (thousands + hundreds only; ones are skipped to
+// avoid picking installment/hour counts). Whole-token match so "الفار" (a
+// surname containing "الف") never counts as 1000.
+function parseArabicWords(text: string): number | null {
+  const t = String(text ?? "").replace(/[ً-ْ]/g, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه");
+  const tokens = t.split(/[^ء-ي]+/).filter(Boolean).map((w) => w.replace(/^و/, ""));
+  const HUND: Record<string, number> = {
+    "خمسميه": 500, "خمسمايه": 500, "تلتميه": 300, "ثلاثمايه": 300, "ربعميه": 400, "اربعميه": 400,
+    "ستميه": 600, "سبعميه": 700, "تمنميه": 800, "تسعميه": 900, "متين": 200, "مئتين": 200, "ميتين": 200, "ميه": 100, "مايه": 100,
+  };
+  const MUL: Record<string, number> = { "واحد": 1, "اتنين": 2, "تنين": 2, "تلات": 3, "اربع": 4, "خمس": 5, "ست": 6, "سبع": 7, "تمان": 8, "تسع": 9, "عشر": 10 };
+  let total = 0, found = false;
+  for (let i = 0; i < tokens.length; i++) {
+    const w = tokens[i];
+    if (HUND[w] != null) { total += HUND[w]; found = true; continue; }
+    if (w === "الفين") { total += 2000; found = true; continue; }
+    if (w === "الف" || w === "الاف" || w === "آلاف") { const m = tokens[i - 1] ? MUL[tokens[i - 1]] : undefined; total += (m || 1) * 1000; found = true; }
+  }
+  return found ? total : null;
+}
+function parseAmount(text: string): number | null {
+  const t0 = String(text ?? "").replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+  // drop installment / hour / day / month counts so they aren't read as amounts
+  const t = t0
+    .replace(/\d+\s*(شهور|شهر|اشهر|أشهر|قسط|اقساط|أقساط|قسطين|ساعة|ساعه|ساعات|ساعتين|يوم|ايام|أيام)/g, " ")
+    .replace(/(على|لمده|لمدة|مده|مدة)\s*\d+/g, " ");
+  const digitVals = [...t.matchAll(/\d[\d,]*(?:\.\d+)?/g)].map((m) => Number(m[0].replace(/,/g, ""))).filter((n) => n > 0 && isFinite(n));
+  const wordVal = parseArabicWords(text);
+  const cands = wordVal != null ? [...digitVals, wordVal] : digitVals;
+  return cands.length ? Math.max(...cands) : null;
+}
+// Which tools carry an employee / a direct amount.
+const EMP_TOOLS = new Set(["add_canteen", "add_other_deduction", "add_loan", "set_salary", "reset_attendance_day"]);
+const AMT_OVERRIDE = new Set(["add_canteen", "add_other_deduction", "add_loan", "add_expense", "add_partner_entry", "add_partner_settlement", "add_owner_ledger"]);
+// Correct the model's args from the user's text; attach _name for the card.
+function resolveMoneyArgs(name: string, args: Record<string, unknown>, text: string, emps: Array<{ id: number; name: string }>): Record<string, unknown> {
+  const a: Record<string, unknown> = { ...args };
+  if (a.employee_id == null && a.employeeId != null) a.employee_id = a.employeeId;
+  if (a.employee_id == null && a.employee != null) a.employee_id = a.employee;
+  if (EMP_TOOLS.has(name)) {
+    const emp = findSoleEmployee(text, emps);
+    if (emp) a.employee_id = emp.id;
+    const known = emps.find((e) => String(e.id) === String(a.employee_id));
+    if (known) a._name = known.name;
+  }
+  if (AMT_OVERRIDE.has(name) && !/%|نسبه|نسبة/.test(text)) {
+    const amt = parseAmount(text);
+    if (amt != null) a.amount = amt;
+  }
+  return a;
+}
+
+// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 Deno.serve(async (req: Request) => {
@@ -1090,9 +1395,11 @@ Deno.serve(async (req: Request) => {
     // For admins, inject the active roster so employee lookups don't need a
     // separate tool round (Dahl is flaky on multi-round loops — single-round wins).
     let roster = "";
+    let rosterEmps: Array<{ id: number; name: string }> = [];
     if (ctx.role === "hr" || ctx.role === "owner") {
       const { data: emps } = await ctx.client.from("employees").select("id,name,active").eq("active", true).order("id");
       if (emps?.length) {
+        rosterEmps = emps.map((e) => ({ id: e.id, name: e.name }));
         roster = "\n\nأرقام الموظفين (استخدمها مباشرة بدون ما تنادي list_employees): " +
           emps.map((e) => `${e.name}=${e.id}`).join("، ") + ".";
       }
@@ -1128,6 +1435,36 @@ Deno.serve(async (req: Request) => {
             asstId = await createAssistantRow(userClient, convId, generationId, runtime.key);
           }
           send("meta", { conversation_id: convId, generation_id: generationId, provider_used: runtime.key, fallback });
+
+          // Deterministic pre-route: admin questions naming exactly ONE employee
+          // are answered straight from the DB (skip the flaky LLM tool choice);
+          // a full report with no period asks the user for a date range first.
+          const pr = preRoute(history, rosterEmps, ctx.role, today);
+          if (pr) {
+            if ("ask" in pr) {
+              reply = pr.ask;
+            } else {
+              const result = await runTool(pr.tool, pr.args, ctx);
+              const failed = !!(result && typeof result === "object" && "error" in (result as Record<string, unknown>));
+              const rendered = failed ? null : safeRender(pr.tool, result, today);
+              reply = failed ? `❌ ${(result as any).error}` : (rendered?.text || "تمام ✅");
+              if (rendered?.tables?.length) tables.push(...rendered.tables.slice(0, 4));
+              executed.push({ name: pr.tool, ok: !failed });
+            }
+            full = reply;
+            send("delta", { text: reply });
+            send("result", { tables, actions: executed, proposals: [] });
+            send("done", { status: "completed", provider_used: runtime.key, fallback });
+            if (asstId) await patchMessage(userClient, asstId, { content: reply, tables, actions: executed, status: "completed", provider_key: runtime.key });
+            if (convId) await touchConversation(userClient, convId, runtime.key);
+            await service.from("assistant_logs").insert({
+              user_id: ctx.userId, role: ctx.role, question: userQuestion.slice(0, 500),
+              reply_summary: reply.slice(0, 500),
+              tools_used: [...executed.map((e) => ({ name: e.name, ok: e.ok })), { preroute: true }],
+              duration_ms: Date.now() - started,
+            });
+            return;
+          }
 
           const onDelta = (t: string) => {
             if (!t) return;
@@ -1176,6 +1513,9 @@ Deno.serve(async (req: Request) => {
                 try { args = JSON.parse(tc.function?.arguments || "{}"); } catch { /* keep {} */ }
                 let resultStr: string;
                 if (SENSITIVE[name]) {
+                  // Correct employee + amount from the user's own text (the model
+                  // mis-transcribes money) before proposing; the card shows these.
+                  args = resolveMoneyArgs(name, args, userQuestion, rosterEmps);
                   const summary = SENSITIVE[name].summary(args);
                   proposals.push({ name, args, summary });
                   roundCalls.push({ name, args, result: null, ok: true, rendered: null, sensitive: true });
