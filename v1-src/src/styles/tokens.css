@@ -1,0 +1,248 @@
+:root,
+:root.dark {
+  color-scheme: dark;
+
+  --font-body: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Alexandria", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+
+  --canvas: #0c1722;
+  --chrome: #101b26;
+  --surface: #172331;
+  --surface-nested: #202f3c;
+  --surface-raised: #263847;
+  --surface-overlay: #2c4050;
+  --text: #f9fbfd;
+  --text-secondary: #b7c2cd;
+  --text-muted: #93a1ad;
+  --text-disabled: #6f7e8b;
+  --line-subtle: rgba(183, 194, 205, 0.13);
+  --line: rgba(183, 194, 205, 0.22);
+  --line-strong: rgba(183, 194, 205, 0.34);
+
+  --gold: #fcc107;
+  --gold-hover: #ffd13f;
+  --gold-text: #fcc107;
+  --gold-on: #2a250b;
+  --gold-soft: rgba(252, 193, 7, 0.14);
+  --gold-line: rgba(252, 193, 7, 0.38);
+
+  --success: #43d9a0;
+  --warning: #ffb84d;
+  --danger: #ff6b70;
+  --info: #7dd3fc;
+  --special: #b49cff;
+  --success-soft: rgba(67, 217, 160, 0.13);
+  --warning-soft: rgba(255, 184, 77, 0.14);
+  --danger-soft: rgba(255, 107, 112, 0.14);
+  --info-soft: rgba(125, 211, 252, 0.13);
+  --special-soft: rgba(180, 156, 255, 0.14);
+  --success-line: rgba(67, 217, 160, 0.34);
+  --warning-line: rgba(255, 184, 77, 0.34);
+  --danger-line: rgba(255, 107, 112, 0.34);
+  --info-line: rgba(125, 211, 252, 0.34);
+  --special-line: rgba(180, 156, 255, 0.34);
+
+  --accent-home: var(--gold-text);
+  --accent-attendance: var(--success);
+  --accent-requests: var(--info);
+  --accent-people: var(--special);
+  --accent-finance: var(--warning);
+  --accent-training: #67e8f9;
+  --accent-assistant: #c4a7ff;
+  --accent-system: #94a3b8;
+  --accent-private: #f0b96b;
+  --accent-training-soft: rgba(103, 232, 249, 0.12);
+  --accent-training-line: rgba(103, 232, 249, 0.32);
+  --accent-assistant-soft: rgba(196, 167, 255, 0.13);
+  --accent-assistant-line: rgba(196, 167, 255, 0.34);
+  --accent-system-soft: rgba(148, 163, 184, 0.13);
+  --accent-system-line: rgba(148, 163, 184, 0.32);
+  --accent-private-soft: rgba(240, 185, 107, 0.13);
+  --accent-private-line: rgba(240, 185, 107, 0.34);
+  --c: var(--gold-text);
+  --c-soft: var(--gold-soft);
+  --c-line: var(--gold-line);
+
+  --shadow-panel: 0 1px 1px rgba(0, 0, 0, 0.18), 0 12px 32px rgba(0, 0, 0, 0.16);
+  --shadow-raised: 0 18px 52px rgba(0, 0, 0, 0.34);
+  --shadow-overlay: 0 28px 80px rgba(0, 0, 0, 0.5);
+  --focus-ring: 0 0 0 3px rgba(125, 211, 252, 0.28);
+
+  --radius-xs: 7px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  --control-h: 42px;
+  --row-h: 46px;
+  --sidebar-w: 272px;
+  --topbar-h: 70px;
+  --bottom-nav-h: 70px;
+  --content-max: 1600px;
+
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0.9, 0.25, 1);
+  --duration-fast: 120ms;
+  --duration-view: 180ms;
+  --duration-overlay: 200ms;
+
+  /* Compatibility aliases used by screens awaiting their visual migration. */
+  --page: var(--canvas);
+  --panel: var(--surface);
+  --panel-soft: var(--surface-nested);
+  --ink: var(--text);
+  --muted: var(--text-secondary);
+  --brand: var(--gold);
+  --brand-strong: var(--gold-hover);
+  --brand-ink: var(--gold-on);
+  --brand-soft: var(--gold-soft);
+  --nav: var(--chrome);
+  --nav-2: var(--surface);
+  --nav-line: var(--line-subtle);
+  --green: var(--success);
+  --red: var(--danger);
+  --amber: var(--warning);
+  --violet: var(--special);
+  --gold-legacy: var(--gold-text);
+  --shadow: var(--shadow-panel);
+  --shadow-lift: var(--shadow-raised);
+}
+
+:root:not(.dark) {
+  color-scheme: light;
+
+  --canvas: #f3f6f8;
+  --chrome: #ffffff;
+  --surface: #ffffff;
+  --surface-nested: #edf2f5;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+  --text: #18232d;
+  --text-secondary: #53616d;
+  --text-muted: #667580;
+  --text-disabled: #8a969f;
+  --line-subtle: rgba(24, 35, 45, 0.11);
+  --line: rgba(24, 35, 45, 0.18);
+  --line-strong: rgba(24, 35, 45, 0.29);
+
+  --gold-hover: #e1aa00;
+  --gold-text: #6f5200;
+  --gold-soft: rgba(111, 82, 0, 0.1);
+  --gold-line: rgba(111, 82, 0, 0.3);
+  --success: #087a55;
+  --warning: #8a4b00;
+  --danger: #b4232a;
+  --info: #07668e;
+  --special: #6146a6;
+  --success-soft: rgba(8, 122, 85, 0.1);
+  --warning-soft: rgba(138, 75, 0, 0.1);
+  --danger-soft: rgba(180, 35, 42, 0.1);
+  --info-soft: rgba(7, 102, 142, 0.1);
+  --special-soft: rgba(97, 70, 166, 0.1);
+  --success-line: rgba(8, 122, 85, 0.3);
+  --warning-line: rgba(138, 75, 0, 0.3);
+  --danger-line: rgba(180, 35, 42, 0.3);
+  --info-line: rgba(7, 102, 142, 0.3);
+  --special-line: rgba(97, 70, 166, 0.3);
+
+  --accent-training: #086c78;
+  --accent-assistant: #6146a6;
+  --accent-system: #52616f;
+  --accent-private: #754900;
+  --accent-training-soft: rgba(8, 108, 120, 0.1);
+  --accent-training-line: rgba(8, 108, 120, 0.28);
+  --accent-assistant-soft: rgba(97, 70, 166, 0.1);
+  --accent-assistant-line: rgba(97, 70, 166, 0.3);
+  --accent-system-soft: rgba(82, 97, 111, 0.1);
+  --accent-system-line: rgba(82, 97, 111, 0.28);
+  --accent-private-soft: rgba(117, 73, 0, 0.1);
+  --accent-private-line: rgba(117, 73, 0, 0.3);
+
+  --shadow-panel: 0 1px 2px rgba(20, 35, 48, 0.05), 0 12px 34px rgba(20, 35, 48, 0.07);
+  --shadow-raised: 0 18px 48px rgba(20, 35, 48, 0.14);
+  --shadow-overlay: 0 28px 80px rgba(20, 35, 48, 0.22);
+  --focus-ring: 0 0 0 3px rgba(7, 102, 142, 0.2);
+}
+
+[data-section="home"] {
+  --c: var(--accent-home);
+  --c-soft: var(--gold-soft);
+  --c-line: var(--gold-line);
+}
+
+[data-section="attendance"],
+[data-section="myrecord"] {
+  --c: var(--accent-attendance);
+  --c-soft: var(--success-soft);
+  --c-line: var(--success-line);
+}
+
+[data-section="requests"] {
+  --c: var(--accent-requests);
+  --c-soft: var(--info-soft);
+  --c-line: var(--info-line);
+}
+
+[data-section="people"] {
+  --c: var(--accent-people);
+  --c-soft: var(--special-soft);
+  --c-line: var(--special-line);
+}
+
+[data-section="finance"],
+[data-section="payroll"] {
+  --c: var(--accent-finance);
+  --c-soft: var(--warning-soft);
+  --c-line: var(--warning-line);
+}
+
+[data-section="training"] {
+  --c: var(--accent-training);
+  --c-soft: var(--accent-training-soft);
+  --c-line: var(--accent-training-line);
+}
+
+[data-section="assistant"] {
+  --c: var(--accent-assistant);
+  --c-soft: var(--accent-assistant-soft);
+  --c-line: var(--accent-assistant-line);
+}
+
+[data-section="system"] {
+  --c: var(--accent-system);
+  --c-soft: var(--accent-system-soft);
+  --c-line: var(--accent-system-line);
+}
+
+[data-section="private-ledger"] {
+  --c: var(--accent-private);
+  --c-soft: var(--accent-private-soft);
+  --c-line: var(--accent-private-line);
+}
+
+@supports (color: color-mix(in srgb, white, black)) {
+  [data-section] {
+    --c-soft: color-mix(in srgb, var(--c) 13%, transparent);
+    --c-line: color-mix(in srgb, var(--c) 34%, transparent);
+  }
+}
+
+@media (pointer: coarse) {
+  :root {
+    --control-h: 48px;
+    --row-h: 54px;
+  }
+}

@@ -3,8 +3,14 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build" },
+  "scripts": {
+    "dev": "vite",
+    "build": "node ./scripts/build.mjs"
+  },
   "dependencies": {
+    "@fontsource/alexandria": "5.2.8",
+    "@fontsource/ibm-plex-sans-arabic": "5.2.9",
+    "@fontsource/jetbrains-mono": "5.2.8",
     "@supabase/supabase-js": "^2.45.4",
     "lucide-react": "^0.417.0",
     "qrcode": "^1.5.4",
