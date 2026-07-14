@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
 import AppShell from "./app/AppShell";
 import { allowedViews, canAccessView, createViewRegistry, getFallbackView } from "./app/registry";
@@ -12,13 +12,59 @@ import TrainingView from "./features/training/TrainingView";
 import DeductionsView from "./features/finance/DeductionsView";
 import { LoginScreen, SetupBanner, Splash } from "./features/system/AuthScreens";
 
-const AssistantView = lazy(() => import("./features/assistant/AssistantView"));
-const EmployeesView = lazy(() => import("./features/people/EmployeesView"));
-const AdminDashboard = lazy(() => import("./features/attendance/AdminDashboard"));
-const OwnerDashboard = lazy(() => import("./features/payroll/OwnerDashboard"));
-const ExpensesView = lazy(() => import("./features/finance/ExpensesView"));
-const PartnerLedgerView = lazy(() => import("./features/finance/PartnerLedgerView"));
-const OwnerLedgerView = lazy(() => import("./features/private-ledger/OwnerLedgerView"));
+// A view chunk that fails to download is almost always a stale client: a new
+// build replaced the hashed filenames this page was built against. Reloading
+// pulls a fresh index.html pointing at chunks that exist. The timestamp guard
+// stops it from looping if the chunk is genuinely unreachable (e.g. offline).
+const RELOAD_KEY = "aoa:chunk-reload-at";
+
+function lazyView(loader) {
+  return lazy(() =>
+    loader().catch((error) => {
+      const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
+      if (Date.now() - last > 10000) {
+        sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+        window.location.reload();
+        return new Promise(() => {}); // the reload takes over; never resolve
+      }
+      throw error;
+    })
+  );
+}
+
+const AssistantView = lazyView(() => import("./features/assistant/AssistantView"));
+const EmployeesView = lazyView(() => import("./features/people/EmployeesView"));
+const AdminDashboard = lazyView(() => import("./features/attendance/AdminDashboard"));
+const OwnerDashboard = lazyView(() => import("./features/payroll/OwnerDashboard"));
+const ExpensesView = lazyView(() => import("./features/finance/ExpensesView"));
+const PartnerLedgerView = lazyView(() => import("./features/finance/PartnerLedgerView"));
+const OwnerLedgerView = lazyView(() => import("./features/private-ledger/OwnerLedgerView"));
+
+// Without this, a failed chunk import leaves Suspense pending forever and the
+// screen just hangs on the skeleton.
+class ViewErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <section className="panel">
+        <h2>فيه تحديث جديد للنظام</h2>
+        <p className="muted">اقفل الصفحة وافتحها تاني عشان تحمّل النسخة الجديدة.</p>
+        <button className="primary" type="button" onClick={() => window.location.reload()}>
+          تحديث الصفحة
+        </button>
+      </section>
+    );
+  }
+}
 
 function ViewSkeleton() {
   return (
@@ -234,15 +280,17 @@ function App() {
       >
         {context.migration_required ? <SetupBanner message={context.setup_message} /> : null}
         {ActiveComponent ? (
-          <Suspense key={`${activeView}/${routeParams.join("/")}`} fallback={<ViewSkeleton />}>
-            <ActiveComponent
-              context={context}
-              session={session}
-              onToast={setToast}
-              onNavigate={navigate}
-              routeParam={routeParam}
-            />
-          </Suspense>
+          <ViewErrorBoundary key={`${activeView}/${routeParams.join("/")}`}>
+            <Suspense fallback={<ViewSkeleton />}>
+              <ActiveComponent
+                context={context}
+                session={session}
+                onToast={setToast}
+                onNavigate={navigate}
+                routeParam={routeParam}
+              />
+            </Suspense>
+          </ViewErrorBoundary>
         ) : null}
       </AppShell>
       <Toast toast={toast} onDismiss={() => setToast("")} />
