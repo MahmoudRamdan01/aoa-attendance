@@ -122,7 +122,11 @@ function EmployeeDetail({ employee, role, onBack, onToast }) {
     const othTotal = d.oth.filter((x) => x.status === "active").reduce((s, x) => s + Number(x.amount), 0);
     const activeLoanIds = new Set(d.loans.filter((l) => l.status === "active").map((l) => l.id));
     const instMonth = d.inst.filter((i) => activeLoanIds.has(i.loan_id) && i.due_month === month).reduce((s, i) => s + Number(i.amount), 0);
-    return { present, late, absent, dedTotal: cantTotal + othTotal + instMonth, cantTotal, othTotal, instMonth };
+    // خصم الحضور/الغياب: أيام مخصومة للتأخير + كل يوم غياب = يوم كامل. القيمة = أيام × (المرتب/30).
+    const attDedDays = d.att.reduce((s, r) => s + Number(r.deduction_days || 0) + (r.status === "absent" ? 1 : 0), 0);
+    const dailyRate = d.salary != null ? Number(d.salary) / 30 : null;
+    const attDedAmount = dailyRate != null ? attDedDays * dailyRate : 0;
+    return { present, late, absent, cantTotal, othTotal, instMonth, attDedDays, attDedAmount, dedTotal: cantTotal + othTotal + instMonth + attDedAmount };
   }, [d, month]);
 
   return (
@@ -162,11 +166,19 @@ function EmployeeDetail({ employee, role, onBack, onToast }) {
 
           <section className="panel">
             <div className="panel-title"><Banknote size={20} /><h2>الخصومات والاستقطاعات — {month}</h2></div>
-            {(stats.instMonth > 0 || d.cant.length || d.oth.length) ? (
+            {(stats.attDedDays > 0 || stats.instMonth > 0 || d.cant.length || d.oth.length) ? (
               <div className="table-wrap">
                 <table>
                   <thead><tr><th>النوع</th><th>التاريخ/الشهر</th><th>المبلغ</th><th>ملاحظة</th></tr></thead>
                   <tbody>
+                    {stats.attDedDays > 0 && (
+                      <tr>
+                        <td>خصم حضور وغياب</td>
+                        <td dir="ltr">{month}</td>
+                        <td>{d.salary != null ? `${money(stats.attDedAmount)} ج` : "—"}</td>
+                        <td>{stats.attDedDays.toFixed(2).replace(/\.?0+$/, "")} يوم</td>
+                      </tr>
+                    )}
                     {stats.instMonth > 0 && <tr><td>قسط سلفة</td><td dir="ltr">{month}</td><td>{money(stats.instMonth)} ج</td><td>—</td></tr>}
                     {d.cant.filter((x) => x.status === "active").map((x) => <tr key={`c${x.id}`}><td>كانتين: {x.item}</td><td dir="ltr">{x.entry_date}</td><td>{money(x.amount)} ج</td><td className="note-cell">{x.note || "—"}</td></tr>)}
                     {d.oth.filter((x) => x.status === "active").map((x) => <tr key={`o${x.id}`}><td>{deductionCategoryLabels[x.category] || x.category}</td><td dir="ltr">{x.entry_date}</td><td>{money(x.amount)} ج</td><td className="note-cell">{x.note || "—"}</td></tr>)}
