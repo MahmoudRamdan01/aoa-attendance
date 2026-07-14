@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, Banknote, BarChart3, CalendarDays, Clock3, Download, FileSpreadsheet, Wallet, TrendingUp, UserPlus, Users } from "lucide-react";
+import { Activity, AlertTriangle, Banknote, BarChart3, CalendarDays, Clock3, Coins, Download, FileSpreadsheet, PiggyBank, Wallet, TrendingUp, UserPlus, Users } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { dateRangeForPeriod, datesBetween } from "../../lib/dates";
@@ -116,6 +116,9 @@ function OwnerDashboard({ onToast }) {
         missingCheckout: employeeRows.filter((row) => row.check_in && !row.check_out && ["present", "late"].includes(row.status)).length,
       };
     }).sort((a, b) => (b.deductionAmount + b.financialDeduction) - (a.deductionAmount + a.financialDeduction) || a.name.localeCompare(b.name, "ar"));
+    // إجمالي المرتبات قبل أي خصم (المرتب الأساسي لكل الموظفين) وبعد كل الخصومات (الصافي التقديري).
+    const grossTotal = payrollRows.reduce((sum, row) => sum + row.salary, 0);
+    const netTotal = payrollRows.reduce((sum, row) => sum + row.netSalary, 0);
     return {
       total,
       expected,
@@ -127,6 +130,8 @@ function OwnerDashboard({ onToast }) {
       deductionDays,
       deductions,
       financialTotal,
+      grossTotal,
+      netTotal,
       attendanceRate: expected ? Math.round(((checkedIn + leave) / expected) * 100) : 0,
       lateByEmployee: [...lateByEmployee.values()].sort((a, b) => b.count - a.count || b.minutes - a.minutes).slice(0, 5),
       payrollRows,
@@ -220,6 +225,8 @@ function OwnerDashboard({ onToast }) {
         <Metric label="خصم أيام" value={stats.deductionDays.toFixed(2)} tone="warn" icon={TrendingUp} />
         <Metric label="خصومات تقديرية" value={`${money(stats.deductions)} ج`} tone="gold" icon={Banknote} />
         <Metric label="استقطاعات مالية" value={`${money(stats.financialTotal)} ج`} tone="gold" icon={Wallet} />
+        <Metric label="إجمالي قبل الخصومات" value={`${money(stats.grossTotal)} ج`} icon={Coins} />
+        <Metric label="إجمالي بعد الخصومات" value={`${money(stats.netTotal)} ج`} tone="ok" icon={PiggyBank} />
       </div>
       <div className="grid two">
         <section className="panel">

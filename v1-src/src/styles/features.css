@@ -1919,6 +1919,11 @@ a.secondary {
 .emp-avatar { width: 42px; height: 42px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--brand-soft); color: var(--gold-text); font-weight: 900; font-size: 18px; flex-shrink: 0; }
 .emp-card-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .emp-card-body strong { font-weight: 800; color: var(--ink); }
+.ledger-net { font-weight: 800; font-size: 13px; }
+.ledger-net.ok { color: var(--success); }
+.ledger-net.danger { color: var(--danger); }
+.ledger-net.muted { color: var(--muted); }
+.actions-row.tight { gap: 8px; margin: 0; }
 .emp-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
 
 .seg-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
