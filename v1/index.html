@@ -3,24 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#FCC107" />
-    <title>Air Ocean Line · HR v1</title>
+    <meta name="theme-color" content="#0C1722" />
+    <meta name="color-scheme" content="dark light" />
+    <title>AOI Ops Hub · Air Ocean Line</title>
     <link rel="icon" href="./icon.svg" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
     <script>
-      // Apply the saved theme before the bundle loads to avoid a light/dark flash.
+      // Dark is the product default; apply the saved choice before React to avoid a flash.
       try {
         var t = localStorage.getItem("aol-theme");
-        if (t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+        var resolvedTheme = t === "light" ? "light" : "dark";
+        document.documentElement.dataset.theme = resolvedTheme;
+        if (resolvedTheme === "dark") {
           document.documentElement.classList.add("dark");
+        } else {
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", "#F3F6F8");
         }
-      } catch (e) {}
+      } catch (e) {
+        document.documentElement.dataset.theme = "dark";
+        document.documentElement.classList.add("dark");
+      }
     </script>
-    <script type="module" crossorigin src="./assets/index-C9v8wJ7v.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CBi0excZ.css">
+    <script type="module" crossorigin src="./assets/index-DZUt0Py4.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DaY2eOuR.css">
   </head>
   <body>
     <div id="root"></div>
