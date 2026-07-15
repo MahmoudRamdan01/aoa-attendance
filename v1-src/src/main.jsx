@@ -24,9 +24,27 @@ createRoot(document.getElementById("root")).render(
 );
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  // When a NEW service worker takes control after a deploy, reload once so an
+  // installed PWA picks up the fresh build instead of serving a stale one
+  // (this is what left the owner's home-screen app looking "old"). We skip the
+  // very first claim (no previous controller) so first-time visitors don't bounce.
+  let hadController = Boolean(navigator.serviceWorker.controller);
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) { hadController = true; return; }
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
   window.addEventListener("load", () => {
     // Face-recognition models are intentionally not warmed here. They are more
     // than 10 MB and must never compete with normal page/API loading.
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker.register("./sw.js").then((reg) => {
+      reg.update?.();
+      // Check for a newer worker whenever the app regains focus.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") reg.update?.();
+      });
+    }).catch(() => {});
   });
 }

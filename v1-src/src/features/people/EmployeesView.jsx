@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, CalendarDays, ChevronLeft, Clock3, History, RefreshCcw, Search, UserCheck, Users, UserX } from "lucide-react";
+import { Banknote, CalendarDays, ChevronLeft, Clock3, History, Plus, Power, RefreshCcw, Search, Trash2, UserCheck, UserPlus, Users, UserX } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { monthRangeFor } from "../../lib/dates";
@@ -34,11 +34,36 @@ function writeEmployeesCache(userId, rows) {
 
 function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
   const role = context?.role || "employee";
+  const isAdmin = role === "hr" || role === "owner";
   const userId = session?.user?.id;
   const [employees, setEmployees] = useState(() => readEmployeesCache(userId));
   const [loading, setLoading] = useState(() => !readEmployeesCache(userId).length);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null);
+  const emptyAdd = { name: "", attendance_exempt: false, checkin_from: "", checkin_to: "", checkout_from: "", checkout_to: "" };
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState(emptyAdd);
+  const [busy, setBusy] = useState(false);
+
+  async function submitAdd(event) {
+    event.preventDefault();
+    if (!addForm.name.trim()) return onToast?.("اكتب اسم الموظف.");
+    setBusy(true);
+    const { data, error } = await supabase.rpc("owner_add_employee_v1", {
+      p_name: addForm.name.trim(),
+      p_attendance_exempt: addForm.attendance_exempt,
+      p_checkin_from: addForm.checkin_from || null,
+      p_checkin_to: addForm.checkin_to || null,
+      p_checkout_from: addForm.checkout_from || null,
+      p_checkout_to: addForm.checkout_to || null,
+    });
+    setBusy(false);
+    if (error || data?.error) return onToast?.(data?.message || "تعذر إضافة الموظف.");
+    onToast?.(`تمت إضافة ${data.name}.`);
+    setAddForm(emptyAdd);
+    setShowAdd(false);
+    load();
+  }
 
   useEffect(() => { load(); }, [userId]);
   useEffect(() => {
@@ -71,6 +96,12 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
           setSelected(null);
           onNavigate?.("team", [], { replace: true });
         }}
+        onChanged={load}
+        onDeleted={() => {
+          setSelected(null);
+          onNavigate?.("team", [], { replace: true });
+          load();
+        }}
         onToast={onToast}
       />
     );
@@ -81,8 +112,33 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
       <section className="panel">
         <div className="panel-title between">
           <div><Users size={20} /><h2>الموظفين</h2></div>
-          <button className="secondary" onClick={load}><RefreshCcw size={16} /> تحديث</button>
+          <div className="toolbar">
+            {isAdmin && !showAdd && <button className="secondary" onClick={() => { setAddForm(emptyAdd); setShowAdd(true); }}><UserPlus size={16} /> إضافة موظف</button>}
+            <button className="secondary" onClick={load}><RefreshCcw size={16} /> تحديث</button>
+          </div>
         </div>
+        {isAdmin && showAdd && (
+          <form className="form" onSubmit={submitAdd}>
+            <div className="panel-title"><Plus size={18} /><h2>موظف جديد</h2></div>
+            <div className="form-grid">
+              <label>الاسم<input value={addForm.name} onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))} required placeholder="اسم الموظف" /></label>
+              <label className="check-inline"><input type="checkbox" checked={addForm.attendance_exempt} onChange={(e) => setAddForm((f) => ({ ...f, attendance_exempt: e.target.checked }))} /> مرتبات فقط (لا يسجّل حضور)</label>
+            </div>
+            {!addForm.attendance_exempt && (
+              <div className="form-grid">
+                <label>نافذة الحضور من<input type="time" value={addForm.checkin_from} onChange={(e) => setAddForm((f) => ({ ...f, checkin_from: e.target.value }))} /></label>
+                <label>إلى<input type="time" value={addForm.checkin_to} onChange={(e) => setAddForm((f) => ({ ...f, checkin_to: e.target.value }))} /></label>
+                <label>نافذة الانصراف من<input type="time" value={addForm.checkout_from} onChange={(e) => setAddForm((f) => ({ ...f, checkout_from: e.target.value }))} /></label>
+                <label>إلى<input type="time" value={addForm.checkout_to} onChange={(e) => setAddForm((f) => ({ ...f, checkout_to: e.target.value }))} /></label>
+              </div>
+            )}
+            <p className="muted">لو سبت النوافذ فاضية هيستخدم مواعيد النظام الافتراضية. تقدر تربطله حساب دخول بعدين من «الرواتب والتقارير ← حسابات الموظفين».</p>
+            <div className="actions-row">
+              <button className="primary" disabled={busy}>{busy ? "جاري الإضافة..." : "إضافة الموظف"}</button>
+              <button type="button" className="secondary" onClick={() => { setShowAdd(false); setAddForm(emptyAdd); }}>إلغاء</button>
+            </div>
+          </form>
+        )}
         <label className="field-search">
           <Search size={16} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث باسم الموظف..." />
@@ -114,11 +170,35 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
   );
 }
 
-function EmployeeDetail({ employee, role, onBack, onToast }) {
+function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast }) {
   const [month, setMonth] = useState(() => todayIso().slice(0, 7));
   const [d, setD] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState(false);
+  const [active, setActive] = useState(employee.active);
+  const isOwner = role === "owner";
   const range = useMemo(() => monthRangeFor(month), [month]);
+
+  async function toggleActive() {
+    setActing(true);
+    const next = !active;
+    const { data, error } = await supabase.rpc("owner_set_employee_active_v1", { p_employee_id: employee.id, p_active: next });
+    setActing(false);
+    if (error || data?.error) return onToast?.(data?.message || "تعذر تحديث حالة الموظف.");
+    setActive(next);
+    onToast?.(next ? "تم تفعيل الموظف." : "تم توقيف الموظف.");
+    onChanged?.();
+  }
+
+  async function removeEmployee() {
+    if (!confirm(`تحذف ${employee.name} نهائيًا؟ الأفضل التوقيف لو عليه سجل.`)) return;
+    setActing(true);
+    const { data, error } = await supabase.rpc("owner_delete_employee_v1", { p_employee_id: employee.id });
+    setActing(false);
+    if (error || data?.error) return onToast?.(data?.message || "تعذر حذف الموظف.");
+    onToast?.(`تم حذف ${data.deleted}.`);
+    onDeleted?.();
+  }
 
   useEffect(() => { load(); }, [employee.id, range.from, range.to]);
   async function load() {
@@ -165,7 +245,7 @@ function EmployeeDetail({ employee, role, onBack, onToast }) {
           <button className="secondary" onClick={onBack}><ChevronLeft size={16} /> رجوع للقايمة</button>
         </div>
         <div className="emp-meta">
-          <span className={cls("badge", employee.active ? "ok" : "muted")}>{employee.active ? "نشط" : "موقوف"}</span>
+          <span className={cls("badge", active ? "ok" : "muted")}>{active ? "نشط" : "موقوف"}</span>
           <span className="badge">{employee.attendance_exempt ? "مرتبات فقط" : "بيسجل حضور"}</span>
           <span className="badge">رصيد أجازات: {employee.leave_balance ?? "—"}</span>
           {!employee.attendance_exempt && (
@@ -177,6 +257,16 @@ function EmployeeDetail({ employee, role, onBack, onToast }) {
           <span>شهر الحضور والخصومات</span>
           <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         </label>
+        <div className="actions-row">
+          <button className="secondary" type="button" onClick={toggleActive} disabled={acting}>
+            <Power size={16} /> {active ? "توقيف الموظف" : "تفعيل الموظف"}
+          </button>
+          {isOwner && (
+            <button className="danger-link" type="button" onClick={removeEmployee} disabled={acting}>
+              <Trash2 size={16} /> حذف نهائي
+            </button>
+          )}
+        </div>
       </section>
 
       {loading && <section className="panel"><p className="muted">جاري التحميل...</p></section>}
