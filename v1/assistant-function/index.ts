@@ -16,6 +16,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/mahmoudramdan01\.github\.io$/,
+  /^https:\/\/([a-z0-9-]+\.)*vercel\.app$/,
   /^http:\/\/localhost(:\d+)?$/,
   /^http:\/\/127\.0\.0\.1(:\d+)?$/,
 ];
