@@ -26,6 +26,19 @@ import {
 import { useTheme } from "./theme";
 
 const roleNames = { employee: "موظف", hr: "HR", owner: "Owner" };
+// Primary mobile bottom-tab views per role (short labels below). The 4th tab is
+// always "المزيد" which opens the full menu sheet.
+const MOBILE_PRIMARY = {
+  employee: ["today", "month", "requests"],
+  hr: ["admin", "team", "deductions"],
+  owner: ["owner", "admin", "team"],
+};
+const MOBILE_TAB_LABELS = {
+  today: "اليوم", month: "سجلي", requests: "طلباتي",
+  admin: "الحضور", team: "الفريق", owner: "الرواتب",
+  deductions: "الخصومات", expenses: "المصروفات", partner: "المديونية",
+  ownerbook: "الخاص", notifications: "الإشعارات", training: "التدريب", assistant: "المساعد",
+};
 const notificationCategoryLabels = {
   admin_message: "رسالة إدارية",
   approval: "موافقة مطلوبة",
@@ -270,9 +283,22 @@ export default function AppShell({
   const quickActions = useMemo(() => createQuickActions(context), [context]);
   const displayName = context?.employee?.name || context?.admin_name || session?.user?.email || "مستخدم النظام";
   const role = context?.role || "employee";
-  const isEmployeeMobileNav = role === "employee" && Boolean(context?.employee);
-  const mobileTabs = accessibleViews.filter((view) => ["today", "record", "requests"].includes(view.mobileSlot));
-  const moreViewIsActive = accessibleViews.some((view) => view.mobileSlot === "more" && view.id === activeView);
+  // Every role gets the mobile bottom nav (not just employees). Primary tabs
+  // are curated per role; the 4th is always "المزيد" → full menu sheet.
+  const mobileTabs = useMemo(() => {
+    const primary = MOBILE_PRIMARY[role] || [];
+    const tabs = primary
+      .map((viewId) => accessibleViews.find((view) => view.id === viewId))
+      .filter(Boolean);
+    for (const view of accessibleViews) {
+      if (tabs.length >= 3) break;
+      if (view.nav === false || view.mobileSlot === "more") continue;
+      if (!tabs.some((tab) => tab.id === view.id)) tabs.push(view);
+    }
+    return tabs.slice(0, 3);
+  }, [accessibleViews, role]);
+  const showBottomNav = Boolean(context) && mobileTabs.length > 0;
+  const moreViewIsActive = !mobileTabs.some((tab) => tab.id === activeView);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -399,7 +425,7 @@ export default function AppShell({
     <div
       className="ops-shell"
       data-section={activeItem?.accent || activeItem?.section || "home"}
-      data-employee-tabs={isEmployeeMobileNav ? "true" : undefined}
+      data-employee-tabs={showBottomNav ? "true" : undefined}
     >
       <a
         className="skip-link"
@@ -440,7 +466,7 @@ export default function AppShell({
             <button className="ops-icon-btn ops-mobile-only" type="button" onClick={openPalette} aria-label="فتح البحث السريع">
               <Search size={18} aria-hidden="true" />
             </button>
-            {role !== "employee" ? (
+            {!showBottomNav ? (
               <button
                 ref={mobileMoreTriggerRef}
                 className="ops-icon-btn ops-mobile-only"
@@ -562,15 +588,15 @@ export default function AppShell({
         </main>
       </div>
 
-      {isEmployeeMobileNav ? (
-        <nav className="ops-bottom-nav" aria-label="تنقل الموظف">
+      {showBottomNav ? (
+        <nav className="ops-bottom-nav" aria-label="التنقل السريع">
           {mobileTabs.map((view) => {
             const Icon = view.icon;
             const selected = view.id === activeView;
             return (
               <button className="ops-bottom-tab" type="button" key={view.id} onPointerEnter={() => onViewIntent?.(view.id)} onFocus={() => onViewIntent?.(view.id)} onClick={() => navigate(view.id)} aria-current={selected ? "page" : undefined}>
                 <Icon size={20} aria-hidden="true" />
-                <span>{view.mobileSlot === "today" ? "اليوم" : view.mobileSlot === "record" ? "سجلي" : "طلباتي"}</span>
+                <span>{MOBILE_TAB_LABELS[view.id] || view.ar}</span>
               </button>
             );
           })}
@@ -603,15 +629,14 @@ export default function AppShell({
           >
             <span className="ops-mobile-more-handle" aria-hidden="true" />
             <header className="ops-mobile-more-head">
-              <h2 id="ops-mobile-more-title">{isEmployeeMobileNav ? "المزيد" : "قائمة النظام"}</h2>
+              <h2 id="ops-mobile-more-title">القائمة</h2>
               <button className="ops-mobile-more-close" type="button" onClick={() => setMobileMoreOpen(false)} aria-label="إغلاق القائمة">
                 <X size={18} aria-hidden="true" />
               </button>
             </header>
-            {(isEmployeeMobileNav
-              ? accessibleViews.filter((view) => view.mobileSlot === "more")
-              : accessibleViews.filter((view) => view.nav !== false)
-            ).map((view) => {
+            {accessibleViews
+              .filter((view) => view.nav !== false && !mobileTabs.some((tab) => tab.id === view.id))
+              .map((view) => {
               const Icon = view.icon;
               return (
                 <button type="button" key={view.id} onPointerEnter={() => onViewIntent?.(view.id)} onFocus={() => onViewIntent?.(view.id)} onClick={() => navigate(view.id)}>
