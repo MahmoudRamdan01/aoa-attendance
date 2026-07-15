@@ -87,3 +87,41 @@ self.addEventListener("message", (event) => {
     event.waitUntil(addAllSettled(MODEL_CACHE, MODEL_FILES));
   }
 });
+
+// Web Push: show a system notification (with sound) even when the app/phone is
+// closed. Payload comes from the send-push Edge Function.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  const title = data.title || "Air Ocean Line";
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || "",
+    icon: "./icon-192.png",
+    badge: "./icon-192.png",
+    tag: data.tag || "aoa-notification",
+    dir: "rtl",
+    lang: "ar",
+    renotify: true,
+    data: { url: data.url || "./#/notifications" },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data && event.notification.data.url ? event.notification.data.url : "./#/notifications";
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if ("focus" in client) {
+        await client.focus();
+        if ("navigate" in client) client.navigate(target).catch(() => {});
+        return;
+      }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(target);
+  })());
+});

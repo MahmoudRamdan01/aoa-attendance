@@ -477,6 +477,12 @@
   border-block-end: 1px solid var(--line-subtle);
 }
 
+.ops-inbox-push {
+  padding: 10px 15px;
+  border-block-start: 1px solid var(--line-subtle);
+}
+.ops-inbox-push .ui-action { width: 100%; justify-content: center; }
+
 .ops-inbox-head h2 {
   margin: 0;
   font-size: 0.95rem;

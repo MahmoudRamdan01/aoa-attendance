@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import CommandPalette from "../ui/CommandPalette";
+import PushToggle from "../ui/PushToggle";
 import { EmptyState, PageHeader, Skeleton } from "../ui/primitives";
 import {
   allowedViews,
@@ -212,6 +213,10 @@ function InboxPopover({
         ) : (
           <EmptyState title="مفيش إشعارات بعد" description="أي تحديث جديد هيظهر هنا فورًا." compact />
         )}
+      </div>
+
+      <div className="ops-inbox-push">
+        <PushToggle onToast={onToast} />
       </div>
 
       <footer className="ops-inbox-foot">

@@ -1,7 +1,7 @@
-const SHELL_CACHE = "aoa-shell-e10f358694a3";
-const ASSET_CACHE = "aoa-assets-e10f358694a3";
-const MODEL_CACHE = "aoa-models-e10f358694a3";
-const PRECACHE = ["./assets/AdminDashboard-DgGk88RA.js","./assets/AssistantView-BINAxMMU.js","./assets/EmployeesView-CVCser_R.js","./assets/ExpensesView-_3lQnQSL.js","./assets/OwnerDashboard-DN6bklso.js","./assets/OwnerLedgerView-CeuiQVYu.js","./assets/PartnerLedgerView-BO5g6I_9.js","./assets/SecuritySettings-bnRQp6yL.js","./assets/alexandria-arabic-600-normal-CG1onHtq.woff2","./assets/alexandria-arabic-600-normal-Cuiz3iHe.woff","./assets/alexandria-arabic-700-normal-D0In6rsA.woff2","./assets/alexandria-arabic-700-normal-DzvlhbG_.woff","./assets/alexandria-latin-600-normal-BS7IWR5e.woff","./assets/alexandria-latin-600-normal-Cb47BBea.woff2","./assets/alexandria-latin-700-normal-9QjHO7f_.woff2","./assets/alexandria-latin-700-normal-BBRdbUeB.woff","./assets/generateCategoricalChart-D_KilQ-a.js","./assets/human.esm-Bsmf_kNX.js","./assets/ibm-plex-sans-arabic-arabic-400-normal-CZLC1jgY.woff","./assets/ibm-plex-sans-arabic-arabic-400-normal-CyU-ddYS.woff2","./assets/ibm-plex-sans-arabic-arabic-500-normal-C4MQITzh.woff2","./assets/ibm-plex-sans-arabic-arabic-500-normal-XmtXq_5I.woff","./assets/ibm-plex-sans-arabic-arabic-600-normal-0pRdybE_.woff2","./assets/ibm-plex-sans-arabic-arabic-600-normal-B3qNl98V.woff","./assets/ibm-plex-sans-arabic-arabic-700-normal-COV7B1nq.woff","./assets/ibm-plex-sans-arabic-arabic-700-normal-DrtBj6UE.woff2","./assets/ibm-plex-sans-arabic-latin-400-normal-Bo5KPYvw.woff2","./assets/ibm-plex-sans-arabic-latin-400-normal-sbZiljcy.woff","./assets/ibm-plex-sans-arabic-latin-500-normal-BKKTaxl1.woff","./assets/ibm-plex-sans-arabic-latin-500-normal-Cd6jVIg7.woff2","./assets/ibm-plex-sans-arabic-latin-600-normal-5MnVa4PS.woff","./assets/ibm-plex-sans-arabic-latin-600-normal-KrqB56Mw.woff2","./assets/ibm-plex-sans-arabic-latin-700-normal-BzSf6GNr.woff2","./assets/ibm-plex-sans-arabic-latin-700-normal-C6QlO9CN.woff","./assets/index-BzT_V6MM.css","./assets/index-DLneg-qs.js","./assets/jetbrains-mono-latin-500-normal-BWZEU5yA.woff2","./assets/jetbrains-mono-latin-500-normal-CJOVTJB7.woff","./assets/jetbrains-mono-latin-600-normal-BfsvjouI.woff","./assets/jetbrains-mono-latin-600-normal-C8RAYTDA.woff2","./assets/pencil-ChI3OGW5.js","./assets/plus-4BFs2hrh.js","./assets/user-plus-DnbFO5g_.js","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./icon-maskable.svg","./icon.svg","./index.html","./logo.png","./manifest.webmanifest","./models/antispoof.bin","./models/antispoof.json","./models/blazeface.bin","./models/blazeface.json","./models/facemesh.bin","./models/facemesh.json","./models/faceres.bin","./models/faceres.json","./models/liveness.bin","./models/liveness.json","./sw-killswitch.js","./training/evaluation-form.pdf","./training/training-plan.pdf","./wasm/tfjs-backend-wasm-simd.wasm","./wasm/tfjs-backend-wasm-threaded-simd.wasm","./wasm/tfjs-backend-wasm.wasm"];
+const SHELL_CACHE = "aoa-shell-e4b60795fcc9";
+const ASSET_CACHE = "aoa-assets-e4b60795fcc9";
+const MODEL_CACHE = "aoa-models-e4b60795fcc9";
+const PRECACHE = ["./assets/AdminDashboard-CcAYG9zh.js","./assets/AssistantView-DXtJ2Ht9.js","./assets/EmployeesView-xNATvyUr.js","./assets/ExpensesView-t7h0TRAO.js","./assets/OwnerDashboard-BAkiDTu2.js","./assets/OwnerLedgerView-C9BUMTwO.js","./assets/PartnerLedgerView-kZbSt51y.js","./assets/SecuritySettings-Dsm6N6Ty.js","./assets/alexandria-arabic-600-normal-CG1onHtq.woff2","./assets/alexandria-arabic-600-normal-Cuiz3iHe.woff","./assets/alexandria-arabic-700-normal-D0In6rsA.woff2","./assets/alexandria-arabic-700-normal-DzvlhbG_.woff","./assets/alexandria-latin-600-normal-BS7IWR5e.woff","./assets/alexandria-latin-600-normal-Cb47BBea.woff2","./assets/alexandria-latin-700-normal-9QjHO7f_.woff2","./assets/alexandria-latin-700-normal-BBRdbUeB.woff","./assets/generateCategoricalChart-B604765Y.js","./assets/human.esm-Bsmf_kNX.js","./assets/ibm-plex-sans-arabic-arabic-400-normal-CZLC1jgY.woff","./assets/ibm-plex-sans-arabic-arabic-400-normal-CyU-ddYS.woff2","./assets/ibm-plex-sans-arabic-arabic-500-normal-C4MQITzh.woff2","./assets/ibm-plex-sans-arabic-arabic-500-normal-XmtXq_5I.woff","./assets/ibm-plex-sans-arabic-arabic-600-normal-0pRdybE_.woff2","./assets/ibm-plex-sans-arabic-arabic-600-normal-B3qNl98V.woff","./assets/ibm-plex-sans-arabic-arabic-700-normal-COV7B1nq.woff","./assets/ibm-plex-sans-arabic-arabic-700-normal-DrtBj6UE.woff2","./assets/ibm-plex-sans-arabic-latin-400-normal-Bo5KPYvw.woff2","./assets/ibm-plex-sans-arabic-latin-400-normal-sbZiljcy.woff","./assets/ibm-plex-sans-arabic-latin-500-normal-BKKTaxl1.woff","./assets/ibm-plex-sans-arabic-latin-500-normal-Cd6jVIg7.woff2","./assets/ibm-plex-sans-arabic-latin-600-normal-5MnVa4PS.woff","./assets/ibm-plex-sans-arabic-latin-600-normal-KrqB56Mw.woff2","./assets/ibm-plex-sans-arabic-latin-700-normal-BzSf6GNr.woff2","./assets/ibm-plex-sans-arabic-latin-700-normal-C6QlO9CN.woff","./assets/index-CkGAS0sI.css","./assets/index-D33a13nu.js","./assets/jetbrains-mono-latin-500-normal-BWZEU5yA.woff2","./assets/jetbrains-mono-latin-500-normal-CJOVTJB7.woff","./assets/jetbrains-mono-latin-600-normal-BfsvjouI.woff","./assets/jetbrains-mono-latin-600-normal-C8RAYTDA.woff2","./assets/pencil-Bq7rd1ld.js","./assets/plus-BfNNhzP_.js","./assets/user-plus-D7DNkftm.js","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./icon-maskable.svg","./icon.svg","./index.html","./logo.png","./manifest.webmanifest","./models/antispoof.bin","./models/antispoof.json","./models/blazeface.bin","./models/blazeface.json","./models/facemesh.bin","./models/facemesh.json","./models/faceres.bin","./models/faceres.json","./models/liveness.bin","./models/liveness.json","./sw-killswitch.js","./training/evaluation-form.pdf","./training/training-plan.pdf","./wasm/tfjs-backend-wasm-simd.wasm","./wasm/tfjs-backend-wasm-threaded-simd.wasm","./wasm/tfjs-backend-wasm.wasm"];
 const MODEL_FILES = PRECACHE.filter((path) => path.includes("/models/") || path.includes("/wasm/"));
 const FACE_RUNTIME_FILES = PRECACHE.filter((path) => path.includes("/human.esm-"));
 const ON_DEMAND_FILES = [...MODEL_FILES, ...FACE_RUNTIME_FILES];
@@ -86,4 +86,42 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "warm-models") {
     event.waitUntil(addAllSettled(MODEL_CACHE, MODEL_FILES));
   }
+});
+
+// Web Push: show a system notification (with sound) even when the app/phone is
+// closed. Payload comes from the send-push Edge Function.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  const title = data.title || "Air Ocean Line";
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || "",
+    icon: "./icon-192.png",
+    badge: "./icon-192.png",
+    tag: data.tag || "aoa-notification",
+    dir: "rtl",
+    lang: "ar",
+    renotify: true,
+    data: { url: data.url || "./#/notifications" },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data && event.notification.data.url ? event.notification.data.url : "./#/notifications";
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if ("focus" in client) {
+        await client.focus();
+        if ("navigate" in client) client.navigate(target).catch(() => {});
+        return;
+      }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(target);
+  })());
 });
