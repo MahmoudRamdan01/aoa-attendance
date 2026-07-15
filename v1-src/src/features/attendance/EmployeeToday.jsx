@@ -1,72 +1,92 @@
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, LogOut, MapPin, MessageSquare, QrCode, WifiOff } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Camera, CheckCircle2, Clock3, LogOut, MapPin, MessageSquare, QrCode, ShieldCheck, WifiOff } from "lucide-react";
 import { distanceMeters, supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { getCompanyLocation } from "../../lib/dates";
-
 import { statusLabels } from "../../lib/labels";
+import { getDeviceFingerprint, getDeviceId } from "../../lib/deviceFingerprint";
+import { isCaptureFromToday, uploadAttendanceCapture } from "../../lib/captureUpload";
+import {
+  enqueueAttendance,
+  listQueuedAttendance,
+  migrateLegacyAttendanceQueue,
+  queuedAttendanceCount,
+  removeQueuedAttendance,
+  updateQueuedAttendance,
+} from "../../lib/offlineQueue";
+import { ConfirmDialog } from "../../ui/primitives";
+import CaptureSheet, { requestCaptureSession } from "./CaptureSheet";
 
-const QUEUE_KEY = "aoa:v1:offlineAttendanceQueue";
+const ERROR_MESSAGES = {
+  photo_required: "لازم تلتقط صورة واضحة عشان تسجّل.",
+  photo_invalid: "الصورة لم تصل بشكل سليم. حاول تلتقط من جديد.",
+  gps_suspect: "تعذر التحقق من الموقع بشكل موثوق. اقفل أي تطبيق Fake GPS وحاول من مكانك الطبيعي.",
+  face_mismatch: "تعذر التحقق من الوجه. اتأكد إن وشك واضح في الإضاءة وحاول تاني.",
+  low_accuracy: "دقة الموقع ضعيفة. شغّل GPS وانتظر لحظة في مكان مكشوف.",
+  outside: "أنت خارج نطاق الشركة.",
+  window_closed: "نافذة التسجيل مقفولة حاليًا.",
+  already: "العملية دي مسجلة بالفعل.",
+  no_checkin: "لازم تسجل حضور الأول.",
+  update_required: "نسخة التطبيق قديمة. حدّث الصفحة وثبّت آخر إصدار.",
+  day_locked: "اليوم مسجل إجازة أو مأمورية أو مرضي، ولا يمكن استبداله بحضور من التطبيق.",
+};
 
-function getQueuedActions() {
-  try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function setQueuedActions(items) {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
-}
-
-function getDeviceId() {
-  let id = localStorage.getItem("aoa:v1:deviceId");
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem("aoa:v1:deviceId", id);
-  }
-  return id;
-}
-
-function getLocation() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error("المتصفح لا يدعم تحديد الموقع."));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        resolve({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: Math.round(pos.coords.accuracy || 0),
-        }),
-      () => reject(new Error("لازم تسمح للموقع عشان التسجيل من الشركة.")),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 20000 }
-    );
-  });
-}
+const LOCKED_DAY_STATUSES = new Set(["leave", "mission", "sick"]);
 
 function normalizeQr(value) {
   return value.trim().toUpperCase();
 }
 
-function EmployeeToday({ context, onToast }) {
+function isNetworkError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return !navigator.onLine || message.includes("fetch") || message.includes("network") || message.includes("load failed");
+}
+
+function EmployeeToday({ context, session, onToast, routeParam }) {
   const [qr, setQr] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState("");
   const [locationState, setLocationState] = useState(null);
   const [todayRecord, setTodayRecord] = useState(null);
-  const [queued, setQueued] = useState(getQueuedActions().length);
+  const [queued, setQueued] = useState(0);
+  const [capture, setCapture] = useState(null);
+  const [consentKind, setConsentKind] = useState("");
+  const [shortcutRequested, setShortcutRequested] = useState(false);
+  const [securityConfig, setSecurityConfig] = useState({
+    face_mode: "off",
+    antispoof_min: 0.6,
+  });
 
   const employee = context?.employee;
   const companyLocation = useMemo(() => getCompanyLocation(context), [context?.location]);
+  const consentKey = `aoa:v1:biometric-consent:${session?.user?.id || employee?.id || "unknown"}`;
+  const dayLocked = LOCKED_DAY_STATUSES.has(todayRecord?.status) && !todayRecord?.check_in;
+
+  const refreshQueueCount = useCallback(async () => {
+    try {
+      setQueued(await queuedAttendanceCount());
+    } catch {
+      setQueued(0);
+    }
+  }, []);
 
   useEffect(() => {
     loadToday();
-    setQueued(getQueuedActions().length);
-  }, [employee?.id]);
+    migrateLegacyAttendanceQueue().finally(refreshQueueCount);
+    supabase.rpc("get_attendance_security_config_v1").then(({ data }) => {
+      if (data?.face_mode) setSecurityConfig(data);
+    }).catch(() => {});
+  }, [employee?.id, refreshQueueCount]);
+
+  useEffect(() => {
+    if (routeParam === "capture-in" && !todayRecord?.check_in && !dayLocked) setShortcutRequested(true);
+  }, [routeParam, todayRecord?.check_in, dayLocked]);
+
+  useEffect(() => {
+    const sync = () => syncQueue({ quiet: true });
+    window.addEventListener("online", sync);
+    return () => window.removeEventListener("online", sync);
+  });
 
   async function loadToday() {
     if (!employee?.id) return;
@@ -79,89 +99,216 @@ function EmployeeToday({ context, onToast }) {
     setTodayRecord(data || null);
   }
 
-  async function submitAttendance(kind, loc, qrValue, deviceId = getDeviceId(), noteValue = "") {
-    const cleanQr = normalizeQr(qrValue);
-    const cleanNote = (noteValue || "").trim();
-    const distance = distanceMeters(loc, companyLocation);
-    setLocationState({ ...loc, distance });
-    if (distance > companyLocation.radiusMeters) {
-      return {
-        error: "outside",
-        message: `أنت خارج نطاق الشركة (${Math.round(distance)} متر).`,
-      };
-    }
-
-    const { data, error } = await supabase.rpc("employee_attendance_action_v1", {
+  function attendanceArgs(kind, captureData, photoPath) {
+    return {
       p_kind: kind,
-      p_lat: loc.lat,
-      p_lng: loc.lng,
-      p_accuracy: loc.accuracy,
-      p_qr_code: cleanQr,
-      p_device_id: deviceId,
-      p_note: cleanNote || null,
-    });
+      p_lat: captureData.location.lat,
+      p_lng: captureData.location.lng,
+      p_accuracy: captureData.location.accuracy,
+      p_qr_code: normalizeQr(qr) || null,
+      p_device_id: getDeviceId(),
+      p_note: note.trim() || null,
+      p_photo_path: photoPath,
+      p_face_embedding: captureData.faceEmbedding ? JSON.stringify(captureData.faceEmbedding) : null,
+      p_face_scores: captureData.faceScores || null,
+      p_gps_samples: captureData.samples,
+      p_fingerprint: getDeviceFingerprint(),
+    };
+  }
+
+  async function runV2(args) {
+    const { data, error } = await supabase.rpc("employee_attendance_action_v2", args);
     if (error) throw error;
+    if (data?.error) {
+      const err = new Error(ERROR_MESSAGES[data.error] || data.message || "تعذر التسجيل.");
+      err.code = data.error;
+      throw err;
+    }
     return data;
   }
 
-  async function attendance(kind) {
-    // QR is optional now — attendance works with GPS alone. If a code is typed
-    // and the admin has turned QR back on (qr_required), the server validates it.
-    setBusy(kind);
-    let loc = null;
-    try {
-      loc = await getLocation();
-      const data = await submitAttendance(kind, loc, qr, getDeviceId(), note);
-      if (data?.error) {
-        onToast(data.message || "تعذر التسجيل.");
-      } else {
-        onToast(data.label || (kind === "in" ? "تم تسجيل الحضور." : "تم تسجيل الانصراف."));
-        setNote("");
-        loadToday();
-      }
-    } catch (error) {
-      if (!loc) {
-        onToast(error.message || "تعذر تحديد الموقع.");
-      } else {
-        const nextQueue = [
-          ...getQueuedActions(),
-          {
-            id: crypto.randomUUID(),
-            kind,
-            qr,
-            note,
-            location: loc,
-            deviceId: getDeviceId(),
-            at: new Date().toISOString(),
-          },
-        ];
-        setQueuedActions(nextQueue);
-        setQueued(nextQueue.length);
-        onToast("تم حفظ العملية Offline لحين عودة الاتصال.");
-      }
-    }
-    setBusy("");
+  async function queueCapture(kind, captureData, args, photoPath = null) {
+    await enqueueAttendance({
+      kind,
+      blob: captureData.blob,
+      width: captureData.width,
+      height: captureData.height,
+      capturedAt: captureData.capturedAt,
+      location: captureData.location,
+      samples: captureData.samples,
+      qr,
+      note,
+      deviceId: args.p_device_id,
+      fingerprint: args.p_fingerprint,
+      faceEmbedding: args.p_face_embedding,
+      faceScores: args.p_face_scores,
+      photoPath,
+    });
+    await refreshQueueCount();
   }
 
-  async function syncQueue() {
-    const items = getQueuedActions();
+  async function submitCapture(kind, captureData) {
+    const distance = distanceMeters(captureData.location, companyLocation);
+    setLocationState({ ...captureData.location, distance });
+    if (distance > companyLocation.radiusMeters) {
+      throw new Error(`أنت خارج نطاق الشركة (${Math.round(distance)} متر).`);
+    }
+
+    const draftArgs = attendanceArgs(kind, captureData, null);
+    if (!navigator.onLine) {
+      await queueCapture(kind, captureData, draftArgs);
+      onToast("تم حفظ الصورة والعملية Offline، وهتتزامن تلقائيًا عند رجوع الإنترنت.");
+      setCapture(null);
+      return;
+    }
+
+    let photoPath = null;
+    try {
+      photoPath = await uploadAttendanceCapture({
+        employeeId: employee.id,
+        kind,
+        blob: captureData.blob,
+        capturedAt: new Date(captureData.capturedAt),
+      });
+      const data = await runV2({ ...draftArgs, p_photo_path: photoPath });
+      onToast(data.label || (kind === "in" ? "تم تسجيل الحضور بالصورة." : "تم تسجيل الانصراف بالصورة."));
+      setNote("");
+      setCapture(null);
+      setShortcutRequested(false);
+      await loadToday();
+    } catch (error) {
+      if (isNetworkError(error)) {
+        await queueCapture(kind, captureData, draftArgs, photoPath);
+        onToast("الاتصال انقطع؛ حفظنا العملية وهتتزامن تلقائيًا.");
+        setCapture(null);
+        return;
+      }
+      throw error;
+    }
+  }
+
+  async function beginCapture(kind) {
+    setBusy(kind);
+    try {
+      // This call must remain directly inside the click handler for iOS.
+      const captureSession = await requestCaptureSession({ faceMode: securityConfig.face_mode });
+      setCapture({ kind, session: captureSession });
+      setShortcutRequested(false);
+    } catch (error) {
+      onToast(error.message || "تعذر تشغيل الكاميرا.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function attendance(kind) {
+    if (kind === "in" && dayLocked) {
+      onToast(ERROR_MESSAGES.day_locked);
+      return;
+    }
+    if (localStorage.getItem(consentKey) !== "accepted") {
+      setConsentKind(kind);
+      return;
+    }
+    beginCapture(kind);
+  }
+
+  function acceptConsent() {
+    const kind = consentKind;
+    localStorage.setItem(consentKey, "accepted");
+    setConsentKind("");
+    beginCapture(kind);
+  }
+
+  async function replayLegacy(item) {
+    const loc = item.location;
+    if (!loc) throw new Error("عملية قديمة بلا موقع.");
+    const { data, error } = await supabase.rpc("employee_attendance_action_v1", {
+      p_kind: item.kind,
+      p_lat: loc.lat,
+      p_lng: loc.lng,
+      p_accuracy: loc.accuracy,
+      p_qr_code: normalizeQr(item.qr || "") || null,
+      p_device_id: item.deviceId || getDeviceId(),
+      p_note: item.note?.trim() || null,
+    });
+    if (error) throw error;
+    if (data?.error && data.error !== "already") throw new Error(data.message || data.error);
+  }
+
+  async function syncQueue({ quiet = false } = {}) {
+    if (!navigator.onLine || busy === "sync") return;
+    let items;
+    try {
+      items = await listQueuedAttendance();
+    } catch {
+      return;
+    }
     if (!items.length) return;
     setBusy("sync");
-    const remaining = [];
-    for (const item of items) {
-      try {
-        const loc = item.location || (await getLocation());
-        const data = await submitAttendance(item.kind, loc, item.qr || qr, item.deviceId, item.note || "");
-        if (data?.error) remaining.push(item);
-      } catch {
-        remaining.push(item);
+    let synced = 0;
+    let expired = 0;
+    try {
+      for (const item of items) {
+        try {
+          if (item.legacy) {
+            await replayLegacy(item);
+          } else {
+            if (!isCaptureFromToday(item.capturedAt)) {
+              expired += 1;
+              await removeQueuedAttendance(item.id);
+              continue;
+            }
+            const photoPath = await uploadAttendanceCapture({
+              employeeId: employee.id,
+              kind: item.kind,
+              blob: item.blob,
+              capturedAt: new Date(item.capturedAt),
+              path: item.photoPath,
+            });
+            if (photoPath !== item.photoPath) {
+              item.photoPath = photoPath;
+              await updateQueuedAttendance(item);
+            }
+            await runV2({
+              p_kind: item.kind,
+              p_lat: item.location.lat,
+              p_lng: item.location.lng,
+              p_accuracy: item.location.accuracy,
+              p_qr_code: normalizeQr(item.qr || "") || null,
+              p_device_id: item.deviceId || getDeviceId(),
+              p_note: item.note?.trim() || null,
+              p_photo_path: photoPath,
+              p_face_embedding: item.faceEmbedding || null,
+              p_face_scores: item.faceScores || null,
+              p_gps_samples: item.samples || [],
+              p_fingerprint: item.fingerprint || getDeviceFingerprint(),
+            });
+          }
+          await removeQueuedAttendance(item.id);
+          synced += 1;
+        } catch (error) {
+          if (error.code === "already") {
+            await removeQueuedAttendance(item.id);
+            synced += 1;
+            continue;
+          }
+          item.attempts = (item.attempts || 0) + 1;
+          item.lastError = error.message || "sync_failed";
+          await updateQueuedAttendance(item);
+        }
       }
+    } finally {
+      setBusy("");
     }
-    setQueuedActions(remaining);
-    setQueued(remaining.length);
-    loadToday();
-    onToast(remaining.length ? `تمت مزامنة ${items.length - remaining.length} وباقي ${remaining.length}.` : "تمت مزامنة كل العمليات المحفوظة.");
-    setBusy("");
+    await refreshQueueCount();
+    await loadToday();
+    if (!quiet || expired) {
+      const parts = [];
+      if (synced) parts.push(`تمت مزامنة ${synced}`);
+      if (expired) parts.push(`تعذر إرسال ${expired} لأنها من يوم سابق`);
+      onToast(parts.join(" · ") || "تعذر مزامنة العمليات المحفوظة.");
+    }
   }
 
   const todayNote = todayRecord
@@ -173,75 +320,107 @@ function EmployeeToday({ context, onToast }) {
     : "";
 
   return (
-    <div className="grid two">
-      <section className="panel hero-panel">
-        <div className="panel-title">
-          <Clock3 size={20} />
-          <h2>تسجيل اليوم</h2>
-        </div>
-        <div className="today-status">
-          <StatusDot done={!!todayRecord?.check_in} label="حضور" value={todayRecord?.check_in?.slice(0, 5) || "لم يسجل"} />
-          <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={todayRecord?.check_out?.slice(0, 5) || "لم يسجل"} />
-        </div>
-        <label className="field">
-          كود QR اليومي (اختياري)
-          <input
-            dir="ltr"
-            value={qr}
-            onChange={(e) => setQr(e.target.value.toUpperCase())}
-            placeholder="اختياري — تقدر تسجل بالموقع بس"
-            autoCapitalize="characters"
-            autoComplete="one-time-code"
-          />
-        </label>
-        <label className="field">
-          ملاحظة (اختياري)
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="اكتب ملاحظة تظهر للإدارة (مثال: اتأخرت بسبب الزحمة)"
-            maxLength={280}
-          />
-        </label>
-        {todayRecord?.employee_note && (
-          <p className="muted">
-            <MessageSquare size={15} /> ملاحظتك المسجلة: {todayRecord.employee_note}
-          </p>
-        )}
-        <div className="actions-row">
-          <button className="primary" disabled={busy || !!todayRecord?.check_in} onClick={() => attendance("in")}>
-            <CheckCircle2 size={18} /> {busy === "in" ? "جاري..." : "تسجيل حضور"}
-          </button>
-          <button className="secondary" disabled={busy || !todayRecord?.check_in || !!todayRecord?.check_out} onClick={() => attendance("out")}>
-            <LogOut size={18} /> {busy === "out" ? "جاري..." : "تسجيل انصراف"}
-          </button>
-        </div>
-        {locationState && (
-          <p className="muted">
-            <MapPin size={15} /> المسافة عن الشركة: {Math.round(locationState.distance)} متر · دقة GPS {locationState.accuracy} متر
-          </p>
-        )}
-        {todayNote && <p className="muted">{todayNote}</p>}
-        {queued > 0 && (
-          <button className="warning-btn" onClick={syncQueue} disabled={busy === "sync"}>
-            <WifiOff size={17} /> مزامنة {queued} عملية محفوظة Offline
-          </button>
-        )}
-      </section>
+    <>
+      <div className="grid two">
+        <section className="panel hero-panel attendance-capture-panel">
+          <div className="panel-title">
+            <Clock3 size={20} />
+            <h2>تسجيل اليوم</h2>
+          </div>
+          <div className="today-status">
+            <StatusDot done={!!todayRecord?.check_in} label="حضور" value={todayRecord?.check_in?.slice(0, 5) || "لم يسجل"} />
+            <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={todayRecord?.check_out?.slice(0, 5) || "لم يسجل"} />
+          </div>
 
-      <section className="panel">
-        <div className="panel-title">
-          <QrCode size={20} />
-          <h2>قواعد التسجيل</h2>
-        </div>
-        <ul className="rules">
-          <li>التسجيل مرة حضور ومرة انصراف يوميًا.</li>
-          <li>لازم تكون داخل {companyLocation.radiusMeters} متر من موقع الشركة.</li>
-          <li>كود QR اختياري — تقدر تسجل بالموقع لوحده (بيظهر عند HR/Owner لو حبيت تستخدمه).</li>
-          <li>لو النت قطع، العملية تتحفظ وتتزامن عند رجوعه.</li>
-        </ul>
-      </section>
-    </div>
+          {shortcutRequested ? (
+            <div className="capture-shortcut">
+              <Camera size={22} />
+              <div><strong>جاهز لتسجيل حضورك؟</strong><span>اضغط لفتح الكاميرا وتثبيت الموقع.</span></div>
+              <button type="button" className="primary" onClick={() => attendance("in")}>ابدأ</button>
+            </div>
+          ) : null}
+
+          <label className="field">
+            كود QR اليومي (اختياري)
+            <input
+              dir="ltr"
+              value={qr}
+              onChange={(event) => setQr(event.target.value.toUpperCase())}
+              placeholder="اختياري — الموقع والصورة يكفوا"
+              autoCapitalize="characters"
+              autoComplete="one-time-code"
+            />
+          </label>
+          <label className="field">
+            ملاحظة (اختياري)
+            <input
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="مثال: اتأخرت بسبب الزحمة"
+              maxLength={280}
+            />
+          </label>
+          {todayRecord?.employee_note ? (
+            <p className="muted"><MessageSquare size={15} /> ملاحظتك المسجلة: {todayRecord.employee_note}</p>
+          ) : null}
+
+          <div className="actions-row attendance-main-actions">
+            <button className="primary capture-action" disabled={busy || !!todayRecord?.check_in || dayLocked} onClick={() => attendance("in")}>
+              <Camera size={19} /> {busy === "in" ? "جاري فتح الكاميرا…" : "تسجيل حضور"}
+            </button>
+            <button className="secondary capture-action" disabled={busy || !todayRecord?.check_in || !!todayRecord?.check_out} onClick={() => attendance("out")}>
+              <LogOut size={19} /> {busy === "out" ? "جاري فتح الكاميرا…" : "تسجيل انصراف"}
+            </button>
+          </div>
+          {locationState ? (
+            <p className="muted">
+              <MapPin size={15} /> المسافة عن الشركة: {Math.round(locationState.distance)} متر · دقة GPS {locationState.accuracy} متر
+            </p>
+          ) : null}
+          {todayNote ? <p className="muted">{todayNote}</p> : null}
+          {queued > 0 ? (
+            <button className="warning-btn" onClick={() => syncQueue()} disabled={busy === "sync"}>
+              <WifiOff size={17} /> مزامنة {queued} عملية محفوظة Offline
+            </button>
+          ) : null}
+        </section>
+
+        <section className="panel">
+          <div className="panel-title">
+            <ShieldCheck size={20} />
+            <h2>تسجيل آمن</h2>
+          </div>
+          <ul className="rules">
+            <li>صورة سيلفي مطلوبة عند الحضور والانصراف.</li>
+            <li>لازم تكون داخل {companyLocation.radiusMeters} متر من موقع الشركة.</li>
+            <li>النظام يفحص تغيرات GPS والجهاز ويرسل تنبيهًا للإدارة عند الاشتباه.</li>
+            <li>الصورة في bucket خاص ولا يمكن تعديلها بعد الرفع.</li>
+            <li><QrCode size={15} /> QR اختياري إلا لو الإدارة فعّلته.</li>
+          </ul>
+        </section>
+      </div>
+
+      <ConfirmDialog
+        open={Boolean(consentKind)}
+        title="موافقة على التحقق بالصورة والوجه"
+        message="أوافق على التقاط صورتي عند الحضور والانصراف واستخدام بصمة الوجه والتحقق من الحيوية لأغراض تأمين سجل الحضور، مع حفظ الصورة في أرشيف خاص متاح للإدارة فقط. يمكنني مراجعة سياسة الخصوصية أو التواصل مع الإدارة."
+        confirmLabel="أوافق وابدأ"
+        cancelLabel="إلغاء"
+        onConfirm={acceptConsent}
+        onCancel={() => setConsentKind("")}
+      />
+
+      {capture ? (
+        <CaptureSheet
+          kind={capture.kind}
+          session={capture.session}
+          faceMode={securityConfig.face_mode}
+          antispoofMin={Number(securityConfig.antispoof_min || 0.6)}
+          onCapture={(data) => submitCapture(capture.kind, data)}
+          onCancel={() => setCapture(null)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -249,10 +428,7 @@ function StatusDot({ done, label, value }) {
   return (
     <div className={cls("status-dot", done && "done")}>
       <span />
-      <div>
-        <small>{label}</small>
-        <strong>{value}</strong>
-      </div>
+      <div><small>{label}</small><strong>{value}</strong></div>
     </div>
   );
 }

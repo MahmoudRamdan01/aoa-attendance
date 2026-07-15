@@ -6,6 +6,8 @@ import { monthRangeFor } from "../../lib/dates";
 import { money } from "../../lib/format";
 import { deductionCategoryLabels, reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
+import FaceEnrollment from "./FaceEnrollment";
+import DeviceHistory from "./DeviceHistory";
 
 function EmployeesView({ context, onToast, onNavigate, routeParam }) {
   const role = context?.role || "employee";
@@ -155,6 +157,12 @@ function EmployeeDetail({ employee, role, onBack, onToast }) {
 
       {!loading && d && stats && (
         <>
+          {!employee.attendance_exempt && (
+            <>
+              <FaceEnrollment employee={employee} onToast={onToast} />
+              <DeviceHistory employee={employee} />
+            </>
+          )}
           <section className="panel">
             <div className="stats-grid compact-stats">
               <Metric label="حضور" value={stats.present} tone="ok" icon={UserCheck} />

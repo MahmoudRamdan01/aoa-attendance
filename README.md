@@ -27,11 +27,8 @@ Static Supabase-powered attendance app.
 cd v1-src
 npm install            # deps include Tailwind CSS + Recharts (KPI dashboard UI)
 npm run build          # outputs to v1-src/dist/
-# then publish the build (remove the old hashed assets first):
-rm ../v1/assets/index-*.js ../v1/assets/index-*.css
-cp dist/index.html ../v1/index.html
-cp dist/assets/*.js dist/assets/*.css ../v1/assets/
-cp dist/icon.svg dist/logo.png dist/manifest.webmanifest dist/sw.js ../v1/
+# publish as an overlay; keep old hashed assets for stale clients:
+cp -r dist/. ../v1/
 ```
 
 The UI follows the AOI brand (yellow `#FCC107` + charcoal, logo in `assets/`) with a
@@ -70,6 +67,8 @@ Run these in Supabase SQL Editor **in order** (all are idempotent, safe to re-ru
 7. `v1/supabase-v1-ops-update.sql` — company GPS fix (real coords + 1000m radius), attendance windows (global 08–11 / 16–19, per-employee overrides), `employees.attendance_exempt` payroll-only flag, salary updates, one-time deduction reset, `notify_team()` + auto team notifications (late arrivals, approved leaves) + notifications realtime publication.
 8. `v1/supabase-v1-exempt-guard.sql` — exempt employees are blocked from check-in/out and never auto-marked absent.
 9. `v1/supabase-v1-assistant.sql` — AI assistant config + logs tables (insert the LLM API key manually — never commit it). The agent itself is the `assistant` Supabase Edge Function (source in `v1/assistant-function/index.ts`), called from the "المساعد الذكي" section with the user's JWT so RLS/RPC guards cap what it can do.
+10. `v1/supabase-v1-face-security.sql` — private captures, trusted devices, face profiles, risk checks, and `employee_attendance_action_v2`. It starts with `face_mode=off` for a safe rollout.
+11. `v1/supabase-v1-security-hardening.sql` — apply only after all clients have adopted v2 and the staged face rollout is stable.
 
 ### ⚠️ Rotate all PINs (mandatory)
 

@@ -12,6 +12,8 @@
     "@fontsource/ibm-plex-sans-arabic": "5.2.9",
     "@fontsource/jetbrains-mono": "5.2.8",
     "@supabase/supabase-js": "^2.45.4",
+    "@tensorflow/tfjs-backend-wasm": "4.22.0",
+    "@vladmandic/human": "3.3.6",
     "lucide-react": "^0.417.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",

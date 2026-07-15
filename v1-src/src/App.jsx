@@ -35,6 +35,7 @@ function lazyView(loader) {
 const AssistantView = lazyView(() => import("./features/assistant/AssistantView"));
 const EmployeesView = lazyView(() => import("./features/people/EmployeesView"));
 const AdminDashboard = lazyView(() => import("./features/attendance/AdminDashboard"));
+const SecuritySettings = lazyView(() => import("./features/system/SecuritySettings"));
 const OwnerDashboard = lazyView(() => import("./features/payroll/OwnerDashboard"));
 const ExpensesView = lazyView(() => import("./features/finance/ExpensesView"));
 const PartnerLedgerView = lazyView(() => import("./features/finance/PartnerLedgerView"));
@@ -130,6 +131,7 @@ function App() {
       partner: PartnerLedgerView,
       team: EmployeesView,
       admin: AdminDashboard,
+      security: SecuritySettings,
       owner: OwnerDashboard,
       ownerbook: OwnerLedgerView,
     }),

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, RefreshCcw, Search, UserCheck, Users, UserX } from "lucide-react";
+import { AlertTriangle, Bell, CalendarDays, Camera, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, RefreshCcw, Search, UserCheck, Users, UserX } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { addDays, datesBetween } from "../../lib/dates";
@@ -8,6 +8,7 @@ import { reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import QRCodeLib from "qrcode";
 import { Cell, Pie, PieChart as RePieChart, ResponsiveContainer, Tooltip as ChartTooltip } from "recharts";
+import CapturesStrip from "./CapturesStrip";
 
 function AdminDashboard({ context, onToast }) {
   const [employees, setEmployees] = useState([]);
@@ -240,16 +241,17 @@ function AdminDashboard({ context, onToast }) {
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>الموظف</th><th>الحالة</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
+            <thead><tr><th>الموظف</th><th>الحالة</th><th>الصورة</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan="7">جاري التحميل...</td></tr>}
-              {!loading && filteredEmployees.length === 0 && <tr><td colSpan="7">لا توجد نتائج مطابقة.</td></tr>}
+              {loading && <tr><td colSpan="8">جاري التحميل...</td></tr>}
+              {!loading && filteredEmployees.length === 0 && <tr><td colSpan="8">لا توجد نتائج مطابقة.</td></tr>}
               {!loading && filteredEmployees.map((emp) => {
                 const rec = recs.get(emp.id);
                 return (
                   <tr key={emp.id}>
                     <td>{emp.name}</td>
                     <td>{rec ? <StatusBadge status={rec.status} /> : "لم يسجل"}</td>
+                    <td><CaptureThumbnail record={rec} /></td>
                     <td dir="ltr">{rec?.check_in?.slice(0, 5) || "-"}</td>
                     <td dir="ltr">{rec?.check_out?.slice(0, 5) || "-"}</td>
                     <td>{rec?.deduction_days || 0} يوم</td>
@@ -264,6 +266,8 @@ function AdminDashboard({ context, onToast }) {
           </table>
         </div>
       </section>
+
+      <CapturesStrip attendance={attendance} employees={employees} />
 
       <div className="grid two">
         <section className="panel">
@@ -297,6 +301,39 @@ function AdminDashboard({ context, onToast }) {
       <Approvals title="أذونات معلقة" rows={permissions} type="permission" canApprove={canApprove} onPermission={decidePermission} />
       <Approvals title="أجازات معلقة" rows={leaves} type="leave" canApprove={canApprove} onLeave={decideLeave} />
       <RequestsHistory />
+    </div>
+  );
+}
+
+function CaptureThumbnail({ record }) {
+  const [urls, setUrls] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const paths = [record?.photo_path, record?.checkout_photo_path].filter(Boolean);
+    if (!paths.length) {
+      setUrls([]);
+      return undefined;
+    }
+    Promise.all(paths.map(async (path) => {
+      const { data } = await supabase.storage.from("attendance-captures").createSignedUrl(path, 300);
+      return data?.signedUrl ? { path, url: data.signedUrl } : null;
+    })).then((items) => {
+      if (!cancelled) setUrls(items.filter(Boolean));
+    });
+    return () => { cancelled = true; };
+  }, [record?.photo_path, record?.checkout_photo_path]);
+
+  if (!record?.photo_path && !record?.checkout_photo_path) {
+    return <span className="capture-thumb-empty"><Camera size={15} />—</span>;
+  }
+  return (
+    <div className="capture-thumbs" aria-label="صور الحضور والانصراف">
+      {urls.map((item, index) => (
+        <a key={item.path} href={item.url} target="_blank" rel="noreferrer" title={index === 0 ? "صورة الحضور" : "صورة الانصراف"}>
+          <img src={item.url} alt={index === 0 ? "صورة الحضور" : "صورة الانصراف"} loading="lazy" />
+        </a>
+      ))}
     </div>
   );
 }
