@@ -17,10 +17,67 @@ import { LoginScreen, SetupBanner, Splash } from "./features/system/AuthScreens"
 // pulls a fresh index.html pointing at chunks that exist. The timestamp guard
 // stops it from looping if the chunk is genuinely unreachable (e.g. offline).
 const RELOAD_KEY = "aoa:chunk-reload-at";
+const CONTEXT_CACHE_PREFIX = "aoa:context:v1:";
+const CONTEXT_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 
-function lazyView(loader) {
+const VIEW_LOADERS = {
+  assistant: () => import("./features/assistant/AssistantView"),
+  team: () => import("./features/people/EmployeesView"),
+  admin: () => import("./features/attendance/AdminDashboard"),
+  security: () => import("./features/system/SecuritySettings"),
+  owner: () => import("./features/payroll/OwnerDashboard"),
+  expenses: () => import("./features/finance/ExpensesView"),
+  partner: () => import("./features/finance/PartnerLedgerView"),
+  ownerbook: () => import("./features/private-ledger/OwnerLedgerView"),
+};
+
+const viewPromises = new Map();
+
+function preloadView(viewId) {
+  const loader = VIEW_LOADERS[viewId];
+  if (!loader) return Promise.resolve(null);
+  if (!viewPromises.has(viewId)) {
+    const promise = loader().catch((error) => {
+      viewPromises.delete(viewId);
+      throw error;
+    });
+    viewPromises.set(viewId, promise);
+  }
+  return viewPromises.get(viewId);
+}
+
+function readCachedContext(userId) {
+  if (!userId) return null;
+  try {
+    const cached = JSON.parse(localStorage.getItem(`${CONTEXT_CACHE_PREFIX}${userId}`) || "null");
+    if (!cached?.value || Date.now() - Number(cached.savedAt || 0) > CONTEXT_CACHE_MAX_AGE) return null;
+    return cached.value;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedContext(userId, value) {
+  if (!userId || !value) return;
+  try {
+    localStorage.setItem(`${CONTEXT_CACHE_PREFIX}${userId}`, JSON.stringify({ savedAt: Date.now(), value }));
+  } catch {
+    /* Storage may be disabled; the live request still works. */
+  }
+}
+
+function clearCachedContext(userId) {
+  if (!userId) return;
+  try {
+    localStorage.removeItem(`${CONTEXT_CACHE_PREFIX}${userId}`);
+  } catch {
+    /* no-op */
+  }
+}
+
+function lazyView(viewId) {
   return lazy(() =>
-    loader().catch((error) => {
+    preloadView(viewId).catch((error) => {
       const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
       if (Date.now() - last > 10000) {
         sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
@@ -32,14 +89,14 @@ function lazyView(loader) {
   );
 }
 
-const AssistantView = lazyView(() => import("./features/assistant/AssistantView"));
-const EmployeesView = lazyView(() => import("./features/people/EmployeesView"));
-const AdminDashboard = lazyView(() => import("./features/attendance/AdminDashboard"));
-const SecuritySettings = lazyView(() => import("./features/system/SecuritySettings"));
-const OwnerDashboard = lazyView(() => import("./features/payroll/OwnerDashboard"));
-const ExpensesView = lazyView(() => import("./features/finance/ExpensesView"));
-const PartnerLedgerView = lazyView(() => import("./features/finance/PartnerLedgerView"));
-const OwnerLedgerView = lazyView(() => import("./features/private-ledger/OwnerLedgerView"));
+const AssistantView = lazyView("assistant");
+const EmployeesView = lazyView("team");
+const AdminDashboard = lazyView("admin");
+const SecuritySettings = lazyView("security");
+const OwnerDashboard = lazyView("owner");
+const ExpensesView = lazyView("expenses");
+const PartnerLedgerView = lazyView("partner");
+const OwnerLedgerView = lazyView("ownerbook");
 
 // Without this, a failed chunk import leaves Suspense pending forever and the
 // screen just hangs on the skeleton.
@@ -117,7 +174,8 @@ function App() {
   const [toast, setToast] = useState("");
   const [unread, setUnread] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
-  const { activeView, navigate, routeParams, routeParam } = useHashRouter("today");
+  const [mountedViews, setMountedViews] = useState([]);
+  const { activeView, navigate, routeParams } = useHashRouter("today");
   const viewRegistry = useMemo(
     () => createViewRegistry({
       today: EmployeeToday,
@@ -139,12 +197,22 @@ function App() {
   );
 
   useEffect(() => {
+    let currentUserId = null;
+    const applySession = (nextSession) => {
+      const nextUserId = nextSession?.user?.id || null;
+      if (nextUserId !== currentUserId) {
+        setContext(readCachedContext(nextUserId));
+        currentUserId = nextUserId;
+      }
+      setSession(nextSession);
+    };
+
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+      applySession(data.session);
       setLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
+      applySession(nextSession);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -154,8 +222,18 @@ function App() {
       setContext(null);
       return;
     }
-    loadContext();
-  }, [session]);
+    let cancelled = false;
+    const cached = readCachedContext(session.user.id);
+    if (cached) setContext((current) => current || cached);
+    loadContext(session, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    setMountedViews([]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!context) return;
@@ -168,6 +246,52 @@ function App() {
       navigate(activeView, [], { replace: true });
     }
   }, [context?.role, context?.employee?.id, activeView, navigate, viewRegistry]);
+
+  // Download the small view chunks while the browser is idle. Heavy face
+  // recognition files remain on-demand so they never compete with navigation.
+  useEffect(() => {
+    if (!context) return undefined;
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType || "")) return undefined;
+
+    let cancelled = false;
+    const preloadAllowedViews = async () => {
+      const ids = allowedViews(viewRegistry, context)
+        .map((view) => view.id)
+        .filter((id) => VIEW_LOADERS[id] && id !== activeView);
+      for (const id of ids) {
+        if (cancelled) break;
+        await preloadView(id).catch(() => {});
+      }
+    };
+
+    let timer;
+    let idleId;
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(preloadAllowedViews, { timeout: 1800 });
+    } else {
+      timer = window.setTimeout(preloadAllowedViews, 400);
+    }
+    return () => {
+      cancelled = true;
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [context?.role, context?.employee?.id, activeView, viewRegistry]);
+
+  // Keep pages already opened mounted. Returning to a page is instant and its
+  // fetched data, filters and scrollable content do not reset on every click.
+  const routeSignature = routeParams.join("/");
+  useEffect(() => {
+    if (!context || !viewRegistry.some((view) => view.id === activeView)) return;
+    setMountedViews((current) => {
+      const nextRoute = { id: activeView, params: [...routeParams] };
+      const index = current.findIndex((item) => item.id === activeView);
+      if (index === -1) return [...current, nextRoute];
+      if (current[index].params.join("/") === routeSignature) return current;
+      return current.map((item, itemIndex) => (itemIndex === index ? nextRoute : item));
+    });
+  }, [activeView, routeSignature, context?.role, context?.employee?.id, viewRegistry]);
 
   useEffect(() => {
     if (!session || !context || context.migration_required) return;
@@ -182,33 +306,40 @@ function App() {
     };
   }, [session?.user?.id, context?.role, context?.employee?.id, context?.migration_required]);
 
-  async function loadContext() {
-    setLoading(true);
+  async function loadContext(activeSession = session, isCancelled = () => false) {
+    if (!activeSession) return;
     const { data, error } = await supabase.rpc("get_my_context_v1");
+    if (isCancelled()) return;
     if (!error && data) {
       setContext(data);
-      setLoading(false);
+      writeCachedContext(activeSession.user.id, data);
       return;
     }
 
-    const uid = session.user.id;
-    const { data: admin } = await supabase
+    const uid = activeSession.user.id;
+    const { data: admin, error: adminError } = await supabase
       .from("app_admins")
       .select("role,name")
       .eq("user_id", uid)
       .maybeSingle();
-    setContext({
+    if (isCancelled()) return;
+    // When the device is temporarily offline, keep the last verified context
+    // instead of replacing it with a misleading migration warning.
+    if (adminError && readCachedContext(uid)) return;
+    const fallbackContext = {
       role: admin?.role || "employee",
-      admin_name: admin?.name || session.user.email,
+      admin_name: admin?.name || activeSession.user.email,
       employee: null,
       migration_required: true,
       setup_message:
         "شغّل migration v1 عشان employee portal وGPS والـ notifications يشتغلوا بالكامل.",
-    });
-    setLoading(false);
+    };
+    setContext(fallbackContext);
+    writeCachedContext(uid, fallbackContext);
   }
 
   async function signOut() {
+    clearCachedContext(session?.user?.id);
     await supabase.auth.signOut();
     setSession(null);
     setContext(null);
@@ -262,7 +393,10 @@ function App() {
 
   const visibleViews = allowedViews(viewRegistry, context);
   const activeItem = visibleViews.find((view) => view.id === activeView);
-  const ActiveComponent = activeItem?.component;
+  const visibleMountedViews = mountedViews.filter((item) => visibleViews.some((view) => view.id === item.id));
+  const routesToRender = activeItem && !visibleMountedViews.some((item) => item.id === activeView)
+    ? [...visibleMountedViews, { id: activeView, params: [...routeParams] }]
+    : visibleMountedViews;
 
   return (
     <>
@@ -274,26 +408,36 @@ function App() {
         routeParams={routeParams}
         onNavigate={navigate}
         onSignOut={signOut}
-        onRefresh={loadContext}
+        onRefresh={() => loadContext(session)}
+        onViewIntent={(viewId) => preloadView(viewId).catch(() => {})}
         unread={unread}
         setUnread={setUnread}
         realtimeConnected={realtimeConnected}
         onToast={setToast}
       >
         {context.migration_required ? <SetupBanner message={context.setup_message} /> : null}
-        {ActiveComponent ? (
-          <ViewErrorBoundary key={`${activeView}/${routeParams.join("/")}`}>
-            <Suspense fallback={<ViewSkeleton />}>
-              <ActiveComponent
-                context={context}
-                session={session}
-                onToast={setToast}
-                onNavigate={navigate}
-                routeParam={routeParam}
-              />
-            </Suspense>
-          </ViewErrorBoundary>
-        ) : null}
+        {routesToRender.map((mountedView) => {
+          const view = visibleViews.find((item) => item.id === mountedView.id);
+          const ViewComponent = view?.component;
+          const isActive = mountedView.id === activeView;
+          const params = isActive ? routeParams : mountedView.params;
+          if (!ViewComponent) return null;
+          return (
+            <div className="ops-mounted-view" key={mountedView.id} hidden={!isActive} aria-hidden={!isActive || undefined}>
+              <ViewErrorBoundary>
+                <Suspense fallback={<ViewSkeleton />}>
+                  <ViewComponent
+                    context={context}
+                    session={session}
+                    onToast={setToast}
+                    onNavigate={navigate}
+                    routeParam={params[0] || null}
+                  />
+                </Suspense>
+              </ViewErrorBoundary>
+            </div>
+          );
+        })}
       </AppShell>
       <Toast toast={toast} onDismiss={() => setToast("")} />
     </>

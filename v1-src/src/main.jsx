@@ -25,13 +25,8 @@ createRoot(document.getElementById("root")).render(
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").then((registration) => {
-      const warmModels = () => {
-        const worker = registration.active || registration.waiting;
-        worker?.postMessage({ type: "warm-models" });
-      };
-      warmModels();
-      navigator.serviceWorker.ready.then(warmModels).catch(() => {});
-    }).catch(() => {});
+    // Face-recognition models are intentionally not warmed here. They are more
+    // than 10 MB and must never compete with normal page/API loading.
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
   });
 }

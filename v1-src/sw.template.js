@@ -3,8 +3,10 @@ const ASSET_CACHE = "aoa-assets-__CACHE_VERSION__";
 const MODEL_CACHE = "aoa-models-__CACHE_VERSION__";
 const PRECACHE = __PRECACHE__;
 const MODEL_FILES = PRECACHE.filter((path) => path.includes("/models/") || path.includes("/wasm/"));
-const ASSET_FILES = PRECACHE.filter((path) => path.includes("/assets/"));
-const SHELL_FILES = PRECACHE.filter((path) => !MODEL_FILES.includes(path) && !ASSET_FILES.includes(path));
+const FACE_RUNTIME_FILES = PRECACHE.filter((path) => path.includes("/human.esm-"));
+const ON_DEMAND_FILES = [...MODEL_FILES, ...FACE_RUNTIME_FILES];
+const ASSET_FILES = PRECACHE.filter((path) => path.includes("/assets/") && !ON_DEMAND_FILES.includes(path));
+const SHELL_FILES = PRECACHE.filter((path) => !ON_DEMAND_FILES.includes(path) && !ASSET_FILES.includes(path));
 
 async function addAllSettled(cacheName, files) {
   const cache = await caches.open(cacheName);

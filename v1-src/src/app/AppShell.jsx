@@ -244,6 +244,7 @@ export default function AppShell({
   setUnread,
   realtimeConnected = false,
   onToast,
+  onViewIntent,
   children,
 }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -505,6 +506,8 @@ export default function AppShell({
                         className="ops-nav-item"
                         type="button"
                         key={view.id}
+                        onPointerEnter={() => onViewIntent?.(view.id)}
+                        onFocus={() => onViewIntent?.(view.id)}
                         onClick={() => navigate(view.id)}
                         aria-current={selected ? "page" : undefined}
                       >
@@ -547,7 +550,7 @@ export default function AppShell({
               description={activeItem?.private ? "مساحة خاصة ومحمية لحساب الـ Owner." : undefined}
               icon={activeItem?.icon}
             />
-            <div className="ops-view" key={`${activeView}/${routeParams.join("/")}`}>
+            <div className="ops-view">
               {children}
             </div>
           </div>
@@ -560,7 +563,7 @@ export default function AppShell({
             const Icon = view.icon;
             const selected = view.id === activeView;
             return (
-              <button className="ops-bottom-tab" type="button" key={view.id} onClick={() => navigate(view.id)} aria-current={selected ? "page" : undefined}>
+              <button className="ops-bottom-tab" type="button" key={view.id} onPointerEnter={() => onViewIntent?.(view.id)} onFocus={() => onViewIntent?.(view.id)} onClick={() => navigate(view.id)} aria-current={selected ? "page" : undefined}>
                 <Icon size={20} aria-hidden="true" />
                 <span>{view.mobileSlot === "today" ? "اليوم" : view.mobileSlot === "record" ? "سجلي" : "طلباتي"}</span>
               </button>
@@ -606,7 +609,7 @@ export default function AppShell({
             ).map((view) => {
               const Icon = view.icon;
               return (
-                <button type="button" key={view.id} onClick={() => navigate(view.id)}>
+                <button type="button" key={view.id} onPointerEnter={() => onViewIntent?.(view.id)} onFocus={() => onViewIntent?.(view.id)} onClick={() => navigate(view.id)}>
                   <Icon size={19} aria-hidden="true" />
                   <span>{view.ar}</span>
                 </button>

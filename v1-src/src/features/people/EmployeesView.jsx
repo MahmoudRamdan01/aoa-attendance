@@ -9,26 +9,52 @@ import { Metric, StatusBadge } from "../../ui/legacy";
 import FaceEnrollment from "./FaceEnrollment";
 import DeviceHistory from "./DeviceHistory";
 
-function EmployeesView({ context, onToast, onNavigate, routeParam }) {
+const EMPLOYEES_CACHE_PREFIX = "aoa:employees:v1:";
+const EMPLOYEES_CACHE_MAX_AGE = 10 * 60 * 1000;
+
+function readEmployeesCache(userId) {
+  if (!userId) return [];
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(`${EMPLOYEES_CACHE_PREFIX}${userId}`) || "null");
+    if (!Array.isArray(cached?.rows) || Date.now() - Number(cached.savedAt || 0) > EMPLOYEES_CACHE_MAX_AGE) return [];
+    return cached.rows;
+  } catch {
+    return [];
+  }
+}
+
+function writeEmployeesCache(userId, rows) {
+  if (!userId) return;
+  try {
+    sessionStorage.setItem(`${EMPLOYEES_CACHE_PREFIX}${userId}`, JSON.stringify({ savedAt: Date.now(), rows }));
+  } catch {
+    /* The live list still works when storage is unavailable. */
+  }
+}
+
+function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
   const role = context?.role || "employee";
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const userId = session?.user?.id;
+  const [employees, setEmployees] = useState(() => readEmployeesCache(userId));
+  const [loading, setLoading] = useState(() => !readEmployeesCache(userId).length);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [userId]);
   useEffect(() => {
     if (!routeParam || !employees.length) return;
     const employee = employees.find((item) => String(item.id) === String(routeParam));
     if (employee) setSelected(employee);
   }, [employees, routeParam]);
   async function load() {
-    setLoading(true);
+    if (!employees.length) setLoading(true);
     const { data } = await supabase
       .from("employees")
       .select("id,name,active,attendance_exempt,leave_balance,checkin_from,checkin_to,checkout_from,checkout_to")
       .order("id");
-    setEmployees(data || []);
+    const rows = data || [];
+    setEmployees(rows);
+    writeEmployeesCache(userId, rows);
     setLoading(false);
   }
   const filtered = useMemo(() => {
