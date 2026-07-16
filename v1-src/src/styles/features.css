@@ -2009,10 +2009,18 @@ a.secondary {
 }
 
 .capture-guide {
+  /* Fixed face-shaped oval: sized from the SHORTER axis so a tall phone
+     preview doesn't stretch it, and nudged above center where a held-phone
+     selfie face actually sits. (Was inset-based → tall/misaligned on mobile.) */
   position: absolute;
-  inset: 10% 19%;
+  top: 46%;
+  left: 50%;
+  height: min(62%, 320px);
+  aspect-ratio: 3 / 4;
+  max-width: 82%;
+  transform: translate(-50%, -50%);
   border: 2px solid rgba(252,193,7,.85);
-  border-radius: 48% 48% 44% 44%;
+  border-radius: 50% / 46%;
   box-shadow: 0 0 0 999px rgba(2,7,12,.32), 0 0 30px rgba(252,193,7,.25);
 }
 

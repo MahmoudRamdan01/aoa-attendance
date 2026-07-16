@@ -22,8 +22,18 @@ function LoginScreen() {
     event.preventDefault();
     setBusy(true);
     setMessage("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setMessage("الإيميل أو الباسورد غير صحيح.");
+    // Mobile keyboards/autofill add stray spaces around the email → auth 400.
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) {
+      // A flaky connection is NOT wrong credentials. Team members on mobile
+      // were seeing "الإيميل أو الباسورد غير صحيح" for network drops, then the
+      // retry logged them in — so tell them what actually happened.
+      const isNetwork = !error.status || error.status === 0 || /fetch|network|timeout|failed/i.test(error.message || "");
+      if (isNetwork) setMessage("الاتصال بالسيرفر فشل — اتأكد من النت وحاول تاني.");
+      else if (error.status === 429) setMessage("محاولات كتير ورا بعض — استنى دقيقة وحاول تاني.");
+      else if (error.status === 400) setMessage("الإيميل أو الباسورد غير صحيح.");
+      else setMessage("حصل خطأ مؤقت — حاول تاني.");
+    }
     setBusy(false);
   }
 
@@ -40,7 +50,7 @@ function LoginScreen() {
         <form onSubmit={login}>
           <label>
             الإيميل
-            <input dir="ltr" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+            <input dir="ltr" type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
           </label>
           <label>
             الباسورد
