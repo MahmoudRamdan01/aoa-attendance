@@ -19,6 +19,10 @@ import { LoginScreen, SetupBanner, Splash } from "./features/system/AuthScreens"
 const RELOAD_KEY = "aoa:chunk-reload-at";
 const CONTEXT_CACHE_PREFIX = "aoa:context:v1:";
 const CONTEXT_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
+const EMPLOYEES_CACHE_PREFIX = "aoa:employees:";
+// Shared-device protection: sign out after this long with no interaction so a
+// walked-away session can't be used by the next person on the same phone/PC.
+const INACTIVITY_MS = 30 * 60 * 1000;
 
 const VIEW_LOADERS = {
   assistant: () => import("./features/assistant/AssistantView"),
@@ -50,30 +54,38 @@ function readCachedContext(userId) {
   if (!userId) return null;
   try {
     const cached = JSON.parse(localStorage.getItem(`${CONTEXT_CACHE_PREFIX}${userId}`) || "null");
-    if (!cached?.value || Date.now() - Number(cached.savedAt || 0) > CONTEXT_CACHE_MAX_AGE) return null;
+    // Identity stamp: a cached context is only valid for the exact user it was
+    // saved for — never let one account render another's cached data.
+    if (!cached?.value || cached.userId !== userId || Date.now() - Number(cached.savedAt || 0) > CONTEXT_CACHE_MAX_AGE) return null;
     return cached.value;
   } catch {
     return null;
   }
 }
 
+// Wipe every cached user's data from this browser (context + employees lists).
+// Called on sign-out so the next person on a shared device starts clean.
+function clearAllAppCaches() {
+  try {
+    for (const store of [localStorage, sessionStorage]) {
+      for (const key of Object.keys(store)) {
+        if (key.startsWith(CONTEXT_CACHE_PREFIX) || key.startsWith(EMPLOYEES_CACHE_PREFIX)) store.removeItem(key);
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
 function writeCachedContext(userId, value) {
   if (!userId || !value) return;
   try {
-    localStorage.setItem(`${CONTEXT_CACHE_PREFIX}${userId}`, JSON.stringify({ savedAt: Date.now(), value }));
+    localStorage.setItem(`${CONTEXT_CACHE_PREFIX}${userId}`, JSON.stringify({ savedAt: Date.now(), userId, value }));
   } catch {
     /* Storage may be disabled; the live request still works. */
   }
 }
 
-function clearCachedContext(userId) {
-  if (!userId) return;
-  try {
-    localStorage.removeItem(`${CONTEXT_CACHE_PREFIX}${userId}`);
-  } catch {
-    /* no-op */
-  }
-}
 
 function lazyView(viewId) {
   return lazy(() =>
@@ -339,11 +351,41 @@ function App() {
   }
 
   async function signOut() {
-    clearCachedContext(session?.user?.id);
+    clearAllAppCaches();
     await supabase.auth.signOut();
     setSession(null);
     setContext(null);
   }
+
+  // Auto sign-out on inactivity (shared-device protection). Any tap/key resets
+  // the timer; returning to a tab that sat idle past the limit logs out too.
+  useEffect(() => {
+    if (!session) return undefined;
+    let last = Date.now();
+    let timer;
+    const doLogout = () => {
+      signOut();
+      setToast("تم تسجيل خروجك تلقائيًا لأمان الجهاز. سجّل دخول من جديد.");
+    };
+    const arm = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(doLogout, INACTIVITY_MS);
+    };
+    const onActivity = () => { last = Date.now(); arm(); };
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - last >= INACTIVITY_MS) doLogout(); else arm();
+    };
+    const events = ["pointerdown", "keydown", "touchstart"];
+    events.forEach((event) => window.addEventListener(event, onActivity, { passive: true }));
+    document.addEventListener("visibilitychange", onVisible);
+    arm();
+    return () => {
+      window.clearTimeout(timer);
+      events.forEach((event) => window.removeEventListener(event, onActivity));
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [session?.user?.id]);
 
   // Unread notifications counter for the topbar bell (head-count only, RLS-scoped).
   useEffect(() => {
