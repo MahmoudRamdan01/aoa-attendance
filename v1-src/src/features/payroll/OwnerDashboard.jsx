@@ -334,8 +334,9 @@ function OwnerDashboard({ onToast }) {
 function AccountManager({ onToast }) {
   const [employees, setEmployees] = useState([]);
   const [accounts, setAccounts] = useState([]);
-  const [form, setForm] = useState({ employeeId: "", email: "", role: "employee" });
+  const [form, setForm] = useState({ employeeId: "", email: "", password: "", role: "employee" });
   const [busy, setBusy] = useState(false);
+  const [lastCreated, setLastCreated] = useState(null);
 
   useEffect(() => {
     loadAccounts();
@@ -356,30 +357,41 @@ function AccountManager({ onToast }) {
   async function submit(event) {
     event.preventDefault();
     setBusy(true);
-    const { data, error } = await supabase.rpc("owner_link_employee_account_v1", {
+    // Create the login (email + password) AND link it in one step.
+    const { data, error } = await supabase.rpc("owner_create_employee_login_v1", {
       p_employee_id: Number(form.employeeId),
-      p_email: form.email,
+      p_email: form.email.trim(),
+      p_password: form.password,
       p_role: form.role,
     });
     setBusy(false);
     if (error || data?.error) {
-      onToast(data?.message || "تعذر ربط الحساب.");
+      onToast(data?.message || "تعذر إنشاء الحساب.");
       return;
     }
-    setForm((current) => ({ ...current, email: "" }));
-    onToast("تم ربط حساب الموظف.");
+    const empName = employees.find((emp) => String(emp.id) === String(form.employeeId))?.name || "";
+    setLastCreated({ name: empName, email: form.email.trim(), password: form.password });
+    setForm((current) => ({ ...current, email: "", password: "" }));
+    onToast("تم إنشاء حساب الدخول.");
     loadAccounts();
   }
 
   return (
     <section className="panel">
       <div className="panel-title"><UserPlus size={20} /><h2>حسابات الموظفين</h2></div>
+      <p className="muted">اعمل إيميل وباسورد دخول لأي موظف مباشرة. سلّمه البيانات وخلّيه يغيّر الباسورد بعد أول دخول.</p>
       <form className="form account-form" onSubmit={submit}>
         <label>الموظف<select value={form.employeeId} onChange={(e) => setForm((current) => ({ ...current, employeeId: e.target.value }))}>{employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}</select></label>
-        <label>إيميل الحساب<input dir="ltr" type="email" value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} required placeholder="employee@airocean.com" /></label>
+        <label>إيميل الحساب<input dir="ltr" type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} required placeholder="employee@airocean.com" /></label>
+        <label>الباسورد<input dir="ltr" type="text" value={form.password} onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} required minLength={6} placeholder="6 حروف على الأقل" /></label>
         <label>الدور<select value={form.role} onChange={(e) => setForm((current) => ({ ...current, role: e.target.value }))}>{roleOptions.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
-        <button className="primary" disabled={busy}>{busy ? "جاري الربط..." : "ربط الحساب"}</button>
+        <button className="primary" disabled={busy}>{busy ? "جاري الإنشاء..." : "إنشاء حساب دخول"}</button>
       </form>
+      {lastCreated && (
+        <div className="setup-banner" dir="rtl">
+          تم إنشاء حساب <strong>{lastCreated.name}</strong> — الإيميل: <bdi dir="ltr">{lastCreated.email}</bdi> · الباسورد: <bdi dir="ltr">{lastCreated.password}</bdi>. سلّمهم للموظف.
+        </div>
+      )}
       <div className="table-wrap">
         <table>
           <thead><tr><th>الموظف</th><th>الإيميل</th><th>الدور</th><th>الحالة</th></tr></thead>
