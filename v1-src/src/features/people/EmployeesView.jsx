@@ -3,7 +3,7 @@ import { Banknote, CalendarDays, ChevronLeft, Clock3, History, Plus, Power, Refr
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { monthRangeFor } from "../../lib/dates";
-import { money } from "../../lib/format";
+import { fmtTime12, money } from "../../lib/format";
 import { deductionCategoryLabels, reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import FaceEnrollment from "./FaceEnrollment";
@@ -249,7 +249,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
           <span className="badge">{employee.attendance_exempt ? "مرتبات فقط" : "بيسجل حضور"}</span>
           <span className="badge">رصيد أجازات: {employee.leave_balance ?? "—"}</span>
           {!employee.attendance_exempt && (
-            <span className="badge">حضور {employee.checkin_from?.slice(0, 5) || "—"}–{employee.checkin_to?.slice(0, 5) || "—"} · انصراف {employee.checkout_from?.slice(0, 5) || "—"}–{employee.checkout_to?.slice(0, 5) || "—"}</span>
+            <span className="badge">حضور {fmtTime12(employee.checkin_from) || "—"}–{fmtTime12(employee.checkin_to) || "—"} · انصراف {fmtTime12(employee.checkout_from) || "—"}–{fmtTime12(employee.checkout_to) || "—"}</span>
           )}
           {role === "owner" && d?.salary != null && <span className="badge ok">المرتب: {money(d.salary)} ج</span>}
         </div>
@@ -374,8 +374,8 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
                       <tr key={r.id}>
                         <td dir="ltr">{r.work_date}</td>
                         <td><span className={cls("status-badge", r.status)}>{statusLabels[r.status] || r.status}</span></td>
-                        <td dir="ltr">{r.check_in ? r.check_in.slice(0, 5) : "—"}</td>
-                        <td dir="ltr">{r.check_out ? r.check_out.slice(0, 5) : "—"}</td>
+                        <td dir="ltr">{fmtTime12(r.check_in) || "—"}</td>
+                        <td dir="ltr">{fmtTime12(r.check_out) || "—"}</td>
                         <td>{Number(r.late_minutes || 0) || "—"}</td>
                         <td>{Number(r.deduction_days || 0) || "—"}</td>
                         <td className="note-cell">{r.employee_note || r.hr_note || "—"}</td>

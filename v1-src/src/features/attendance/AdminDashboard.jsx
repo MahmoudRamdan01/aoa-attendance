@@ -3,7 +3,7 @@ import { AlertTriangle, Bell, CalendarDays, Camera, Clipboard, Clock3, FileSprea
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { addDays, datesBetween } from "../../lib/dates";
-import { csvCell, downloadTextFile } from "../../lib/format";
+import { csvCell, downloadTextFile, fmtTime12 } from "../../lib/format";
 import { reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import QRCodeLib from "qrcode";
@@ -252,8 +252,8 @@ function AdminDashboard({ context, onToast }) {
                     <td>{emp.name}</td>
                     <td>{rec ? <StatusBadge status={rec.status} /> : "لم يسجل"}</td>
                     <td><CaptureThumbnail record={rec} /></td>
-                    <td dir="ltr">{rec?.check_in?.slice(0, 5) || "-"}</td>
-                    <td dir="ltr">{rec?.check_out?.slice(0, 5) || "-"}</td>
+                    <td dir="ltr">{fmtTime12(rec?.check_in) || "-"}</td>
+                    <td dir="ltr">{fmtTime12(rec?.check_out) || "-"}</td>
                     <td>{rec?.deduction_days || 0} يوم</td>
                     <td>
                       <AdminNoteCell empId={emp.id} rec={rec} reportDate={reportDate} onToast={onToast} onSaved={loadAdmin} />

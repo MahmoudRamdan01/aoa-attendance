@@ -28,6 +28,17 @@ function fmtDateTime(value) {
   });
 }
 
+// "17:46:00" → "5:46 م" — 12-hour clock for attendance times.
+function fmtTime12(value) {
+  if (!value) return null;
+  const [h, m] = String(value).split(":");
+  const hour = Number(h);
+  if (Number.isNaN(hour) || m === undefined) return String(value);
+  const suffix = hour < 12 ? "ص" : "م";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:${m} ${suffix}`;
+}
+
 function downloadTextFile(filename, text) {
   const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -43,4 +54,4 @@ function csvCell(value) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-export { csvCell, downloadTextFile, fmtDate, fmtDateTime, money, normalizeArabicName };
+export { csvCell, downloadTextFile, fmtDate, fmtDateTime, fmtTime12, money, normalizeArabicName };

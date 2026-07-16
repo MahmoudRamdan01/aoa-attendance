@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Banknote, CalendarDays, Clock3, FileSpreadsheet, History, UserCheck, UserX } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 
-import { csvCell, downloadTextFile } from "../../lib/format";
+import { csvCell, downloadTextFile, fmtTime12 } from "../../lib/format";
 import { statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 
@@ -134,8 +134,8 @@ function MyMonthView({ context, onToast }) {
                   <td dir="ltr">{row.work_date}</td>
                   <td>{weekdayName(row.work_date)}</td>
                   <td><StatusBadge status={row.status} /></td>
-                  <td dir="ltr">{row.check_in?.slice(0, 5) || "-"}</td>
-                  <td dir="ltr">{row.check_out?.slice(0, 5) || "-"}</td>
+                  <td dir="ltr">{fmtTime12(row.check_in) || "-"}</td>
+                  <td dir="ltr">{fmtTime12(row.check_out) || "-"}</td>
                   <td>{row.late_minutes || 0} د</td>
                   <td>{row.deduction_days || 0}</td>
                   <td className="note-cell">{row.employee_note || "-"}</td>

@@ -4,6 +4,7 @@ import { distanceMeters, supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { getCompanyLocation } from "../../lib/dates";
 import { statusLabels } from "../../lib/labels";
+import { fmtTime12 } from "../../lib/format";
 import { getDeviceFingerprint, getDeviceId } from "../../lib/deviceFingerprint";
 import { isCaptureFromToday, uploadAttendanceCapture } from "../../lib/captureUpload";
 import {
@@ -103,9 +104,9 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
   function attendanceArgs(kind, captureData, photoPath) {
     return {
       p_kind: kind,
-      p_lat: captureData.location.lat,
-      p_lng: captureData.location.lng,
-      p_accuracy: captureData.location.accuracy,
+      p_lat: captureData.location?.lat ?? null,
+      p_lng: captureData.location?.lng ?? null,
+      p_accuracy: captureData.location?.accuracy ?? null,
       p_qr_code: normalizeQr(qr) || null,
       p_device_id: getDeviceId(),
       p_note: note.trim() || null,
@@ -149,10 +150,11 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
   }
 
   async function submitCapture(kind, captureData) {
-    const distance = distanceMeters(captureData.location, companyLocation);
-    setLocationState({ ...captureData.location, distance });
-    if (distance > companyLocation.radiusMeters) {
-      throw new Error(`أنت خارج نطاق الشركة (${Math.round(distance)} متر).`);
+    if (captureData.location) {
+      const distance = distanceMeters(captureData.location, companyLocation);
+      setLocationState({ ...captureData.location, distance });
+      // No client-side hard block: employees may have extra allowed locations
+      // (employee_locations) that only the server knows about — it validates.
     }
 
     const draftArgs = attendanceArgs(kind, captureData, null);
@@ -210,15 +212,22 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
   async function submitDirect(kind) {
     setBusy(kind);
     try {
-      const sampler = startGpsSampler();
-      sampler.first.catch(() => {});
-      const samples = await sampler.done;
-      const location = [...samples].sort((a, b) => a.accuracy - b.accuracy)[0] || null;
-      if (!location) throw new Error("تعذر تثبيت الموقع. فعّل الـ GPS وحاول من مكان مكشوف.");
-      const distance = distanceMeters(location, companyLocation);
-      setLocationState({ ...location, distance });
-      if (distance > companyLocation.radiusMeters) {
-        throw new Error(`أنت خارج نطاق الشركة (${Math.round(distance)} متر).`);
+      // location_exempt (e.g. حبيبة): no GPS at all — the server skips the
+      // geofence for her too, so we go straight to the RPC.
+      const locationExempt = Boolean(employee?.location_exempt);
+      let location = null;
+      let samples = [];
+      if (!locationExempt) {
+        const sampler = startGpsSampler();
+        sampler.first.catch(() => {});
+        samples = await sampler.done;
+        location = [...samples].sort((a, b) => a.accuracy - b.accuracy)[0] || null;
+        if (!location) throw new Error("تعذر تثبيت الموقع. فعّل الـ GPS وحاول من مكان مكشوف.");
+        const distance = distanceMeters(location, companyLocation);
+        setLocationState({ ...location, distance });
+        // Client precheck only warns for the MAIN geofence; employees with an
+        // extra allowed location (إسراء) are validated server-side, so don't
+        // hard-block here — let the RPC decide.
       }
       const captureData = { location, samples, blob: null, capturedAt: new Date().toISOString(), faceEmbedding: null, faceScores: null };
       const args = attendanceArgs(kind, captureData, null);
@@ -379,8 +388,8 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
             <h2>تسجيل اليوم</h2>
           </div>
           <div className="today-status">
-            <StatusDot done={!!todayRecord?.check_in} label="حضور" value={todayRecord?.check_in?.slice(0, 5) || "لم يسجل"} />
-            <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={todayRecord?.check_out?.slice(0, 5) || "لم يسجل"} />
+            <StatusDot done={!!todayRecord?.check_in} label="حضور" value={fmtTime12(todayRecord?.check_in) || "لم يسجل"} />
+            <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={fmtTime12(todayRecord?.check_out) || "لم يسجل"} />
           </div>
 
           {shortcutRequested ? (

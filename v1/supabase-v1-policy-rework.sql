@@ -1,0 +1,52 @@
+-- ============================================================================
+-- AOA v1 — attendance policy rework (2026-07-16) — APPLIED LIVE
+-- (v1/v2 RPCs live-patched via pg_get_functiondef + replace + execute; this
+-- file DOCUMENTS the changes — the live functions are the source of truth.)
+--
+-- 1) LATENESS (per-employee shift): lateness counts from the employee's own
+--    checkin_from (شفت أحمد 8:30 يعني السماح من 8:30، عبدالرحمن من 1م). Grace
+--    = settings.grace_mins (15). NO MORE 'pending/موافقة المدير' from check-in
+--    — records always apply immediately; approval workflow is only for
+--    leave/permission requests. An APPROVED same-day permission excuses
+--    lateness entirely (يحسب من رصيد الاستئذانات).
+--    Tier tables (monthly counters in late_tier_counters, cycles restart):
+--      15-30 د : occ1,2 = خصم مدة التأخير (minutes/480 day)؛ occ3 = ربع يوم؛
+--                cycle 3؛ hits>6 → notify admins (تحقيق/إنذار شديد)
+--      30-60 د : occ1 = المدة؛ occ2 = ساعة (0.125)؛ occ3 = ربع؛ occ4 = نصف؛
+--                cycle 4؛ hits>5 → notify (تشديد)
+--      60-120 د: occ1 = المدة؛ occ2 = ربع؛ occ3 = نصف؛ cycle 3؛ hits>3 → تحقيق
+--      >120 د  : نصف يوم تلقائيًا + notify admins (يحق للإدارة اعتباره غياب)؛
+--                تكرار → تحقيق
+--    Work day = 480 min for minute-fraction deductions.
+--
+-- 2) ABSENCE (mark_absentees_v1): occurrence within month —
+--      1st = خصم يوم الغياب فقط (deduction_days=0; payroll's absent flag = the
+--            day) + إنذار للموظف
+--      2nd = + جزاء يوم إضافي (deduction_days=1) + إنذار شديد
+--      3rd+ = تحقيق إداري (notify admins)؛ >3 = تصعيد قانوني
+--    (Old behavior set deduction_days=1 ALWAYS → every absence cost 2 days.)
+--
+-- 3) EARLY CHECKOUT (بدون إذن): checkout BEFORE the employee's checkout_from
+--    is now RECORDED (window only rejects after checkout_to) and penalized:
+--      occ1 = خصم مدة الانصراف + إنذار؛ occ2 = ربع؛ occ3 = نصف؛ cycle 3؛
+--      >3 → تحقيق إداري. Approved permission / leave-status skips it.
+--
+-- 4) LOCATION RULES: employees.location_exempt (حبيبة=true) → no GPS required
+--    at all. employee_locations table → extra allowed geofences per employee
+--    (إسراء: 31.198885, 29.9033318 r=500m from maps.app.goo.gl/Wm4VWqixgvHvBxEj9)
+--    — pass if inside company radius OR any of the employee's extra locations.
+--
+-- 5) 12-HOUR TIMES: fmt_time12(time) → '5:46 م' in all server messages +
+--    client display (lib/format.js fmtTime12).
+--
+-- 6) NOTIFICATIONS: notify_admins = category 'system' (informational).
+--    notify_admins_approval = category 'approval' — used ONLY by
+--    trg_notify_request_submitted (طلبات الإجازات والأذونات).
+--
+-- 7) SCHEDULES applied: global 9:00-10:30 / 17:00-19:00؛
+--    أحمد(15)+ياسمين(4): 8:30-10 / 16:30-18؛ سهيلة(11): 8-10 / 16-17؛
+--    عبدالرحمن(10) unchanged؛ أحمد salary=6000.
+--    Team photos wiped (storage attendance-captures + attendance photo columns
+--    + face_profiles).
+-- ============================================================================
+select 'documentation only — live functions are source of truth' as note;
