@@ -16,6 +16,7 @@ import {
 } from "../../lib/offlineQueue";
 import { ConfirmDialog } from "../../ui/primitives";
 import CaptureSheet, { requestCaptureSession } from "./CaptureSheet";
+import { startGpsSampler } from "./useGpsSampler";
 
 const ERROR_MESSAGES = {
   photo_required: "لازم تلتقط صورة واضحة عشان تسجّل.",
@@ -201,9 +202,58 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     }
   }
 
+  // The camera is only needed when the photo is required OR face verification
+  // is active. With both off (owner's "متوقف"), check-in is GPS-only — no
+  // camera prompt and no biometric consent.
+  const cameraNeeded = securityConfig.photo_required !== false || securityConfig.face_mode !== "off";
+
+  async function submitDirect(kind) {
+    setBusy(kind);
+    try {
+      const sampler = startGpsSampler();
+      sampler.first.catch(() => {});
+      const samples = await sampler.done;
+      const location = [...samples].sort((a, b) => a.accuracy - b.accuracy)[0] || null;
+      if (!location) throw new Error("تعذر تثبيت الموقع. فعّل الـ GPS وحاول من مكان مكشوف.");
+      const distance = distanceMeters(location, companyLocation);
+      setLocationState({ ...location, distance });
+      if (distance > companyLocation.radiusMeters) {
+        throw new Error(`أنت خارج نطاق الشركة (${Math.round(distance)} متر).`);
+      }
+      const captureData = { location, samples, blob: null, capturedAt: new Date().toISOString(), faceEmbedding: null, faceScores: null };
+      const args = attendanceArgs(kind, captureData, null);
+      if (!navigator.onLine) {
+        await queueCapture(kind, captureData, args);
+        onToast("مفيش إنترنت؛ حفظنا العملية وهتتزامن تلقائيًا.");
+        return;
+      }
+      try {
+        const data = await runV2(args);
+        onToast(data.label || (kind === "in" ? "تم تسجيل الحضور." : "تم تسجيل الانصراف."));
+        setNote("");
+        await loadToday();
+      } catch (error) {
+        if (isNetworkError(error)) {
+          await queueCapture(kind, captureData, args);
+          onToast("الاتصال انقطع؛ حفظنا العملية وهتتزامن تلقائيًا.");
+          return;
+        }
+        throw error;
+      }
+    } catch (error) {
+      onToast(error.message || "تعذر التسجيل.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   function attendance(kind) {
     if (kind === "in" && dayLocked) {
       onToast(ERROR_MESSAGES.day_locked);
+      return;
+    }
+    if (!cameraNeeded) {
+      submitDirect(kind);
       return;
     }
     if (localStorage.getItem(consentKey) !== "accepted") {
@@ -259,14 +309,15 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
               await removeQueuedAttendance(item.id);
               continue;
             }
-            const photoPath = await uploadAttendanceCapture({
+            // GPS-only items (camera off) have no blob — nothing to upload.
+            const photoPath = item.blob ? await uploadAttendanceCapture({
               employeeId: employee.id,
               kind: item.kind,
               blob: item.blob,
               capturedAt: new Date(item.capturedAt),
               path: item.photoPath,
-            });
-            if (photoPath !== item.photoPath) {
+            }) : null;
+            if (item.blob && photoPath !== item.photoPath) {
               item.photoPath = photoPath;
               await updateQueuedAttendance(item);
             }

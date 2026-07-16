@@ -1,0 +1,29 @@
+-- ============================================================================
+-- AOA v1 — risk-engine tuning (2026-07-16) — APPLIED LIVE via surgical patch
+-- (pg_get_functiondef + replace + execute on employee_attendance_action_v2).
+-- This file records WHAT changed; do not re-run blindly — the live function is
+-- the source of truth (dump with pg_get_functiondef before editing).
+--
+-- Why: employee #4 (ياسمين) was blocked 12x in a row while standing 20m from
+-- the office. Flags: [gps_static, new_device] → risk 75 ≥ 60 → rejected.
+-- A stationary phone returning identical coordinates across watchPosition
+-- samples is NORMAL (fused/cached location), not spoofing evidence.
+--
+-- Changes:
+-- 1) gps_static downgraded strong(+60) → medium(+20). Mediums are capped at
+--    risk_medium_cap (45) < risk_block_threshold (60), so gps_static +
+--    new_device can NEVER block. Only real evidence still blocks:
+--    gps_teleport (>500m jump in <10s) and impossible_travel (>200 km/h).
+--      v_strong := v_strong + 60 ... 'gps_static'   -- before
+--      v_medium := v_medium + 20 ... 'gps_static'   -- after
+-- 2) New-device notifications (both in/out branches) changed from
+--    notify_admins (category 'approval' → showed "موافقة مطلوبة") to a direct
+--    informational insert: category 'system', priority 'normal'.
+--
+-- Settings changed the same day (owner request — face feature off for now):
+--    photo_required = false, face_mode = 'off'
+-- Client (EmployeeToday.jsx): when photo_required=false AND face_mode='off',
+-- check-in is GPS-only — no camera sheet, no biometric consent. Flip either
+-- setting back on from «أمان الحضور» and the camera returns automatically.
+-- ============================================================================
+select 'documentation only — see header' as note;
