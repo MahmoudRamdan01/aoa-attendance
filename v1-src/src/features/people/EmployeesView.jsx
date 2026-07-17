@@ -40,7 +40,7 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
   const [loading, setLoading] = useState(() => !readEmployeesCache(userId).length);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null);
-  const emptyAdd = { name: "", attendance_exempt: false, checkin_from: "", checkin_to: "", checkout_from: "", checkout_to: "" };
+  const emptyAdd = { name: "", attendance_exempt: false, checkin_from: "", checkin_to: "", checkout_from: "", checkout_to: "", salary: "" };
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState(emptyAdd);
   const [busy, setBusy] = useState(false);
@@ -56,6 +56,7 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
       p_checkin_to: addForm.checkin_to || null,
       p_checkout_from: addForm.checkout_from || null,
       p_checkout_to: addForm.checkout_to || null,
+      p_salary: addForm.salary ? Number(addForm.salary) : null,
     });
     setBusy(false);
     if (error || data?.error) return onToast?.(data?.message || "تعذر إضافة الموظف.");
@@ -122,6 +123,9 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
             <div className="panel-title"><Plus size={18} /><h2>موظف جديد</h2></div>
             <div className="form-grid">
               <label>الاسم<input value={addForm.name} onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))} required placeholder="اسم الموظف" /></label>
+              {role === "owner" && (
+                <label>المرتب الشهري (ج)<input type="number" min="0" step="50" value={addForm.salary} onChange={(e) => setAddForm((f) => ({ ...f, salary: e.target.value }))} placeholder="مثال: 5000" /></label>
+              )}
               <label className="check-inline"><input type="checkbox" checked={addForm.attendance_exempt} onChange={(e) => setAddForm((f) => ({ ...f, attendance_exempt: e.target.checked }))} /> مرتبات فقط (لا يسجّل حضور)</label>
             </div>
             {!addForm.attendance_exempt && (

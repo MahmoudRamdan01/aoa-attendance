@@ -83,6 +83,15 @@ function ThemeButton({ theme, onToggle, mobile = false }) {
   );
 }
 
+// Where a notification takes you when tapped, by category + role.
+function notificationTarget(category, role) {
+  const isAdmin = role === "hr" || role === "owner";
+  if (category === "approval") return isAdmin ? "admin" : "requests";
+  if (category === "qr") return "today";
+  if (category === "admin_message") return "notifications";
+  return isAdmin ? "admin" : "month";
+}
+
 function InboxPopover({
   id,
   open,
@@ -91,6 +100,7 @@ function InboxPopover({
   setUnread,
   onNavigate,
   onToast,
+  role = "employee",
 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -210,7 +220,11 @@ function InboxPopover({
               type="button"
               key={item.id}
               disabled={busy === String(item.id)}
-              onClick={() => markRead(item.id)}
+              onClick={() => {
+                markRead(item.id);
+                onNavigate?.(notificationTarget(item.category, role));
+                onClose?.();
+              }}
             >
               <span className="ops-inbox-item-dot" aria-hidden="true" />
               <span className="ops-inbox-item-copy">
@@ -344,7 +358,13 @@ export default function AppShell({
       if (!inboxWrapRef.current?.contains(event.target)) setInboxOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    // Lock the page behind the inbox so swiping the list doesn't scroll the app.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [inboxOpen]);
 
   useEffect(() => {
@@ -506,6 +526,7 @@ export default function AppShell({
                 setUnread={setUnread}
                 onNavigate={navigate}
                 onToast={onToast}
+                role={role}
               />
             </div>
             <div className="ops-user-chip" title={displayName}>

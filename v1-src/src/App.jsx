@@ -20,9 +20,6 @@ const RELOAD_KEY = "aoa:chunk-reload-at";
 const CONTEXT_CACHE_PREFIX = "aoa:context:v1:";
 const CONTEXT_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 const EMPLOYEES_CACHE_PREFIX = "aoa:employees:";
-// Shared-device protection: sign out after this long with no interaction so a
-// walked-away session can't be used by the next person on the same phone/PC.
-const INACTIVITY_MS = 30 * 60 * 1000;
 
 const VIEW_LOADERS = {
   assistant: () => import("./features/assistant/AssistantView"),
@@ -356,36 +353,6 @@ function App() {
     setSession(null);
     setContext(null);
   }
-
-  // Auto sign-out on inactivity (shared-device protection). Any tap/key resets
-  // the timer; returning to a tab that sat idle past the limit logs out too.
-  useEffect(() => {
-    if (!session) return undefined;
-    let last = Date.now();
-    let timer;
-    const doLogout = () => {
-      signOut();
-      setToast("تم تسجيل خروجك تلقائيًا لأمان الجهاز. سجّل دخول من جديد.");
-    };
-    const arm = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(doLogout, INACTIVITY_MS);
-    };
-    const onActivity = () => { last = Date.now(); arm(); };
-    const onVisible = () => {
-      if (document.visibilityState !== "visible") return;
-      if (Date.now() - last >= INACTIVITY_MS) doLogout(); else arm();
-    };
-    const events = ["pointerdown", "keydown", "touchstart"];
-    events.forEach((event) => window.addEventListener(event, onActivity, { passive: true }));
-    document.addEventListener("visibilitychange", onVisible);
-    arm();
-    return () => {
-      window.clearTimeout(timer);
-      events.forEach((event) => window.removeEventListener(event, onActivity));
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [session?.user?.id]);
 
   // Unread notifications counter for the topbar bell (head-count only, RLS-scoped).
   useEffect(() => {

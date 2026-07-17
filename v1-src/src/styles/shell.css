@@ -497,6 +497,9 @@
   padding: 6px;
   overflow-y: auto;
   list-style: none;
+  /* Swiping inside the list must never scroll the page behind it. */
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .ops-inbox-loading {
