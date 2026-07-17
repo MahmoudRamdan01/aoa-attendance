@@ -1,0 +1,29 @@
+-- ============================================================================
+-- AOA v1 — security review fixes (2026-07-17) — APPLIED LIVE
+-- Found via full review (Supabase advisors + unauthenticated anon probing).
+--
+-- CRITICAL (fixed): owner_list_employee_accounts_v1 was SECURITY DEFINER with
+--   NO internal auth check and executable by `anon` → an attacker with only the
+--   public anon key (no login) could dump every employee's name + login email +
+--   user_id + role. Fix: added is_owner() guard + revoked anon/public EXECUTE.
+--
+-- HIGH (fixed): notify_user / notify_admins / notify_admins_approval /
+--   notify_owners / notify_team had no guard → arbitrary notification spam to
+--   any user_id. Internal-only (called from other definer functions that run as
+--   the owner), so EXECUTE revoked from public, anon AND authenticated.
+--
+-- MEDIUM (fixed): get_daily_qr_v1 / get_qr_for_date_v1 → authenticated only;
+--   ensure_daily_qr → internal only.
+--
+-- Verified: anon → "permission denied"; owner still lists 15 accounts; direct
+-- table reads (employees, salaries) already return [] for anon (RLS solid).
+--
+-- STILL TO DO (dashboard / broader):
+--   * Enable "Leaked password protection" (HaveIBeenPwned) in Auth settings.
+--   * Fixed search_path on the 7 remaining mutable-search_path functions.
+--   * Review the kiosk_employees SECURITY DEFINER view (advisor ERROR).
+--   * Defense-in-depth: revoke anon EXECUTE on the remaining ~35 guarded definer
+--     functions (they already reject anon internally — verified).
+--   * Move the `vector` extension out of the public schema.
+-- ============================================================================
+select 'documentation — review fixes applied live 2026-07-17' as note;
