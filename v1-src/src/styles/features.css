@@ -754,6 +754,18 @@
     background: var(--brand-soft);
   }
 
+  /* Landed-on notification (from a bell-inbox tap): flash it so it's obvious. */
+  .notification-row.is-target {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(252, 193, 7, 0.45);
+    animation: notif-target-flash 3.4s ease both;
+  }
+
+  @keyframes notif-target-flash {
+    0%, 55% { background: rgba(252, 193, 7, 0.22); }
+    100% { background: var(--brand-soft); }
+  }
+
   .notification-actions {
     display: flex;
     align-items: center;

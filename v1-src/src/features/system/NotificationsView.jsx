@@ -6,7 +6,7 @@ import { cls } from "../../lib/cls";
 import { fmtDateTime } from "../../lib/format";
 import { notificationCategoryLabels } from "../../lib/labels";
 
-function NotificationsView({ context, onToast }) {
+function NotificationsView({ context, onToast, routeParam }) {
   const [rows, setRows] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [message, setMessage] = useState({ scope: "team", employeeId: "", title: "", body: "" });
@@ -91,6 +91,18 @@ function NotificationsView({ context, onToast }) {
   const unread = rows.filter((row) => !row.read_at).length;
   const visibleRows = rows.filter((row) => filter === "all" || !row.read_at);
 
+  // Arriving from the bell inbox with a notification id: scroll to that
+  // notification and flash-highlight it so the user lands right on it.
+  useEffect(() => {
+    if (!routeParam || loading) return undefined;
+    const el = document.getElementById(`notif-${routeParam}`);
+    if (!el) return undefined;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.add("is-target");
+    const timer = setTimeout(() => el.classList.remove("is-target"), 3500);
+    return () => clearTimeout(timer);
+  }, [routeParam, loading, rows.length]);
+
   return (
     <div className="stack">
       {isAdmin && (
@@ -127,7 +139,7 @@ function NotificationsView({ context, onToast }) {
           {loading && <p className="muted">جاري تحميل الإشعارات...</p>}
           {!loading && visibleRows.length === 0 && <p className="muted">لا توجد إشعارات بعد.</p>}
           {!loading && visibleRows.map((item) => (
-            <div className={cls("list-row notification-row", !item.read_at && "unread")} key={item.id}>
+            <div className={cls("list-row notification-row", !item.read_at && "unread")} id={`notif-${item.id}`} key={item.id}>
               <div>
                 <strong>{item.title}</strong>
                 <span>{fmtDateTime(item.created_at)} · {notificationCategoryLabels[item.category] || item.category || "النظام"}</span>

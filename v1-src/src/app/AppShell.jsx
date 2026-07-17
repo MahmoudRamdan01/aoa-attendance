@@ -83,15 +83,6 @@ function ThemeButton({ theme, onToggle, mobile = false }) {
   );
 }
 
-// Where a notification takes you when tapped, by category + role.
-function notificationTarget(category, role) {
-  const isAdmin = role === "hr" || role === "owner";
-  if (category === "approval") return isAdmin ? "admin" : "requests";
-  if (category === "qr") return "today";
-  if (category === "admin_message") return "notifications";
-  return isAdmin ? "admin" : "month";
-}
-
 function InboxPopover({
   id,
   open,
@@ -100,7 +91,6 @@ function InboxPopover({
   setUnread,
   onNavigate,
   onToast,
-  role = "employee",
 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -222,7 +212,9 @@ function InboxPopover({
               disabled={busy === String(item.id)}
               onClick={() => {
                 markRead(item.id);
-                onNavigate?.(notificationTarget(item.category, role));
+                // Take the user TO the notification itself: the full
+                // notifications page, scrolled to and highlighting this one.
+                onNavigate?.("notifications", [String(item.id)]);
                 onClose?.();
               }}
             >
@@ -526,7 +518,6 @@ export default function AppShell({
                 setUnread={setUnread}
                 onNavigate={navigate}
                 onToast={onToast}
-                role={role}
               />
             </div>
             <div className="ops-user-chip" title={displayName}>
