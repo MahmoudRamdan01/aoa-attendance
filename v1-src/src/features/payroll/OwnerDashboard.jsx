@@ -7,6 +7,7 @@ import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { roleNames, roleOptions, statusLabels } from "../../lib/labels";
 import { Bar, Metric, StatusBadge } from "../../ui/legacy";
 import { Area, AreaChart, Bar as ReBar, BarChart as ReBarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
+import CompanyReports from "./CompanyReports";
 
 function OwnerDashboard({ onToast }) {
   const [rows, setRows] = useState([]);
@@ -14,11 +15,22 @@ function OwnerDashboard({ onToast }) {
   const [employees, setEmployees] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [finRows, setFinRows] = useState([]);
+  const [report, setReport] = useState(null);
   const [period, setPeriod] = useState("month");
   const [reportDate, setReportDate] = useState(todayIso());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const range = useMemo(() => dateRangeForPeriod(period, reportDate), [period, reportDate]);
+  const reportMonth = reportDate.slice(0, 7);
+
+  // Owner-only cross-month analytics (history + financial + requests + security).
+  useEffect(() => {
+    let active = true;
+    supabase.rpc("owner_reports_v1", { p_month: reportMonth }).then(({ data, error: err }) => {
+      if (active && !err && data) setReport(data);
+    });
+    return () => { active = false; };
+  }, [reportMonth]);
 
   useEffect(() => {
     setLoading(true);
@@ -217,6 +229,17 @@ function OwnerDashboard({ onToast }) {
         </div>
         <p className="muted">الفترة: {range.from} إلى {range.to}</p>
       </section>
+
+      <CompanyReports
+        report={report}
+        rows={rows}
+        employees={employees}
+        salaries={salaries}
+        stats={stats}
+        range={range}
+        loading={loading}
+      />
+
       <div className="stats-grid">
         <Metric label="معدل التغطية" value={`${stats.attendanceRate}%`} tone="ok" icon={Activity} />
         <Metric label={`سجلات ${range.label}`} value={`${stats.total}/${stats.expected}`} icon={CalendarDays} />

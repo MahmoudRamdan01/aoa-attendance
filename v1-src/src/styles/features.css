@@ -2177,6 +2177,87 @@ a.secondary {
 .capture-lightbox__close { position: absolute; z-index: 1; top: 10px; inset-inline-end: 10px; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(2,7,12,.72); color: #fff; }
 .capture-flags { display: flex; flex-wrap: wrap; gap: 6px; }
 .capture-flags span { padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: .72rem; }
+
+/* ===== Owner reports — «نبض الشركة» ===== */
+.company-reports { gap: 16px; }
+.report-tone-ok, .tone-ok { --rc: var(--green, #10b981); }
+.tone-warn { --rc: var(--warning, #f59e0b); }
+.tone-danger { --rc: var(--danger, #ef4444); }
+.tone-gold { --rc: var(--gold, #FCC107); }
+.tone-muted { --rc: var(--muted); }
+
+/* Pulse */
+.pulse-panel { display: flex; flex-direction: column; }
+.pulse-score { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin: 8px 0 4px; color: var(--rc, var(--gold)); }
+.pulse-score.tone-ok { --rc: var(--green, #10b981); }
+.pulse-score.tone-warn { --rc: var(--warning, #f59e0b); }
+.pulse-score.tone-danger { --rc: var(--danger, #ef4444); }
+.pulse-score strong { font-size: 3.4rem; font-weight: 900; line-height: 1; }
+.pulse-score span { font-size: 1.1rem; color: var(--muted); font-weight: 700; }
+.pulse-delta { display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-weight: 800; font-size: .85rem; margin: 0 auto 10px; }
+.pulse-delta.tone-ok { color: var(--green, #10b981); }
+.pulse-delta.tone-danger { color: var(--danger, #ef4444); }
+.pulse-delta.tone-muted { color: var(--muted); }
+.pulse-bars { display: grid; gap: 10px; margin-top: 4px; }
+.pulse-bar-head, .breakdown-head { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; color: var(--ink); margin-bottom: 4px; }
+.pulse-bar-head strong, .breakdown-head strong { color: var(--gold-text); font-weight: 800; }
+.pulse-bar-track, .breakdown-track { height: 9px; border-radius: 999px; background: var(--panel-soft); overflow: hidden; }
+.pulse-bar-fill, .breakdown-fill { height: 100%; border-radius: 999px; background: var(--rc, var(--gold)); transition: width .4s ease; }
+.pulse-bar-fill.tone-ok { background: var(--green, #10b981); }
+.pulse-bar-fill.tone-warn { background: var(--warning, #f59e0b); }
+.pulse-bar-fill.tone-danger { background: var(--danger, #ef4444); }
+
+/* Story */
+.story-list { display: grid; gap: 10px; }
+.story-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-soft); }
+.story-emoji { font-size: 1.25rem; flex: 0 0 auto; line-height: 1.4; }
+.story-item p { margin: 0; color: var(--ink); font-weight: 600; line-height: 1.6; }
+
+/* Summary cards */
+.report-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.report-card { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-inline-start: 3px solid var(--rc, var(--gold)); border-radius: 14px; background: var(--panel); }
+.report-card > svg { color: var(--rc, var(--gold-text)); flex: 0 0 auto; }
+.report-card > div { display: grid; gap: 1px; min-width: 0; }
+.report-card span { color: var(--muted); font-size: .76rem; font-weight: 700; }
+.report-card strong { font-size: 1.35rem; font-weight: 900; color: var(--ink); }
+.report-card small { color: var(--muted); font-size: .72rem; }
+
+/* Breakdown */
+.breakdown-bar { margin-bottom: 12px; }
+.breakdown-fill.tone-warn { background: var(--warning, #f59e0b); }
+.breakdown-fill.tone-danger { background: var(--danger, #ef4444); }
+.breakdown-fill.tone-gold { background: var(--gold, #FCC107); }
+
+/* Heatmap */
+.heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
+table.heatmap { border-collapse: separate; border-spacing: 3px; }
+table.heatmap th { font-size: .64rem; color: var(--muted); font-weight: 700; text-align: center; padding: 0 1px; }
+table.heatmap th.hm-name, table.heatmap td.hm-name { position: sticky; inset-inline-start: 0; background: var(--panel); z-index: 1; text-align: start; font-size: .78rem; color: var(--ink); font-weight: 700; white-space: nowrap; padding-inline-end: 8px; }
+.hm-cell { width: 15px; height: 15px; border-radius: 4px; background: var(--panel-soft); }
+.hm-present { background: var(--green, #10b981); }
+.hm-late { background: var(--warning, #f59e0b); }
+.hm-absent { background: var(--danger, #ef4444); }
+.hm-leave { background: #3b82f6; }
+.hm-none { background: color-mix(in srgb, var(--line) 60%, transparent); }
+.heatmap-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+.heatmap-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: .76rem; color: var(--muted); }
+.heatmap-legend i { width: 13px; height: 13px; border-radius: 4px; display: inline-block; }
+
+/* Owner-only KPI strip on the attendance board */
+.owner-kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; padding: 12px; border: 1px dashed color-mix(in srgb, var(--gold) 45%, var(--line)); border-radius: 14px; background: color-mix(in srgb, var(--gold) 6%, var(--panel-soft)); }
+.owner-kpi-strip > div { display: grid; gap: 2px; text-align: center; }
+.owner-kpi-strip span { color: var(--muted); font-size: .74rem; font-weight: 700; }
+.owner-kpi-strip strong { color: var(--gold-text); font-size: 1.4rem; font-weight: 900; }
+
+@media (max-width: 720px) {
+  .report-cards { grid-template-columns: repeat(2, 1fr); }
+  .owner-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media print {
+  .company-reports .heatmap-scroll { overflow: visible; }
+  .company-reports .report-card, .company-reports .story-item, .company-reports .panel { break-inside: avoid; }
+}
 @media (max-width: 640px) {
   .capture-lightbox article { grid-template-columns: 1fr; }
   .capture-lightbox article > img { min-height: 260px; max-height: 55vh; }

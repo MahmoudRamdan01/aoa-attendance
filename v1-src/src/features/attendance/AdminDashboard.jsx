@@ -148,7 +148,11 @@ function AdminDashboard({ context, onToast }) {
       const rec = recs.get(emp.id);
       return rec?.check_in && !rec?.check_out && ["present", "late"].includes(rec.status);
     }).length;
-    const deductions = attendance.reduce((sum, rec) => sum + Number(rec.deduction_days || 0), 0);
+    const deductions = attendance.reduce((sum, rec) => sum + Number(rec.deduction_days || 0)
+      + (rec.status === "absent" ? 1 : 0), 0);
+    // Currently on-site: checked in, not yet checked out (present/late only).
+    const currentlyIn = attendance.filter((rec) => rec.check_in && !rec.check_out
+      && ["present", "late"].includes(rec.status)).length;
     return {
       active: active.length,
       checkedIn,
@@ -157,6 +161,7 @@ function AdminDashboard({ context, onToast }) {
       pending,
       missingCheckout,
       deductions,
+      currentlyIn,
     };
   }, [employees, attendance, recs]);
   const filteredEmployees = useMemo(() => {
@@ -224,6 +229,14 @@ function AdminDashboard({ context, onToast }) {
           <Metric label="تأخير" value={adminStats.late} tone="warn" icon={Clock3} />
           <Metric label="بدون انصراف" value={adminStats.missingCheckout} tone="gold" icon={AlertTriangle} />
         </div>
+        {context.role === "owner" && (
+          <div className="owner-kpi-strip">
+            <div><span>موجودين دلوقتي</span><strong>{adminStats.currentlyIn}</strong></div>
+            <div><span>نسبة الحضور</span><strong>{adminStats.active ? Math.round((adminStats.checkedIn / adminStats.active) * 100) : 0}%</strong></div>
+            <div><span>معلّق للموافقة</span><strong>{adminStats.pending + permissions.length + leaves.length}</strong></div>
+            <div><span>خصم النهارده</span><strong>{adminStats.deductions.toFixed(2)} يوم</strong></div>
+          </div>
+        )}
         <div className="toolbar table-filters">
           <label className="search-field">
             <Search size={16} />
