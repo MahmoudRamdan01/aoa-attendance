@@ -6,7 +6,6 @@ import { getCompanyLocation } from "../../lib/dates";
 import { statusLabels } from "../../lib/labels";
 import { fmtTime12 } from "../../lib/format";
 import { getDeviceFingerprint, getDeviceId } from "../../lib/deviceFingerprint";
-import { isCaptureFromToday, uploadAttendanceCapture } from "../../lib/captureUpload";
 import {
   enqueueAttendance,
   listQueuedAttendance,
@@ -17,11 +16,10 @@ import {
 } from "../../lib/offlineQueue";
 import { ConfirmDialog } from "../../ui/primitives";
 import CaptureSheet, { requestCaptureSession } from "./CaptureSheet";
+import { prepareFaceEngine } from "./useFaceEngine";
 import { startGpsSampler } from "./useGpsSampler";
 
 const ERROR_MESSAGES = {
-  photo_required: "لازم تلتقط صورة واضحة عشان تسجّل.",
-  photo_invalid: "الصورة لم تصل بشكل سليم. حاول تلتقط من جديد.",
   gps_suspect: "تعذر التحقق من الموقع بشكل موثوق. اقفل أي تطبيق Fake GPS وحاول من مكانك الطبيعي.",
   face_mismatch: "تعذر التحقق من الوجه. اتأكد إن وشك واضح في الإضاءة وحاول تاني.",
   low_accuracy: "دقة الموقع ضعيفة. شغّل GPS وانتظر لحظة في مكان مكشوف.",
@@ -80,6 +78,12 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     }).catch(() => {});
   }, [employee?.id, refreshQueueCount]);
 
+  // Warm the face models in the background as soon as we know face mode is on,
+  // so the capture sheet opens with the engine already loaded (fast UX).
+  useEffect(() => {
+    if (securityConfig.face_mode !== "off") prepareFaceEngine().catch(() => {});
+  }, [securityConfig.face_mode]);
+
   useEffect(() => {
     if (routeParam === "capture-in" && !todayRecord?.check_in && !dayLocked) setShortcutRequested(true);
   }, [routeParam, todayRecord?.check_in, dayLocked]);
@@ -101,7 +105,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     setTodayRecord(data || null);
   }
 
-  function attendanceArgs(kind, captureData, photoPath) {
+  function attendanceArgs(kind, captureData) {
     return {
       p_kind: kind,
       p_lat: captureData.location?.lat ?? null,
@@ -110,7 +114,9 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       p_qr_code: normalizeQr(qr) || null,
       p_device_id: getDeviceId(),
       p_note: note.trim() || null,
-      p_photo_path: photoPath,
+      // No photos, ever: only the face embedding (a mathematical template)
+      // leaves the device. The server stores it encrypted.
+      p_photo_path: null,
       p_face_embedding: captureData.faceEmbedding ? JSON.stringify(captureData.faceEmbedding) : null,
       p_face_scores: captureData.faceScores || null,
       p_gps_samples: captureData.samples,
@@ -129,12 +135,9 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     return data;
   }
 
-  async function queueCapture(kind, captureData, args, photoPath = null) {
+  async function queueCapture(kind, captureData, args) {
     await enqueueAttendance({
       kind,
-      blob: captureData.blob,
-      width: captureData.width,
-      height: captureData.height,
       capturedAt: captureData.capturedAt,
       location: captureData.location,
       samples: captureData.samples,
@@ -144,7 +147,6 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       fingerprint: args.p_fingerprint,
       faceEmbedding: args.p_face_embedding,
       faceScores: args.p_face_scores,
-      photoPath,
     });
     await refreshQueueCount();
   }
@@ -157,31 +159,24 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       // (employee_locations) that only the server knows about — it validates.
     }
 
-    const draftArgs = attendanceArgs(kind, captureData, null);
+    const draftArgs = attendanceArgs(kind, captureData);
     if (!navigator.onLine) {
       await queueCapture(kind, captureData, draftArgs);
-      onToast("تم حفظ الصورة والعملية Offline، وهتتزامن تلقائيًا عند رجوع الإنترنت.");
+      onToast("تم حفظ العملية Offline، وهتتزامن تلقائيًا عند رجوع الإنترنت.");
       setCapture(null);
       return;
     }
 
-    let photoPath = null;
     try {
-      photoPath = await uploadAttendanceCapture({
-        employeeId: employee.id,
-        kind,
-        blob: captureData.blob,
-        capturedAt: new Date(captureData.capturedAt),
-      });
-      const data = await runV2({ ...draftArgs, p_photo_path: photoPath });
-      onToast(data.label || (kind === "in" ? "تم تسجيل الحضور بالصورة." : "تم تسجيل الانصراف بالصورة."));
+      const data = await runV2(draftArgs);
+      onToast(data.label || (kind === "in" ? "تم تسجيل الحضور." : "تم تسجيل الانصراف."));
       setNote("");
       setCapture(null);
       setShortcutRequested(false);
       await loadToday();
     } catch (error) {
       if (isNetworkError(error)) {
-        await queueCapture(kind, captureData, draftArgs, photoPath);
+        await queueCapture(kind, captureData, draftArgs);
         onToast("الاتصال انقطع؛ حفظنا العملية وهتتزامن تلقائيًا.");
         setCapture(null);
         return;
@@ -204,10 +199,10 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     }
   }
 
-  // The camera is only needed when the photo is required OR face verification
-  // is active. With both off (owner's "متوقف"), check-in is GPS-only — no
-  // camera prompt and no biometric consent.
-  const cameraNeeded = securityConfig.photo_required !== false || securityConfig.face_mode !== "off";
+  // The camera is only needed for face verification. With face off (owner's
+  // "متوقف"), check-in is GPS-only — no camera prompt and no biometric consent.
+  // Photos are never taken or stored in any mode.
+  const cameraNeeded = securityConfig.face_mode !== "off";
 
   async function submitDirect(kind) {
     setBusy(kind);
@@ -229,8 +224,8 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
         // extra allowed location (إسراء) are validated server-side, so don't
         // hard-block here — let the RPC decide.
       }
-      const captureData = { location, samples, blob: null, capturedAt: new Date().toISOString(), faceEmbedding: null, faceScores: null };
-      const args = attendanceArgs(kind, captureData, null);
+      const captureData = { location, samples, capturedAt: new Date().toISOString(), faceEmbedding: null, faceScores: null };
+      const args = attendanceArgs(kind, captureData);
       if (!navigator.onLine) {
         await queueCapture(kind, captureData, args);
         onToast("مفيش إنترنت؛ حفظنا العملية وهتتزامن تلقائيًا.");
@@ -313,22 +308,13 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
           if (item.legacy) {
             await replayLegacy(item);
           } else {
-            if (!isCaptureFromToday(item.capturedAt)) {
+            // Attendance is per-day: an item queued on a previous day can't be
+            // replayed as today's record.
+            const queuedDay = String(item.capturedAt || "").slice(0, 10);
+            if (queuedDay !== todayIso()) {
               expired += 1;
               await removeQueuedAttendance(item.id);
               continue;
-            }
-            // GPS-only items (camera off) have no blob — nothing to upload.
-            const photoPath = item.blob ? await uploadAttendanceCapture({
-              employeeId: employee.id,
-              kind: item.kind,
-              blob: item.blob,
-              capturedAt: new Date(item.capturedAt),
-              path: item.photoPath,
-            }) : null;
-            if (item.blob && photoPath !== item.photoPath) {
-              item.photoPath = photoPath;
-              await updateQueuedAttendance(item);
             }
             await runV2({
               p_kind: item.kind,
@@ -338,7 +324,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
               p_qr_code: normalizeQr(item.qr || "") || null,
               p_device_id: item.deviceId || getDeviceId(),
               p_note: item.note?.trim() || null,
-              p_photo_path: photoPath,
+              p_photo_path: null,
               p_face_embedding: item.faceEmbedding || null,
               p_face_scores: item.faceScores || null,
               p_gps_samples: item.samples || [],
@@ -426,10 +412,10 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
           <div className="actions-row attendance-main-actions">
             <button className="primary capture-action" disabled={busy || !!todayRecord?.check_in || dayLocked} onClick={() => attendance("in")}>
-              <Camera size={19} /> {busy === "in" ? "جاري فتح الكاميرا…" : "تسجيل حضور"}
+              <Camera size={19} /> {busy === "in" ? (cameraNeeded ? "جاري فتح الكاميرا…" : "جاري التسجيل…") : "تسجيل حضور"}
             </button>
             <button className="secondary capture-action" disabled={busy || !todayRecord?.check_in || !!todayRecord?.check_out} onClick={() => attendance("out")}>
-              <LogOut size={19} /> {busy === "out" ? "جاري فتح الكاميرا…" : "تسجيل انصراف"}
+              <LogOut size={19} /> {busy === "out" ? (cameraNeeded ? "جاري فتح الكاميرا…" : "جاري التسجيل…") : "تسجيل انصراف"}
             </button>
           </div>
           {locationState ? (
@@ -451,10 +437,10 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
             <h2>تسجيل آمن</h2>
           </div>
           <ul className="rules">
-            <li>صورة سيلفي مطلوبة عند الحضور والانصراف.</li>
+            <li>التحقق من الوجه لحظي زي بصمة الموبايل — من غير حفظ أي صور أو فيديو.</li>
+            <li>اللي بيتخزن بصمة رقمية مشفرة فقط (أرقام لا يمكن تحويلها لصورة).</li>
             <li>لازم تكون داخل {companyLocation.radiusMeters} متر من موقع الشركة.</li>
             <li>النظام يفحص تغيرات GPS والجهاز ويرسل تنبيهًا للإدارة عند الاشتباه.</li>
-            <li>الصورة في bucket خاص ولا يمكن تعديلها بعد الرفع.</li>
             <li><QrCode size={15} /> QR اختياري إلا لو الإدارة فعّلته.</li>
           </ul>
         </section>
@@ -462,8 +448,8 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
       <ConfirmDialog
         open={Boolean(consentKind)}
-        title="موافقة على التحقق بالصورة والوجه"
-        message="أوافق على التقاط صورتي عند الحضور والانصراف واستخدام بصمة الوجه والتحقق من الحيوية لأغراض تأمين سجل الحضور، مع حفظ الصورة في أرشيف خاص متاح للإدارة فقط. يمكنني مراجعة سياسة الخصوصية أو التواصل مع الإدارة."
+        title="موافقة على التحقق ببصمة الوجه"
+        message="أوافق على استخدام الكاميرا لحظيًا عند الحضور والانصراف للتحقق من بصمة وجهي والحيوية لأغراض تأمين سجل الحضور. لا يتم حفظ أي صور أو فيديو نهائيًا — يتم استخراج بصمة رقمية (أرقام فقط) وتُخزَّن مشفرة. يمكنني التواصل مع الإدارة لأي استفسار."
         confirmLabel="أوافق وابدأ"
         cancelLabel="إلغاء"
         onConfirm={acceptConsent}

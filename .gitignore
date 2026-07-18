@@ -8,3 +8,4 @@ node_modules/
 v1-src/dist/
 v2-src/dist/
 v2-src/node_modules/
+.claude/

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bell, CalendarDays, Camera, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, RefreshCcw, Search, UserCheck, Users, UserX } from "lucide-react";
+import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, RefreshCcw, ScanFace, Search, UserCheck, Users, UserX } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { addDays, datesBetween } from "../../lib/dates";
@@ -8,7 +8,6 @@ import { reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import QRCodeLib from "qrcode";
 import { Cell, Pie, PieChart as RePieChart, ResponsiveContainer, Tooltip as ChartTooltip } from "recharts";
-import CapturesStrip from "./CapturesStrip";
 
 function AdminDashboard({ context, onToast }) {
   const [employees, setEmployees] = useState([]);
@@ -241,7 +240,7 @@ function AdminDashboard({ context, onToast }) {
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>الموظف</th><th>الحالة</th><th>الصورة</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
+            <thead><tr><th>الموظف</th><th>الحالة</th><th>الوجه</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
             <tbody>
               {loading && <tr><td colSpan="8">جاري التحميل...</td></tr>}
               {!loading && filteredEmployees.length === 0 && <tr><td colSpan="8">لا توجد نتائج مطابقة.</td></tr>}
@@ -251,7 +250,7 @@ function AdminDashboard({ context, onToast }) {
                   <tr key={emp.id}>
                     <td>{emp.name}</td>
                     <td>{rec ? <StatusBadge status={rec.status} /> : "لم يسجل"}</td>
-                    <td><CaptureThumbnail record={rec} /></td>
+                    <td><FaceBadge record={rec} /></td>
                     <td dir="ltr">{fmtTime12(rec?.check_in) || "-"}</td>
                     <td dir="ltr">{fmtTime12(rec?.check_out) || "-"}</td>
                     <td>{rec?.deduction_days || 0} يوم</td>
@@ -266,8 +265,6 @@ function AdminDashboard({ context, onToast }) {
           </table>
         </div>
       </section>
-
-      <CapturesStrip attendance={attendance} employees={employees} />
 
       <div className="grid two">
         <section className="panel">
@@ -305,36 +302,31 @@ function AdminDashboard({ context, onToast }) {
   );
 }
 
-function CaptureThumbnail({ record }) {
-  const [urls, setUrls] = useState([]);
+// Face verification status for the daily board. No photos exist anywhere —
+// this surfaces the match score and any face flags recorded by the RPC.
+function FaceBadge({ record }) {
+  const sim = record?.face_similarity_in ?? record?.face_similarity_out;
+  const flags = [
+    ...(Array.isArray(record?.risk_flags?.in) ? record.risk_flags.in : []),
+    ...(Array.isArray(record?.risk_flags?.out) ? record.risk_flags.out : []),
+  ];
+  const notEnrolled = flags.includes("face_not_enrolled");
+  const mismatch = flags.some((flag) => String(flag).startsWith("face_") && flag !== "face_not_enrolled");
 
-  useEffect(() => {
-    let cancelled = false;
-    const paths = [record?.photo_path, record?.checkout_photo_path].filter(Boolean);
-    if (!paths.length) {
-      setUrls([]);
-      return undefined;
-    }
-    Promise.all(paths.map(async (path) => {
-      const { data } = await supabase.storage.from("attendance-captures").createSignedUrl(path, 300);
-      return data?.signedUrl ? { path, url: data.signedUrl } : null;
-    })).then((items) => {
-      if (!cancelled) setUrls(items.filter(Boolean));
-    });
-    return () => { cancelled = true; };
-  }, [record?.photo_path, record?.checkout_photo_path]);
-
-  if (!record?.photo_path && !record?.checkout_photo_path) {
-    return <span className="capture-thumb-empty"><Camera size={15} />—</span>;
+  if (!record || (sim == null && !notEnrolled && !mismatch)) {
+    return <span className="capture-thumb-empty"><ScanFace size={15} />—</span>;
+  }
+  if (notEnrolled && sim == null) {
+    return <span className="capture-thumb-empty" title="سجّل بصمة الموظف من ملفه"><ScanFace size={15} /> غير مسجلة</span>;
   }
   return (
-    <div className="capture-thumbs" aria-label="صور الحضور والانصراف">
-      {urls.map((item, index) => (
-        <a key={item.path} href={item.url} target="_blank" rel="noreferrer" title={index === 0 ? "صورة الحضور" : "صورة الانصراف"}>
-          <img src={item.url} alt={index === 0 ? "صورة الحضور" : "صورة الانصراف"} loading="lazy" />
-        </a>
-      ))}
-    </div>
+    <span
+      className="capture-thumb-empty"
+      data-face={mismatch ? "warn" : "ok"}
+      title={mismatch ? "الوجه غير متطابق — راجع الإشعارات" : "تطابق بصمة الوجه"}
+    >
+      <ScanFace size={15} /> {sim != null ? `${Math.round(Number(sim) * 100)}%` : "⚠"}{mismatch ? " ⚠" : ""}
+    </span>
   );
 }
 

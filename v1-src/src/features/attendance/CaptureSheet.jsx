@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, CheckCircle2, Loader2, LocateFixed, ShieldCheck, X } from "lucide-react";
-import { videoFrameToJpeg } from "../../lib/captureUpload";
 import { startGpsSampler } from "./useGpsSampler";
 import { prepareFaceEngine, useFaceEngine } from "./useFaceEngine";
 
@@ -88,12 +87,12 @@ export default function CaptureSheet({
     setBusy(true);
     setError("");
     try {
-      const frame = await videoFrameToJpeg(videoRef.current);
+      // No frame is ever captured or uploaded: the live video only feeds the
+      // on-device face engine, and closing the sheet stops the tracks.
       const samples = await session.gpsSampler.done;
       const location = [...samples].sort((a, b) => a.accuracy - b.accuracy)[0] || null;
       if (requireGps && !location) throw new Error("تعذر تثبيت الموقع. حاول من مكان مكشوف.");
       await onCapture({
-        ...frame,
         samples,
         location,
         capturedAt: new Date().toISOString(),
@@ -133,7 +132,7 @@ export default function CaptureSheet({
           onLoadedMetadata={() => setCameraReady(true)}
         />
         <div className="capture-guide" aria-hidden="true" />
-        <p>{faceMode === "off" ? "خلّي وشك واضح داخل الإطار وابص للكاميرا" : face.instruction}</p>
+        <p>{faceMode === "off" ? "خلّي وشك داخل الإطار وابص للكاميرا" : face.instruction}</p>
       </div>
 
       <div className="capture-checks" aria-live="polite">
@@ -164,9 +163,9 @@ export default function CaptureSheet({
         disabled={!cameraReady || !gpsReady || !faceReady || busy}
       >
         {busy ? <Loader2 className="spin" size={21} /> : <Camera size={21} />}
-        {busy ? "جاري التحقق والتسجيل…" : "التقاط وتسجيل"}
+        {busy ? "جاري التحقق والتسجيل…" : "تحقق وتسجيل"}
       </button>
-      <p className="capture-privacy">الصورة تُحفظ في أرشيف خاص للمراجعة الأمنية ولا تظهر للموظفين.</p>
+      <p className="capture-privacy">لا يتم حفظ أي صور أو فيديو — بيتم استخراج بصمة رقمية مشفرة فقط وتُمسح اللقطات فورًا.</p>
     </div>
   );
 }
