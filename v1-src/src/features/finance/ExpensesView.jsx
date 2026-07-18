@@ -6,7 +6,7 @@ import { monthRangeFor } from "../../lib/dates";
 import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { expenseCategoryLabels, statusLabels } from "../../lib/labels";
 import { Bar, Metric, StatusBadge } from "../../ui/legacy";
-import { useUid, voidFinancial } from "./shared";
+import { useUid, voidFinancial, maskActor } from "./shared";
 
 function ExpensesView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -91,7 +91,7 @@ function ExpensesView({ context, onToast }) {
       expenseCategoryLabels[r.category] || r.category,
       r.amount,
       r.description || "",
-      r.created_by_name || "",
+      maskActor(r.created_by_name, role) || "",
       r.confirmed_at ? "نعم" : "لا",
       statusLabels[r.status] || r.status,
     ].map(csvCell).join(","));
@@ -167,7 +167,7 @@ function ExpensesView({ context, onToast }) {
                   <td>{expenseCategoryLabels[row.category] || row.category}</td>
                   <td>{money(row.amount)} ج</td>
                   <td className="note-cell">{row.description || "-"}</td>
-                  <td>{row.created_by_name || "-"}</td>
+                  <td>{maskActor(row.created_by_name, role) || "-"}</td>
                   <td>
                     {row.status === "voided" ? <StatusBadge status="voided" /> : row.confirmed_at ? <StatusBadge status="confirmed" /> : <StatusBadge status="pending" />}
                   </td>

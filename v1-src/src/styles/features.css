@@ -2255,6 +2255,17 @@ table.heatmap th.hm-name, table.heatmap td.hm-name { position: sticky; inset-inl
   .owner-kpi-strip { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* "Inside company" reassurance on the check-in screen */
+.location-ok { display: inline-flex; align-items: center; gap: 6px; color: var(--green, #10b981); font-weight: 700; font-size: .85rem; }
+
+/* Owner per-day attendance correction modal */
+.correction-card { position: relative; width: min(100%, 440px); max-height: 92vh; overflow: auto; display: grid; gap: 12px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); color: var(--ink); }
+.correction-card h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.1rem; }
+.correction-card .field, .correction-card label { display: grid; gap: 5px; font-weight: 700; font-size: .85rem; }
+.correction-card input { border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; background: var(--panel-soft); color: var(--ink); font-weight: 700; }
+.correction-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.correction-card .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
 @media print {
   .company-reports .heatmap-scroll { overflow: visible; }
   .company-reports .report-card, .company-reports .story-item, .company-reports .panel { break-inside: avoid; }

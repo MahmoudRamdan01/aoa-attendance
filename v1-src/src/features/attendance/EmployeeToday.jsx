@@ -424,9 +424,15 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
             </button>
           </div>
           {locationState ? (
-            <p className="muted">
-              <MapPin size={15} /> المسافة عن الشركة: {Math.round(locationState.distance)} متر · دقة GPS {locationState.accuracy} متر
-            </p>
+            locationState.distance <= (companyLocation.radiusMeters || 1000) ? (
+              <p className="location-ok">
+                <CheckCircle2 size={15} /> أنت داخل نطاق الشركة ✓
+              </p>
+            ) : (
+              <p className="muted">
+                <MapPin size={15} /> المسافة عن الشركة: {Math.round(locationState.distance)} متر · دقة GPS {locationState.accuracy} متر
+              </p>
+            )
           ) : null}
           {todayNote ? <p className="muted">{todayNote}</p> : null}
           {queued > 0 ? (

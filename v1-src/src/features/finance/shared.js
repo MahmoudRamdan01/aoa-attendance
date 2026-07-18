@@ -31,4 +31,12 @@ async function voidFinancial(kind, id, onToast, reload) {
   }
 }
 
-export { useUid, voidFinancial };
+// The owner's name is hidden from HR wherever it appears as an actor/holder in
+// finance entries — HR sees the amount, not that it's the owner's.
+const OWNER_MASK_NAME = "محمود";
+function maskActor(name, role) {
+  if (role !== "owner" && name && name.trim() === OWNER_MASK_NAME) return "الإدارة";
+  return name;
+}
+
+export { useUid, voidFinancial, maskActor };

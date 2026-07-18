@@ -3,7 +3,7 @@ import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, RefreshCcw, U
 import { supabase, todayIso } from "../../lib/supabase";
 import { money } from "../../lib/format";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { voidFinancial } from "./shared";
+import { voidFinancial, maskActor } from "./shared";
 
 function TreasuryView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -35,10 +35,10 @@ function TreasuryView({ context, onToast }) {
     const outTotal = active.filter((e) => e.direction === "out").reduce((s, e) => s + Number(e.amount), 0);
     const spentMonth = active.filter((e) => e.direction === "out" && e.entry_date.startsWith(month))
       .reduce((s, e) => s + Number(e.amount), 0);
-    // Per-holder custody balance (in − out).
+    // Per-holder custody balance (in − out). Owner name masked for HR.
     const holders = new Map();
     active.forEach((e) => {
-      const key = e.holder_name || "الخزنة";
+      const key = maskActor(e.holder_name, role) || "الخزنة";
       const cur = holders.get(key) || { name: key, held: 0 };
       cur.held += (e.direction === "in" ? 1 : -1) * Number(e.amount);
       holders.set(key, cur);
@@ -174,7 +174,7 @@ function TreasuryView({ context, onToast }) {
                   <td>{row.direction === "in"
                     ? <span className="badge ok">عهدة</span>
                     : <span className="badge warn">صرف</span>}</td>
-                  <td>{row.holder_name || "الخزنة"}</td>
+                  <td>{maskActor(row.holder_name, role) || "الخزنة"}</td>
                   <td>{money(row.amount)} ج</td>
                   <td className="note-cell">{row.note || (row.direction === "out" ? "صرف" : "-")}</td>
                   <td>{row.status === "voided" ? <StatusBadge status="voided" /> : <StatusBadge status="active" />}</td>

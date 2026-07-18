@@ -6,7 +6,7 @@ import { cls } from "../../lib/cls";
 import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { partnerDirectionLabels, partnerKindLabels, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { voidFinancial } from "./shared";
+import { voidFinancial, maskActor } from "./shared";
 
 function PartnerLedgerView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -139,7 +139,7 @@ function PartnerLedgerView({ context, onToast }) {
       e.remaining.toFixed(2),
       statusLabels[e.derived] || e.derived,
       e.due_date || "",
-      e.created_by_name || "",
+      maskActor(e.created_by_name, role) || "",
     ].map(csvCell).join(","));
     downloadTextFile(`partner-ledger-${todayIso()}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
   }
@@ -153,7 +153,7 @@ function PartnerLedgerView({ context, onToast }) {
       s.amount,
       statusLabels[s.status] || s.status,
       s.note || "",
-      s.created_by_name || "",
+      maskActor(s.created_by_name, role) || "",
     ].map(csvCell).join(","));
     downloadTextFile(`partner-settlements-${todayIso()}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
   }
@@ -188,7 +188,7 @@ function PartnerLedgerView({ context, onToast }) {
                   <strong>{money(s.amount)} ج</strong>
                   <span>{s.entryDescription} · {s.settle_date}</span>
                   {s.note && <p>{s.note}</p>}
-                  <p className="muted">سجله: {s.created_by_name || "-"}</p>
+                  <p className="muted">سجله: {maskActor(s.created_by_name, role) || "-"}</p>
                 </div>
                 <div className="approval-actions">
                   {!isOwner && <span className="badge">قرار Owner فقط</span>}
@@ -259,7 +259,7 @@ function PartnerLedgerView({ context, onToast }) {
                       <div className="list-row compact-row" key={s.id}>
                         <div>
                           <strong>{money(s.amount)} ج</strong>
-                          <span>{s.settle_date} · {s.created_by_name || "-"}</span>
+                          <span>{s.settle_date} · {maskActor(s.created_by_name, role) || "-"}</span>
                         </div>
                         <StatusBadge status={s.status} />
                       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, RefreshCcw, ScanFace, Search, UserCheck, Users, UserX } from "lucide-react";
+import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, RefreshCcw, ScanFace, Search, UserCheck, Users, UserX, Wrench, X } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { addDays, datesBetween } from "../../lib/dates";
@@ -21,6 +21,7 @@ function AdminDashboard({ context, onToast }) {
   const [error, setError] = useState("");
   const [employeeQuery, setEmployeeQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [correcting, setCorrecting] = useState(null); // {empId, name, rec} — owner day correction
 
   useEffect(() => {
     loadAdmin();
@@ -70,7 +71,7 @@ function AdminDashboard({ context, onToast }) {
     }
   }
 
-  async function decidePermission(id, approve, hoursApproved) {
+  async function decidePermission(id, approve, hoursApproved, note) {
     if (context.role !== "owner") {
       onToast("الموافقة على الأذونات Owner فقط.");
       return;
@@ -79,7 +80,7 @@ function AdminDashboard({ context, onToast }) {
       p_id: id,
       p_approve: approve,
       p_hours_approved: hoursApproved,
-      p_note: approve ? "تمت الموافقة" : "تم الرفض",
+      p_note: approve ? "تمت الموافقة" : (note || "تم الرفض"),
     });
     if (error || data?.error) onToast(data?.message || "تعذر تحديث الإذن.");
     else {
@@ -88,7 +89,7 @@ function AdminDashboard({ context, onToast }) {
     }
   }
 
-  async function decideLeave(id, approve) {
+  async function decideLeave(id, approve, note) {
     if (context.role !== "owner") {
       onToast("الموافقة على الأجازات Owner فقط.");
       return;
@@ -96,11 +97,28 @@ function AdminDashboard({ context, onToast }) {
     const { data, error } = await supabase.rpc("decide_leave_v1", {
       p_id: id,
       p_approve: approve,
-      p_note: approve ? "تمت الموافقة" : "تم الرفض",
+      p_note: approve ? "تمت الموافقة" : (note || "تم الرفض"),
     });
     if (error || data?.error) onToast(data?.message || "تعذر تحديث الأجازة.");
     else {
       onToast("تم تحديث طلب الأجازة.");
+      loadAdmin();
+    }
+  }
+
+  async function applyCorrection(action, checkIn, checkOut, reason) {
+    const { data, error } = await supabase.rpc("owner_correct_attendance_v1", {
+      p_employee_id: correcting.empId,
+      p_date: reportDate,
+      p_action: action,
+      p_check_in: checkIn || null,
+      p_check_out: checkOut || null,
+      p_reason: reason || null,
+    });
+    if (error || data?.error) onToast(data?.message || "تعذر التصحيح.");
+    else {
+      onToast("تم التصحيح.");
+      setCorrecting(null);
       loadAdmin();
     }
   }
@@ -270,7 +288,14 @@ function AdminDashboard({ context, onToast }) {
                     <td>
                       <AdminNoteCell empId={emp.id} rec={rec} reportDate={reportDate} onToast={onToast} onSaved={loadAdmin} />
                     </td>
-                    <td>{context.role === "owner" && rec ? <button className="danger-link" onClick={() => reset(emp.id)}>تراجع</button> : "-"}</td>
+                    <td>
+                      {context.role === "owner" ? (
+                        <span className="approval-actions">
+                          <button className="secondary" onClick={() => setCorrecting({ empId: emp.id, name: emp.name, rec })}><Wrench size={14} /> تصحيح</button>
+                          {rec && <button className="danger-link" onClick={() => reset(emp.id)}>تراجع</button>}
+                        </span>
+                      ) : "-"}
+                    </td>
                   </tr>
                 );
               })}
@@ -311,6 +336,48 @@ function AdminDashboard({ context, onToast }) {
       <Approvals title="أذونات معلقة" rows={permissions} type="permission" canApprove={canApprove} onPermission={decidePermission} />
       <Approvals title="أجازات معلقة" rows={leaves} type="leave" canApprove={canApprove} onLeave={decideLeave} />
       <RequestsHistory />
+
+      {correcting && (
+        <CorrectionModal target={correcting} date={reportDate} onApply={applyCorrection} onClose={() => setCorrecting(null)} />
+      )}
+    </div>
+  );
+}
+
+// Owner-only per-day correction: clear a deduction, cancel an absence, or edit
+// the check-in/out times for a single day (owner_correct_attendance_v1).
+function CorrectionModal({ target, date, onApply, onClose }) {
+  const rec = target.rec;
+  const [checkIn, setCheckIn] = useState(rec?.check_in ? String(rec.check_in).slice(0, 5) : "");
+  const [checkOut, setCheckOut] = useState(rec?.check_out ? String(rec.check_out).slice(0, 5) : "");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState("");
+
+  async function run(action) {
+    setBusy(action);
+    await onApply(action, action === "set_times" ? checkIn : null, action === "set_times" ? checkOut : null, reason);
+    setBusy("");
+  }
+
+  return (
+    <div className="capture-lightbox" role="dialog" aria-modal="true" onClick={onClose}>
+      <article className="correction-card" onClick={(e) => e.stopPropagation()}>
+        <button className="capture-lightbox__close" type="button" onClick={onClose} aria-label="إغلاق"><X size={20} /></button>
+        <h3><Wrench size={18} /> تصحيح يوم {target.name}</h3>
+        <p className="muted">{date}{rec ? ` · ${statusLabels[rec.status] || rec.status}` : " · لا يوجد سجل"}</p>
+        <label className="field">سبب التصحيح (اختياري)
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="ملاحظة تتسجل في السجل" />
+        </label>
+        <div className="correction-actions">
+          <button className="secondary" type="button" disabled={!rec || busy} onClick={() => run("clear_deduction")}>مسح الخصم</button>
+          <button className="secondary" type="button" disabled={!rec || rec?.status !== "absent" || busy} onClick={() => run("clear_absence")}>إلغاء الغياب</button>
+        </div>
+        <div className="form-grid">
+          <label>حضور<input type="time" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} /></label>
+          <label>انصراف<input type="time" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} /></label>
+        </div>
+        <button className="primary" type="button" disabled={busy} onClick={() => run("set_times")}>حفظ المواعيد</button>
+      </article>
     </div>
   );
 }
@@ -505,13 +572,13 @@ function Approvals({ title, rows, type, canApprove, onPermission, onLeave }) {
                 <>
                   <button onClick={() => onPermission(row.id, true, 1)}>موافقة ساعة</button>
                   <button onClick={() => onPermission(row.id, true, 2)}>موافقة ساعتين</button>
-                  <button className="danger-link" onClick={() => onPermission(row.id, false, null)}>رفض</button>
+                  <button className="danger-link" onClick={() => { const r = prompt("سبب الرفض (اختياري):"); if (r === null) return; onPermission(row.id, false, null, r.trim() || null); }}>رفض</button>
                 </>
               )}
               {canApprove && type === "leave" && (
                 <>
                   <button onClick={() => onLeave(row.id, true)}>موافقة</button>
-                  <button className="danger-link" onClick={() => onLeave(row.id, false)}>رفض</button>
+                  <button className="danger-link" onClick={() => { const r = prompt("سبب الرفض (اختياري):"); if (r === null) return; onLeave(row.id, false, r.trim() || null); }}>رفض</button>
                 </>
               )}
             </div>

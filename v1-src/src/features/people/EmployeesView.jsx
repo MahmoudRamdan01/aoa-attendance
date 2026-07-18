@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, CalendarDays, ChevronLeft, Clock3, History, Plus, Power, RefreshCcw, Search, Trash2, UserCheck, UserPlus, Users, UserX } from "lucide-react";
+import { Banknote, CalendarDays, ChevronLeft, Clock3, History, Plus, Power, RefreshCcw, Search, Sparkles, Trash2, UserCheck, UserPlus, Users, UserX } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { monthRangeFor } from "../../lib/dates";
@@ -180,6 +180,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [active, setActive] = useState(employee.active);
+  const [assistantOn, setAssistantOn] = useState(employee.assistant_enabled !== false);
   const isOwner = role === "owner";
   const range = useMemo(() => monthRangeFor(month), [month]);
 
@@ -191,6 +192,17 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
     if (error || data?.error) return onToast?.(data?.message || "تعذر تحديث حالة الموظف.");
     setActive(next);
     onToast?.(next ? "تم تفعيل الموظف." : "تم توقيف الموظف.");
+    onChanged?.();
+  }
+
+  async function toggleAssistant() {
+    setActing(true);
+    const next = !assistantOn;
+    const { data, error } = await supabase.rpc("owner_set_assistant_v1", { p_employee_id: employee.id, p_enabled: next });
+    setActing(false);
+    if (error || data?.error) return onToast?.(data?.message || "تعذر تحديث المساعد.");
+    setAssistantOn(next);
+    onToast?.(next ? "تم تفعيل المساعد الذكي للموظف." : "تم إخفاء المساعد الذكي عن الموظف.");
     onChanged?.();
   }
 
@@ -265,6 +277,11 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
           <button className="secondary" type="button" onClick={toggleActive} disabled={acting}>
             <Power size={16} /> {active ? "توقيف الموظف" : "تفعيل الموظف"}
           </button>
+          {isOwner && (
+            <button className="secondary" type="button" onClick={toggleAssistant} disabled={acting}>
+              <Sparkles size={16} /> {assistantOn ? "إخفاء المساعد الذكي" : "تفعيل المساعد الذكي"}
+            </button>
+          )}
           {isOwner && (
             <button className="danger-link" type="button" onClick={removeEmployee} disabled={acting}>
               <Trash2 size={16} /> حذف نهائي
