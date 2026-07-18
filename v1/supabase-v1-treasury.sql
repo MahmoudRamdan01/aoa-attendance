@@ -1,0 +1,28 @@
+-- ============================================================================
+-- الخزنة (treasury / petty-cash custody) — DOC ONLY (live objects are truth).
+-- Applied live 2026-07-18. See pg_get_functiondef for current bodies.
+-- ============================================================================
+-- TABLE treasury_entries:
+--   direction 'in'  = عهدة/توريد (money into the safe / handed to a custodian)
+--   direction 'out' = صرف       (spent — also books a company_expenses row)
+--   holder_employee_id bigint FK employees (nullable) + holder_name text
+--   amount, note («هي إيه»), entry_date, category, expense_id FK company_expenses,
+--   status active|voided, created_by/name, voided_*
+--   RLS: SELECT to authenticated USING is_hr(); writes via definer RPCs only.
+--
+-- RPCs (SECURITY DEFINER, is_hr guard, audit-logged):
+--   add_treasury_hold_v1(p_holder_employee_id, p_holder_name, p_amount, p_note, p_date)
+--     → inserts direction='in'. Holder resolves to employee name / free text / 'الخزنة'.
+--   add_treasury_spend_v1(p_amount, p_note, p_holder_employee_id, p_holder_name,
+--                         p_category, p_date)
+--     → inserts a company_expenses row (category default 'treasury', owner auto-
+--       confirmed else pending + notify_owners) THEN a treasury_entries 'out'
+--       linked by expense_id. This is how "spends add to expenses + totals".
+--
+-- void_financial_v1 gains kind 'treasury' with a two-way cascade:
+--   - void a treasury 'out' → also voids its linked company_expenses row
+--   - void that company_expenses row (kind 'expense') → also voids the treasury row
+--
+-- company_expenses_category_check was altered to allow 'treasury'.
+-- Current safe balance = Σ(in) − Σ(out) over status='active'.
+-- ============================================================================
