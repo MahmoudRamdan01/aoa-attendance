@@ -1,0 +1,30 @@
+-- ============================================================================
+-- owner_reports_v1(p_month text)  —  DOC ONLY (live function is source of truth)
+-- ============================================================================
+-- Owner-only analytics feeding the «نبض الشركة» section in OwnerDashboard and the
+-- owner-only KPI strip on AdminDashboard. Applied live 2026-07-18.
+--
+-- SECURITY: SECURITY DEFINER + `if not is_owner() then raise 42501` guard;
+--           execute revoked from public/anon, granted to authenticated only;
+--           search_path pinned to public, extensions.
+--
+-- RETURNS jsonb:
+--   month      text  — normalized 'YYYY-MM'
+--   history[]  — last 6 months, each:
+--                { month, workdays (capped at today for the current month),
+--                  present, late, absent, leave, lateMinutes, deductionDays,
+--                  deductionAmount, financial, gross, net }
+--                deductionAmount/net REPLICATE the client payroll formula exactly:
+--                  per-employee dd = Σ(deduction_days) + absent-day
+--                  amount = dd * salary/30 ; financial = active loan installments
+--                    (due_month) + active canteen + active other_deductions
+--                  net = Σ max(0, salary - amount - financial)   (clamp per employee)
+--   financial  — { expensesMonth, expensesByCategory[], canteenMonth,
+--                  ownerLedgerOutstanding, partnerNet }
+--   requests   — { leavePending, leaveApprovedMonth, permPending,
+--                  permApprovedMonth, permRejectedMonth, avgResponseHours }
+--   security   — { riskFlagsMonth, newDevicesMonth, faceApproved, faceTotal }
+--
+-- To read/patch the live body:  select pg_get_functiondef(
+--   'public.owner_reports_v1(text)'::regprocedure);
+-- ============================================================================
