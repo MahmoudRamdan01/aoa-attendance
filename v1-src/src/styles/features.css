@@ -1916,6 +1916,7 @@ a.secondary {
 
 /* ===== Employees page + shared bits (v19 UI additions) ===== */
 .badge.ok { background: rgba(16,185,129,0.14); color: var(--green); border-color: rgba(16,185,129,0.4); }
+.badge.warn { background: rgba(245,158,11,0.16); color: var(--warning, #b45309); border-color: rgba(245,158,11,0.4); }
 .badge.danger { background: rgba(239,68,68,0.14); color: var(--red); border-color: rgba(239,68,68,0.4); }
 .badge.muted { background: var(--panel-soft); color: var(--muted); border-color: var(--line); }
 

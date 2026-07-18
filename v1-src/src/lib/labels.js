@@ -36,6 +36,7 @@ const expenseCategoryLabels = {
   rent: "إيجار",
   maintenance: "صيانة",
   stationery: "قرطاسية",
+  treasury: "الخزنة",
   other: "أخرى",
 };
 const partnerKindLabels = {

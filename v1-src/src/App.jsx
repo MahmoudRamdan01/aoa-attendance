@@ -28,6 +28,7 @@ const VIEW_LOADERS = {
   security: () => import("./features/system/SecuritySettings"),
   owner: () => import("./features/payroll/OwnerDashboard"),
   expenses: () => import("./features/finance/ExpensesView"),
+  treasury: () => import("./features/finance/TreasuryView"),
   partner: () => import("./features/finance/PartnerLedgerView"),
   ownerbook: () => import("./features/private-ledger/OwnerLedgerView"),
 };
@@ -104,6 +105,7 @@ const AdminDashboard = lazyView("admin");
 const SecuritySettings = lazyView("security");
 const OwnerDashboard = lazyView("owner");
 const ExpensesView = lazyView("expenses");
+const TreasuryView = lazyView("treasury");
 const PartnerLedgerView = lazyView("partner");
 const OwnerLedgerView = lazyView("ownerbook");
 
@@ -195,6 +197,7 @@ function App() {
       assistant: AssistantView,
       deductions: DeductionsView,
       expenses: ExpensesView,
+      treasury: TreasuryView,
       partner: PartnerLedgerView,
       team: EmployeesView,
       admin: AdminDashboard,

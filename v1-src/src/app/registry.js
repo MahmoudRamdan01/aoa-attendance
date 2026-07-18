@@ -12,6 +12,7 @@ import {
   Sparkles,
   UserCog,
   Users,
+  Vault,
   Wallet,
 } from "lucide-react";
 
@@ -121,6 +122,17 @@ const DEFINITIONS = [
     ar: "المصروفات",
     en: "Expenses",
     icon: Receipt,
+    legacyKind: "admin",
+    capability: capabilities.admin,
+    mobileSlot: null,
+  },
+  {
+    id: "treasury",
+    section: "finance",
+    accent: "finance",
+    ar: "الخزنة",
+    en: "Treasury",
+    icon: Vault,
     legacyKind: "admin",
     capability: capabilities.admin,
     mobileSlot: null,
