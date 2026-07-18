@@ -218,6 +218,11 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
         samples = await sampler.done;
         location = [...samples].sort((a, b) => a.accuracy - b.accuracy)[0] || null;
         if (!location) throw new Error("تعذر تثبيت الموقع. فعّل الـ GPS وحاول من مكان مكشوف.");
+        // A coarse network fix can sit km away from the phone — sending it
+        // gets an unfair "خارج النطاق". Be honest instead and ask for a retry.
+        if (location.accuracy > 300) {
+          throw new Error(`تحديد الموقع مش دقيق دلوقتي (±${location.accuracy} متر). استنى ثواني في مكان قريب من شباك أو مكشوف وحاول تاني.`);
+        }
         const distance = distanceMeters(location, companyLocation);
         setLocationState({ ...location, distance });
         // Client precheck only warns for the MAIN geofence; employees with an

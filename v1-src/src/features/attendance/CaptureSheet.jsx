@@ -92,6 +92,9 @@ export default function CaptureSheet({
       const samples = await session.gpsSampler.done;
       const location = [...samples].sort((a, b) => a.accuracy - b.accuracy)[0] || null;
       if (requireGps && !location) throw new Error("تعذر تثبيت الموقع. حاول من مكان مكشوف.");
+      if (requireGps && location && location.accuracy > 300) {
+        throw new Error(`تحديد الموقع مش دقيق دلوقتي (±${location.accuracy} متر). استنى ثواني وحاول تاني.`);
+      }
       await onCapture({
         samples,
         location,

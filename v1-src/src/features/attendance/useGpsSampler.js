@@ -6,7 +6,7 @@ function locationError(error) {
   return new Error("تحديد الموقع أخد وقت طويل. اتأكد إن GPS شغّال وحاول تاني.");
 }
 
-export function startGpsSampler({ timeoutMs = 8000, maxSamples = 5, minSamples = 3 } = {}) {
+export function startGpsSampler({ timeoutMs = 12000, maxSamples = 10, minSamples = 3, goodAccuracyM = 30 } = {}) {
   if (!navigator.geolocation) {
     throw new Error("المتصفح لا يدعم تحديد الموقع.");
   }
@@ -69,7 +69,16 @@ export function startGpsSampler({ timeoutMs = 8000, maxSamples = 5, minSamples =
         firstSettled = true;
         resolveFirst(sample);
       }
-      if (samples.length >= maxSamples || samples.length >= minSamples) finish();
+      // Don't stop at a fixed count: the first indoor fixes are coarse
+      // network positions (hundreds of meters off, sometimes km) before the
+      // GPS chip warms up. Finish early only once a genuinely accurate fix
+      // arrived; otherwise keep sampling until maxSamples or the timeout.
+      const bestAccuracy = samples.reduce(
+        (best, item) => Math.min(best, item.accuracy || Infinity),
+        Infinity,
+      );
+      if (samples.length >= maxSamples
+          || (samples.length >= minSamples && bestAccuracy <= goodAccuracyM)) finish();
     },
     fail,
     { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
