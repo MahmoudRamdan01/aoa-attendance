@@ -101,13 +101,11 @@ const DEFINITIONS = [
     en: "AI Assistant",
     icon: Sparkles,
     legacyKind: "all",
-    // Owner can hide the assistant per employee (employees.assistant_enabled).
-    // Owner/admins always keep it.
+    // Assistant is OFF for everyone by default except the owner. The owner
+    // enables it per person (employees.assistant_enabled) from the People page.
     capability: ({ context }) =>
       Boolean(context) &&
-      (context.role === "owner" ||
-        context.role === "hr" ||
-        context?.employee?.assistant_enabled !== false),
+      (context.role === "owner" || context?.employee?.assistant_enabled === true),
     mobileSlot: "more",
   },
   {

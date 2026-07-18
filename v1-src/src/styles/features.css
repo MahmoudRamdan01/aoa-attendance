@@ -2258,6 +2258,14 @@ table.heatmap th.hm-name, table.heatmap td.hm-name { position: sticky; inset-inl
 /* "Inside company" reassurance on the check-in screen */
 .location-ok { display: inline-flex; align-items: center; gap: 6px; color: var(--green, #10b981); font-weight: 700; font-size: .85rem; }
 
+/* Assistant bulk picker (owner) */
+.assistant-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 4px 0 12px; }
+.assistant-pick { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel-soft); color: var(--ink); font-weight: 700; font-size: .85rem; cursor: pointer; }
+.assistant-pick.picked { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+.assistant-pick input { width: 17px; height: 17px; accent-color: var(--gold); flex: 0 0 auto; }
+.assistant-pick > span:first-of-type { flex: 1; min-width: 0; }
+.assistant-pick .badge { font-size: .66rem; padding: 2px 6px; }
+
 /* Owner per-day attendance correction modal */
 .correction-card { position: relative; width: min(100%, 440px); max-height: 92vh; overflow: auto; display: grid; gap: 12px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); color: var(--ink); }
 .correction-card h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.1rem; }

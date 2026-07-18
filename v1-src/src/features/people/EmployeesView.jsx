@@ -76,7 +76,7 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
     if (!employees.length) setLoading(true);
     const { data } = await supabase
       .from("employees")
-      .select("id,name,active,attendance_exempt,leave_balance,checkin_from,checkin_to,checkout_from,checkout_to")
+      .select("id,name,active,attendance_exempt,leave_balance,checkin_from,checkin_to,checkout_from,checkout_to,assistant_enabled")
       .order("id");
     const rows = data || [];
     setEmployees(rows);
@@ -170,7 +170,64 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
         </div>
         {!loading && filtered.length === 0 && <p className="muted">مفيش نتايج.</p>}
       </section>
+
+      {role === "owner" && <AssistantManager employees={employees} onChanged={load} onToast={onToast} />}
     </div>
+  );
+}
+
+// Owner-only bulk control for who sees the AI assistant (default OFF for all).
+function AssistantManager({ employees, onChanged, onToast }) {
+  const [picked, setPicked] = useState(() => new Set());
+  const [busy, setBusy] = useState(false);
+  const people = useMemo(() => employees.filter((e) => e.active !== false), [employees]);
+
+  function toggle(id) {
+    setPicked((cur) => {
+      const next = new Set(cur);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  async function apply(enabled) {
+    if (picked.size === 0) return onToast?.("اختار موظف واحد على الأقل.");
+    setBusy(true);
+    const { data, error } = await supabase.rpc("owner_set_assistant_bulk_v1", { p_ids: [...picked], p_enabled: enabled });
+    setBusy(false);
+    if (error || data?.error) return onToast?.(data?.message || "تعذر التحديث.");
+    onToast?.(enabled ? `تم تفعيل المساعد لـ ${data.count} موظف.` : `تم إخفاء المساعد عن ${data.count} موظف.`);
+    setPicked(new Set());
+    onChanged?.();
+  }
+
+  const enabledCount = people.filter((e) => e.assistant_enabled).length;
+
+  return (
+    <section className="panel">
+      <div className="panel-title between">
+        <div><Sparkles size={20} /><h2>المساعد الذكي — مين يشوفه</h2></div>
+        <span className="badge">{enabledCount} مفعّل</span>
+      </div>
+      <p className="muted">المساعد مخفي عن الكل افتراضيًا (ما عدا المالك). اختار الأشخاص وفعّله أو أوقفه لهم دفعة واحدة.</p>
+      <div className="assistant-pick-grid">
+        {people.map((e) => (
+          <label key={e.id} className={cls("assistant-pick", picked.has(e.id) && "picked")}>
+            <input type="checkbox" checked={picked.has(e.id)} onChange={() => toggle(e.id)} />
+            <span>{e.name}</span>
+            {e.assistant_enabled && <span className="badge ok">مفعّل</span>}
+          </label>
+        ))}
+      </div>
+      <div className="actions-row">
+        <button className="primary" type="button" disabled={busy || picked.size === 0} onClick={() => apply(true)}>
+          <Sparkles size={16} /> فعّل للمحددين
+        </button>
+        <button className="secondary" type="button" disabled={busy || picked.size === 0} onClick={() => apply(false)}>
+          أوقف للمحددين
+        </button>
+      </div>
+    </section>
   );
 }
 

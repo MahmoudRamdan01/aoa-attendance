@@ -90,7 +90,10 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
     rows.forEach((r) => { if (r.status === "late") byDow[new Date(`${r.work_date}T00:00:00Z`).getUTCDay()] += 1; });
     const maxDow = byDow.indexOf(Math.max(...byDow));
     if (byDow[maxDow] > 0) facts.push({ icon: "📅", text: `يوم ${WEEKDAYS_AR[maxDow]} أكتر يوم فيه تأخير (${byDow[maxDow]} مرة).` });
-    if (breakdown.total > 0) facts.push({ icon: "💸", text: `إجمالي الخصومات الشهر ده حوالي ${money(breakdown.total)} ج.` });
+    // "الخصومات" here = attendance penalties only (تأخير/غياب/انصراف مبكر).
+    // Loan installments/canteen are repayments/other and are NOT penalties.
+    const penalties = breakdown.attendanceCost + breakdown.absentCost;
+    if (penalties > 0) facts.push({ icon: "💸", text: `خصومات التأخير والغياب الشهر ده حوالي ${money(penalties)} ج.` });
     const late = stats.late || 0;
     const worst = [...ranked].sort((a, b) => b.late - a.late)[0];
     if (worst && worst.late >= 3) facts.push({ icon: "⚠️", text: `${worst.name} عليه ${worst.late} تأخير الشهر ده — محتاج متابعة.` });
