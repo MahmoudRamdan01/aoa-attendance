@@ -127,7 +127,7 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
       if (!activeRef.current) return;
       setState({
         status: "unavailable",
-        instruction: "تعذر تحميل التحقق من الوجه؛ سيتم التسجيل بالصورة مع تنبيه للإدارة.",
+        instruction: "تعذر تحميل التحقق من الوجه؛ هيتم التسجيل بالموقع فقط مع تنبيه للإدارة.",
         data: { faceScores: { unavailable: true } },
         unavailable: true,
       });

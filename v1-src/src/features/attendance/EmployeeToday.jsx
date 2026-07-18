@@ -392,7 +392,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
               dir="ltr"
               value={qr}
               onChange={(event) => setQr(event.target.value.toUpperCase())}
-              placeholder="اختياري — الموقع والصورة يكفوا"
+              placeholder="اختياري — الموقع كافي"
               autoCapitalize="characters"
               autoComplete="one-time-code"
             />

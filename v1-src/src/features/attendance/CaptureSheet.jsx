@@ -18,7 +18,7 @@ function cameraError(error) {
 
 export async function requestCaptureSession({ faceMode = "off", requireGps = true } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error("المتصفح لا يدعم التقاط الصور. افتح النظام من Safari أو Chrome حديث.");
+    throw new Error("المتصفح لا يدعم تشغيل الكاميرا. افتح النظام من Safari أو Chrome حديث.");
   }
   // Both permission requests start synchronously from the user's click. This is
   // required by iOS Safari and avoids opening a permission prompt on mount.

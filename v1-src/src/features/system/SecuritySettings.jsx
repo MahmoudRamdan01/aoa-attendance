@@ -68,7 +68,7 @@ export default function SecuritySettings({ onToast }) {
         </div>
         <p className="muted">كل تغيير هنا Owner-only ويتسجل في Audit Log. الانتقال الموصى به: Off ← Warn لمدة أسبوعين ← Enforce.</p>
         <div className="security-metrics">
-          <div><span>محاولات بصورة · 30 يوم</span><strong>{metrics.face_attempts_30d || 0}</strong></div>
+          <div><span>تحققات وجه · 30 يوم</span><strong>{metrics.face_attempts_30d || 0}</strong></div>
           <div><span>عدم تطابق الوجه</span><strong>{metrics.face_mismatches_30d || 0}</strong></div>
           <div><span>معدل عدم التطابق</span><strong>{(Number(metrics.face_mismatch_rate || 0) * 100).toFixed(1)}%</strong></div>
         </div>
@@ -85,7 +85,7 @@ export default function SecuritySettings({ onToast }) {
               onClick={() => setNextMode(mode)}
             >
               <strong>{modeLabels[mode]}</strong>
-              <small>{mode === "off" ? "صورة فقط" : mode === "warn" ? "يسجل ويرسل تنبيه" : "يرفض عدم التطابق"}</small>
+              <small>{mode === "off" ? "GPS فقط — بدون كاميرا" : mode === "warn" ? "يسجل ويرسل تنبيه" : "يرفض عدم التطابق"}</small>
             </button>
           ))}
         </div>
@@ -93,8 +93,8 @@ export default function SecuritySettings({ onToast }) {
           <NumberSetting label="حد تطابق الوجه" value={settings.face_match_threshold} step="0.01" min="0" max="1" onSave={(value) => save("face_match_threshold", value)} busy={busy === "face_match_threshold"} />
           <NumberSetting label="أدنى Anti-spoof" value={settings.antispoof_min} step="0.01" min="0" max="1" onSave={(value) => save("antispoof_min", value)} busy={busy === "antispoof_min"} />
           <ToggleSetting label="اختبار الحيوية مطلوب" value={settings.liveness_required} onSave={(value) => save("liveness_required", value)} />
-          <ToggleSetting label="الصورة مطلوبة" value={settings.photo_required} onSave={(value) => save("photo_required", value)} />
         </div>
+        <p className="muted">لا يتم حفظ أي صور نهائيًا — التحقق ببصمة رقمية مشفرة فقط، والتسجيل المرجعي من ملف الموظف.</p>
       </section>
 
       <section className="panel">
