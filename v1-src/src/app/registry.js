@@ -159,8 +159,10 @@ const DEFINITIONS = [
     ar: "الموظفين",
     en: "People",
     icon: Users,
-    legacyKind: "admin",
-    capability: capabilities.admin,
+    legacyKind: "owner",
+    // Owner decision: the People page (data, face enrollment, devices) is
+    // for the owner only — HR manages the day-to-day from لوحة الحضور.
+    capability: capabilities.owner,
     mobileSlot: null,
   },
   {

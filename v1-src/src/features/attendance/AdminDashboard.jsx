@@ -3,7 +3,7 @@ import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, 
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { addDays, datesBetween } from "../../lib/dates";
-import { csvCell, downloadTextFile, fmtTime12 } from "../../lib/format";
+import { csvCell, downloadTextFile, fmtSubmittedAt, fmtTime12 } from "../../lib/format";
 import { reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import QRCodeLib from "qrcode";
@@ -564,6 +564,7 @@ function Approvals({ title, rows, type, canApprove, onPermission, onLeave }) {
               <strong>{row.employees?.name || `موظف #${row.employee_id}`}</strong>
               <span>{type === "permission" ? `${row.perm_date} · ${row.hours_requested || row.hours} ساعة` : `${row.from_date} → ${row.to_date}`}</span>
               {type === "leave" && row.cover?.name && <span>Cover: {row.cover.name}</span>}
+              {row.created_at && <span>قُدّم الطلب: {fmtSubmittedAt(row.created_at)}</span>}
               <p>{row.reason || "بدون سبب"}</p>
             </div>
             <div className="approval-actions">
