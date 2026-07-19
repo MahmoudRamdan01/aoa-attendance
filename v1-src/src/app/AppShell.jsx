@@ -30,7 +30,7 @@ const roleNames = { employee: "موظف", hr: "HR", owner: "Owner" };
 // always "المزيد" which opens the full menu sheet.
 const MOBILE_PRIMARY = {
   employee: ["today", "month", "requests"],
-  hr: ["admin", "team", "deductions"],
+  hr: ["admin", "deductions", "expenses"],
   owner: ["owner", "admin", "team"],
 };
 const MOBILE_TAB_LABELS = {

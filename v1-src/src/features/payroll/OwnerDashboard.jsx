@@ -18,10 +18,19 @@ function OwnerDashboard({ onToast }) {
   const [report, setReport] = useState(null);
   const [period, setPeriod] = useState("month");
   const [reportDate, setReportDate] = useState(todayIso());
+  const [customRange, setCustomRange] = useState({ from: `${todayIso().slice(0, 7)}-01`, to: todayIso() });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const range = useMemo(() => dateRangeForPeriod(period, reportDate), [period, reportDate]);
-  const reportMonth = reportDate.slice(0, 7);
+  const range = useMemo(() => {
+    if (period === "range") {
+      const from = customRange.from;
+      const to = customRange.to < from ? from : customRange.to;
+      return { from, to, label: "الفترة المحددة" };
+    }
+    return dateRangeForPeriod(period, reportDate);
+  }, [period, reportDate, customRange.from, customRange.to]);
+  // «نبض الشركة» is a month-keyed report; a custom range uses its start month.
+  const reportMonth = (period === "range" ? customRange.from : reportDate).slice(0, 7);
 
   // Owner-only cross-month analytics (history + financial + requests + security).
   useEffect(() => {
@@ -219,8 +228,29 @@ function OwnerDashboard({ onToast }) {
               <button className={cls(period === "day" && "active")} onClick={() => setPeriod("day")}>يومي</button>
               <button className={cls(period === "week" && "active")} onClick={() => setPeriod("week")}>أسبوعي</button>
               <button className={cls(period === "month" && "active")} onClick={() => setPeriod("month")}>شهري</button>
+              <button className={cls(period === "range" && "active")} onClick={() => setPeriod("range")}>فترة محددة</button>
             </div>
-            <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} />
+            {period === "range" ? (
+              <>
+                <input
+                  type="date"
+                  value={customRange.from}
+                  aria-label="من تاريخ"
+                  title="من تاريخ"
+                  onChange={(e) => setCustomRange((r) => ({ from: e.target.value, to: r.to < e.target.value ? e.target.value : r.to }))}
+                />
+                <input
+                  type="date"
+                  value={customRange.to}
+                  min={customRange.from}
+                  aria-label="إلى تاريخ"
+                  title="إلى تاريخ"
+                  onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))}
+                />
+              </>
+            ) : (
+              <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} />
+            )}
             <button className="secondary" onClick={exportCsv} disabled={loading || rows.length === 0}>
               <FileSpreadsheet size={16} /> Excel
             </button>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, RefreshCcw, Users, Banknote } from "lucide-react";
+import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, Coins, HandCoins, Landmark, RefreshCcw, Scale, Users, Banknote } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { money } from "../../lib/format";
 import { Metric, StatusBadge } from "../../ui/legacy";
@@ -10,6 +10,7 @@ function TreasuryView({ context, onToast }) {
   const isOwner = role === "owner";
   const [entries, setEntries] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [receivables, setReceivables] = useState({ loans: [], installments: [], partnerEntries: [], settlements: [] });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [month, setMonth] = useState(() => todayIso().slice(0, 7));
@@ -20,12 +21,23 @@ function TreasuryView({ context, onToast }) {
 
   async function loadData() {
     setLoading(true);
-    const [ent, emp] = await Promise.all([
+    const [ent, emp, loans, inst, partner, settle] = await Promise.all([
       supabase.from("treasury_entries").select("*").order("entry_date", { ascending: false }).order("id", { ascending: false }).limit(600),
       supabase.from("employees").select("id,name,active").eq("active", true).order("id"),
+      // Company receivables for the financial-position card.
+      supabase.from("emp_loans").select("id,amount,status").eq("status", "active"),
+      supabase.from("emp_loan_installments").select("loan_id,amount,due_month"),
+      supabase.from("partner_ledger_entries").select("id,direction,amount,status").eq("status", "active"),
+      supabase.from("partner_settlements").select("entry_id,amount,status").eq("status", "confirmed"),
     ]);
     setEntries(ent.data || []);
     setEmployees(emp.data || []);
+    setReceivables({
+      loans: loans.data || [],
+      installments: inst.data || [],
+      partnerEntries: partner.data || [],
+      settlements: settle.data || [],
+    });
     setLoading(false);
   }
 
@@ -56,6 +68,40 @@ function TreasuryView({ context, onToast }) {
     () => entries.filter((e) => e.entry_date.startsWith(month)),
     [entries, month]
   );
+
+  // المركز المالي للشركة: النقدية + المستحقات القائمة. الدفتر الشخصي
+  // والمصروفات الشخصية خارج الحساب تمامًا (بقرار المالك).
+  const position = useMemo(() => {
+    const currentMonth = todayIso().slice(0, 7);
+    // Loan installments due in past months were already deducted from payroll —
+    // the rest of each active loan is still owed to the company (same
+    // convention as صفحة الاستقطاعات).
+    const paidByLoan = receivables.installments.reduce((acc, i) => {
+      if (i.due_month < currentMonth) acc.set(i.loan_id, (acc.get(i.loan_id) || 0) + Number(i.amount));
+      return acc;
+    }, new Map());
+    const loansOutstanding = receivables.loans.reduce(
+      (sum, loan) => sum + Math.max(0, Number(loan.amount) - (paidByLoan.get(loan.id) || 0)),
+      0
+    );
+    const settledByEntry = receivables.settlements.reduce((acc, s) => {
+      acc.set(s.entry_id, (acc.get(s.entry_id) || 0) + Number(s.amount));
+      return acc;
+    }, new Map());
+    const partnerRemaining = (direction) => receivables.partnerEntries
+      .filter((e) => e.direction === direction)
+      .reduce((sum, e) => sum + Math.max(0, Number(e.amount) - (settledByEntry.get(e.id) || 0)), 0);
+    const partnerToUs = partnerRemaining("owed_to_us");
+    const partnerByUs = partnerRemaining("owed_by_us");
+    const partnerNet = partnerToUs - partnerByUs;
+    return {
+      loansOutstanding,
+      partnerToUs,
+      partnerByUs,
+      partnerNet,
+      total: stats.balance + loansOutstanding + partnerNet,
+    };
+  }, [receivables, stats.balance]);
 
   function holderArgs(form) {
     if (form.mode === "employee") return { p_holder_employee_id: Number(form.employeeId), p_holder_name: null };
@@ -104,6 +150,26 @@ function TreasuryView({ context, onToast }) {
 
   return (
     <div className="stack">
+      <section className="panel">
+        <div className="panel-title"><Landmark size={20} /><h2>المركز المالي للشركة</h2></div>
+        <div className="stats-grid compact-stats">
+          <Metric label="السيولة النقدية (الخزنة)" value={`${money(stats.balance)} ج`} tone={stats.balance >= 0 ? "ok" : "danger"} icon={Vault} />
+          <Metric label="سلف مستحقة على الموظفين" value={`${money(position.loansOutstanding)} ج`} icon={HandCoins} />
+          <Metric
+            label="صافي مستحقات Air Ocean"
+            value={`${money(Math.abs(position.partnerNet))} ج ${position.partnerNet >= 0 ? "لنا" : "علينا"}`}
+            tone={position.partnerNet >= 0 ? "ok" : "danger"}
+            icon={Scale}
+          />
+          <Metric label="إجمالي أموال الشركة" value={`${money(position.total)} ج`} tone={position.total >= 0 ? "gold" : "danger"} icon={Coins} />
+        </div>
+        <p className="muted">
+          الإجمالي = السيولة النقدية بالخزنة + السلف القائمة على الموظفين (تُحصَّل من الرواتب)
+          + صافي مستحقات Air Ocean (مستحق لنا {money(position.partnerToUs)} ج − مستحق علينا {money(position.partnerByUs)} ج).
+          لا يشمل هذا الإجمالي الدفتر الشخصي أو المصروفات الشخصية.
+        </p>
+      </section>
+
       <section className="panel">
         <div className="panel-title between">
           <div><Vault size={20} /><h2>الخزنة</h2></div>

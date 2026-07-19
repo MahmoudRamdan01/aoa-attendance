@@ -3,7 +3,7 @@ import { CalendarDays } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { addDays } from "../../lib/dates";
-import { fmtDateTime } from "../../lib/format";
+import { fmtDateTime, fmtSubmittedAt } from "../../lib/format";
 
 import { StatusBadge } from "../../ui/legacy";
 
@@ -126,8 +126,8 @@ function MyRequests({ context, refreshKey }) {
     if (!context?.employee?.id) return;
     setLoading(true);
     Promise.all([
-      supabase.from("permissions").select("id,perm_date,hours,hours_requested,hours_approved,reason,status,decision_note,decided_at").eq("employee_id", context.employee.id).order("perm_date", { ascending: false }).limit(10),
-      supabase.from("leave_requests").select("id,from_date,to_date,days,reason,status,decision_note,decided_at").eq("employee_id", context.employee.id).order("from_date", { ascending: false }).limit(10),
+      supabase.from("permissions").select("id,perm_date,hours,hours_requested,hours_approved,reason,status,decision_note,decided_at,created_at").eq("employee_id", context.employee.id).order("perm_date", { ascending: false }).limit(10),
+      supabase.from("leave_requests").select("id,from_date,to_date,days,reason,status,decision_note,decided_at,created_at").eq("employee_id", context.employee.id).order("from_date", { ascending: false }).limit(10),
     ]).then(([p, l]) => {
       const nextRows = [
         ...(p.data || []).map((item) => ({
@@ -139,6 +139,7 @@ function MyRequests({ context, refreshKey }) {
           reason: item.reason,
           decision: item.decision_note,
           decidedAt: item.decided_at,
+          submittedAt: item.created_at,
         })),
         ...(l.data || []).map((item) => ({
           type: "أجازة",
@@ -149,6 +150,7 @@ function MyRequests({ context, refreshKey }) {
           reason: item.reason,
           decision: item.decision_note,
           decidedAt: item.decided_at,
+          submittedAt: item.created_at,
         })),
       ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
       setRows(nextRows);
@@ -166,6 +168,7 @@ function MyRequests({ context, refreshKey }) {
           <div className="list-row" key={`${row.type}-${row.date}-${index}`}>
             <div><strong>{row.type}</strong><span>{row.date}</span></div>
             <p>{row.meta}</p>
+            {row.submittedAt && <p className="muted">قُدّم الطلب: {fmtSubmittedAt(row.submittedAt)}</p>}
             {row.reason && <p>السبب: {row.reason}</p>}
             {row.decision && <p>قرار الإدارة: {row.decision}{row.decidedAt ? ` · ${fmtDateTime(row.decidedAt)}` : ""}</p>}
             <StatusBadge status={row.status} />

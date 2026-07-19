@@ -28,6 +28,19 @@ function fmtDateTime(value) {
   });
 }
 
+// Full submission stamp: weekday + date + time ("الأحد، 19/07/2026، 08:45 م").
+function fmtSubmittedAt(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("ar-EG-u-nu-latn", {
+    weekday: "long",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 // "17:46:00" → "5:46 م" — 12-hour clock for attendance times.
 function fmtTime12(value) {
   if (!value) return null;
@@ -54,4 +67,4 @@ function csvCell(value) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-export { csvCell, downloadTextFile, fmtDate, fmtDateTime, fmtTime12, money, normalizeArabicName };
+export { csvCell, downloadTextFile, fmtDate, fmtDateTime, fmtSubmittedAt, fmtTime12, money, normalizeArabicName };

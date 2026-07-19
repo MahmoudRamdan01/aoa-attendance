@@ -186,6 +186,7 @@ function App() {
   const [unread, setUnread] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [mountedViews, setMountedViews] = useState([]);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const { activeView, navigate, routeParams } = useHashRouter("today");
   const viewRegistry = useMemo(
     () => createViewRegistry({
@@ -350,6 +351,16 @@ function App() {
     writeCachedContext(uid, fallbackContext);
   }
 
+  // Topbar refresh: reload the account context AND the data on screen. Views
+  // fetch on mount, so dropping the cached pages and remounting the active one
+  // under a new key re-pulls everything from the server.
+  function refreshAppData() {
+    loadContext(session);
+    setMountedViews((current) => current.filter((item) => item.id === activeView));
+    setRefreshNonce((nonce) => nonce + 1);
+    setToast("جارٍ تحديث البيانات…");
+  }
+
   async function signOut() {
     clearAllAppCaches();
     await supabase.auth.signOut();
@@ -371,7 +382,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id, context?.role, activeView]);
+  }, [session?.user?.id, context?.role, activeView, refreshNonce]);
 
   // Realtime: any new notification for me → red badge + toast + ding, instantly.
   useEffect(() => {
@@ -420,7 +431,7 @@ function App() {
         routeParams={routeParams}
         onNavigate={navigate}
         onSignOut={signOut}
-        onRefresh={() => loadContext(session)}
+        onRefresh={refreshAppData}
         onViewIntent={(viewId) => preloadView(viewId).catch(() => {})}
         unread={unread}
         setUnread={setUnread}
@@ -435,7 +446,7 @@ function App() {
           const params = isActive ? routeParams : mountedView.params;
           if (!ViewComponent) return null;
           return (
-            <div className="ops-mounted-view" key={mountedView.id} hidden={!isActive} aria-hidden={!isActive || undefined}>
+            <div className="ops-mounted-view" key={`${mountedView.id}:${refreshNonce}`} hidden={!isActive} aria-hidden={!isActive || undefined}>
               <ViewErrorBoundary>
                 <Suspense fallback={<ViewSkeleton />}>
                   <ViewComponent
