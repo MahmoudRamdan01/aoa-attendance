@@ -5,6 +5,7 @@ import { cls } from "../../lib/cls";
 import { getCompanyLocation } from "../../lib/dates";
 import { statusLabels } from "../../lib/labels";
 import { fmtTime12 } from "../../lib/format";
+import { checkoutWindowState } from "../../lib/attendanceWindow";
 import { getDeviceFingerprint, getDeviceId } from "../../lib/deviceFingerprint";
 import {
   enqueueAttendance,
@@ -52,15 +53,22 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
   const [capture, setCapture] = useState(null);
   const [consentKind, setConsentKind] = useState("");
   const [shortcutRequested, setShortcutRequested] = useState(false);
+  const [clock, setClock] = useState(() => new Date());
   const [securityConfig, setSecurityConfig] = useState({
     face_mode: "off",
     antispoof_min: 0.6,
+    checkout_from: null,
+    checkout_to: null,
   });
 
   const employee = context?.employee;
   const companyLocation = useMemo(() => getCompanyLocation(context), [context?.location]);
   const consentKey = `aoa:v1:biometric-consent:${session?.user?.id || employee?.id || "unknown"}`;
   const dayLocked = LOCKED_DAY_STATUSES.has(todayRecord?.status) && !todayRecord?.check_in;
+  const checkoutFrom = securityConfig.checkout_from;
+  const checkoutTo = securityConfig.checkout_to;
+  const checkoutWindow = checkoutWindowState({ checkoutFrom, checkoutTo, now: clock });
+  const checkoutTimeAllowed = checkoutWindow.configured && checkoutWindow.open;
 
   const refreshQueueCount = useCallback(async () => {
     try {
@@ -70,19 +78,38 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     }
   }, []);
 
+  const refreshSecurityConfig = useCallback(async () => {
+    const { data, error } = await supabase.rpc("get_attendance_security_config_v1");
+    if (!error && data) setSecurityConfig((current) => ({ ...current, ...data }));
+  }, []);
+
   useEffect(() => {
     loadToday();
     migrateLegacyAttendanceQueue().finally(refreshQueueCount);
-    supabase.rpc("get_attendance_security_config_v1").then(({ data }) => {
-      if (data?.face_mode) setSecurityConfig(data);
-    }).catch(() => {});
-  }, [employee?.id, refreshQueueCount]);
+    refreshSecurityConfig();
+  }, [employee?.id, refreshQueueCount, refreshSecurityConfig]);
+
+  useEffect(() => {
+    const refresh = () => refreshSecurityConfig();
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [refreshSecurityConfig]);
 
   // Warm the face models in the background as soon as we know face mode is on,
   // so the capture sheet opens with the engine already loaded (fast UX).
   useEffect(() => {
     if (securityConfig.face_mode !== "off") prepareFaceEngine().catch(() => {});
   }, [securityConfig.face_mode]);
+
+  useEffect(() => {
+    if (!todayRecord?.check_in || todayRecord?.check_out) return undefined;
+    const timer = window.setInterval(() => setClock(new Date()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [todayRecord?.check_in, todayRecord?.check_out]);
 
   useEffect(() => {
     if (routeParam === "capture-in" && !todayRecord?.check_in && !dayLocked) setShortcutRequested(true);
@@ -419,8 +446,16 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
             <button className="primary capture-action" disabled={busy || !!todayRecord?.check_in || dayLocked} onClick={() => attendance("in")}>
               <Camera size={19} /> {busy === "in" ? (cameraNeeded ? "جاري فتح الكاميرا…" : "جاري التسجيل…") : "تسجيل حضور"}
             </button>
-            <button className="secondary capture-action" disabled={busy || !todayRecord?.check_in || !!todayRecord?.check_out} onClick={() => attendance("out")}>
-              <LogOut size={19} /> {busy === "out" ? (cameraNeeded ? "جاري فتح الكاميرا…" : "جاري التسجيل…") : "تسجيل انصراف"}
+            <button className="secondary capture-action" disabled={busy || !todayRecord?.check_in || !!todayRecord?.check_out || !checkoutTimeAllowed} onClick={() => attendance("out")}>
+              <LogOut size={19} /> {busy === "out"
+                ? (cameraNeeded ? "جاري فتح الكاميرا…" : "جاري التسجيل…")
+                : checkoutWindow.beforeOpen
+                  ? `يفتح ${fmtTime12(checkoutFrom)}`
+                  : checkoutWindow.afterClose
+                    ? "انتهى وقت الانصراف"
+                    : checkoutWindow.configured
+                      ? "تسجيل انصراف"
+                      : "موعد الانصراف غير مضبوط"}
             </button>
           </div>
           {locationState ? (
