@@ -69,6 +69,7 @@ Run these in Supabase SQL Editor **in order** (all are idempotent, safe to re-ru
 9. `v1/supabase-v1-assistant.sql` — AI assistant config + logs tables (insert the LLM API key manually — never commit it). The agent itself is the `assistant` Supabase Edge Function (source in `v1/assistant-function/index.ts`), called from the "المساعد الذكي" section with the user's JWT so RLS/RPC guards cap what it can do.
 10. `v1/supabase-v1-face-security.sql` — private captures, trusted devices, face profiles, risk checks, and `employee_attendance_action_v2`. It starts with `face_mode=off` for a safe rollout.
 11. `v1/supabase-v1-security-hardening.sql` — apply only after all clients have adopted v2 and the staged face rollout is stable.
+12. `v1/supabase-v1-checkout-window-hardening.sql` — final checkout guard for both v1/v2 RPCs: rejects before `checkout_from` and after `checkout_to`, fails closed on incomplete schedules, and serializes concurrent attendance actions.
 
 ### ⚠️ Rotate all PINs (mandatory)
 
