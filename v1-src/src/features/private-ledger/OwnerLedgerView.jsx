@@ -160,7 +160,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
     loadData();
   }
   async function removeEntry(id) {
-    if (!confirm("تحذف القيد ده وكل دفعاته نهائيًا؟")) return;
+    if (!confirm("هل تريد حذف هذا القيد وجميع دفعاته نهائيًا؟")) return;
     const { error } = await supabase.from("owner_ledger_entries").delete().eq("id", id);
     if (error) return onToast("تعذر الحذف: " + error.message);
     onToast("تم الحذف.");
@@ -202,7 +202,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
     loadData();
   }
   async function removePayment(id) {
-    if (!confirm("تحذف الدفعة دي؟")) return;
+    if (!confirm("هل تريد حذف هذه الدفعة؟")) return;
     const { error } = await supabase.from("owner_ledger_payments").delete().eq("id", id);
     if (error) return onToast("تعذر الحذف: " + error.message);
     onToast("تم حذف الدفعة.");
@@ -217,7 +217,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
         <section className="panel">
           <div className="panel-title between">
             <div><Wallet size={20} /><h2>{person.label}</h2></div>
-            <button className="secondary" onClick={backToList}><ChevronLeft size={16} /> رجوع للقايمة</button>
+            <button className="secondary" onClick={backToList}><ChevronLeft size={16} /> رجوع للقائمة</button>
           </div>
           <div className="emp-meta">
             <span className={cls("badge", Math.abs(person.net) < 0.01 ? "muted" : person.net > 0 ? "ok" : "danger")}>
@@ -225,7 +225,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
             </span>
             <span className="badge">{person.entries.length} قيد</span>
           </div>
-          <p className="muted">الدفتر ده شخصي — محدش بيشوفه غيرك حتى الـ HR.</p>
+          <p className="muted">هذا الدفتر خاص بك — لا يطّلع عليه أحد سواك، ولا حتى الموارد البشرية.</p>
         </section>
 
         {/* Add a new entry for this person */}
@@ -275,12 +275,12 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
                 <div className="panel-title between">
                   <div>
                     <Banknote size={18} />
-                    <h2>{entry.direction === "lent" ? "سلّفته" : "استلفت"} {money(entry.amount)} ج</h2>
+                    <h2>{entry.direction === "lent" ? "أقرضته" : "اقترضت"} {money(entry.amount)} ج</h2>
                   </div>
                   <span className="badge">{entry.entry_date}</span>
                 </div>
                 <p className="muted">
-                  سدد: {money(entry.paid)} ج · متبقي: <strong>{money(entry.remaining)} ج</strong>
+                  مسدد: {money(entry.paid)} ج · متبقي: <strong>{money(entry.remaining)} ج</strong>
                   {entry.remaining <= 0 && <> <StatusBadge status="settled" /></>}
                   {entry.note ? ` · ${entry.note}` : ""}
                 </p>
@@ -362,11 +362,11 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
           <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
         </div>
         <div className="stats-grid compact-stats">
-          <Metric label="سلّفته لناس" value={`${money(totals.lent)} ج`} tone="ok" icon={TrendingUp} />
-          <Metric label="عليّ لناس" value={`${money(totals.borrowed)} ج`} tone="danger" icon={Banknote} />
-          <Metric label="الصافي" value={`${money(Math.abs(totals.net))} ج ${totals.net >= 0 ? "ليك" : "عليك"}`} tone={totals.net >= 0 ? "ok" : "warn"} icon={Wallet} />
+          <Metric label="مستحق لك" value={`${money(totals.lent)} ج`} tone="ok" icon={TrendingUp} />
+          <Metric label="مستحق عليك" value={`${money(totals.borrowed)} ج`} tone="danger" icon={Banknote} />
+          <Metric label="الصافي" value={`${money(Math.abs(totals.net))} ج ${totals.net >= 0 ? "لك" : "عليك"}`} tone={totals.net >= 0 ? "ok" : "warn"} icon={Wallet} />
         </div>
-        <p className="muted">الدفتر ده شخصي — محدش بيشوفه غيرك حتى الـ HR. دوس على أي شخص تشوف كل قيوده وتضيف/تعدّل/تحذف.</p>
+        <p className="muted">هذا الدفتر خاص بك — لا يطّلع عليه أحد سواك، ولا حتى الموارد البشرية. اضغط على أي شخص لعرض جميع قيوده مع إمكانية الإضافة أو التعديل أو الحذف.</p>
       </section>
 
       <section className="panel">
@@ -401,7 +401,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
         )}
 
         {loading && <p className="muted">جارٍ التحميل...</p>}
-        {!loading && byPerson.length === 0 && <p className="muted">الدفتر فاضي — سجّل أول قيد.</p>}
+        {!loading && byPerson.length === 0 && <p className="muted">الدفتر فارغ — سجّل أول قيد.</p>}
 
         {filtered.length > 0 && (
           <div className="emp-grid">
