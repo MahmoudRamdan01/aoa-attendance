@@ -84,7 +84,7 @@ function TreasuryView({ context, onToast }) {
   async function submitSpend(event) {
     event.preventDefault();
     if (spend.mode === "employee" && !spend.employeeId) return onToast("اختار الموظف.");
-    if (spend.mode === "other" && !spend.name.trim()) return onToast("اكتب اسم اللي صرف.");
+    if (spend.mode === "other" && !spend.name.trim()) return onToast("اكتب اسم من قام بالصرف.");
     setBusy("spend");
     const { data, error } = await supabase.rpc("add_treasury_spend_v1", {
       p_amount: Number(spend.amount),
@@ -95,7 +95,7 @@ function TreasuryView({ context, onToast }) {
     });
     setBusy("");
     if (error || data?.error) return onToast(data?.message || "تعذر تسجيل الصرف.");
-    onToast(data.confirmed ? "تم الصرف وأُضيف للمصروفات." : "تم الصرف — في انتظار تأكيد الـ Owner.");
+    onToast(data.confirmed ? "تم الصرف وأُضيف للمصروفات." : "تم الصرف — في انتظار تأكيد المالك.");
     setSpend((f) => ({ ...f, amount: "", note: "" }));
     loadData();
   }
@@ -118,16 +118,16 @@ function TreasuryView({ context, onToast }) {
           <Metric label="المصروف (كلي)" value={`${money(stats.outTotal)} ج`} tone="warn" icon={Wallet} />
           <Metric label={`المصروف ${month}`} value={`${money(stats.spentMonth)} ج`} tone="gold" icon={Banknote} />
         </div>
-        <p className="muted">أي صرف من الخزنة بيتضاف تلقائيًا لصفحة «المصروفات» والإجمالي.</p>
+        <p className="muted">يُضاف أي صرف من الخزنة تلقائيًا إلى صفحة «المصروفات» والإجمالي.</p>
       </section>
 
       {stats.holders.length > 0 && (
         <section className="panel">
-          <div className="panel-title"><Users size={20} /><h2>العهد المفتوحة (مع مين)</h2></div>
+          <div className="panel-title"><Users size={20} /><h2>العُهد المفتوحة (لدى من)</h2></div>
           <div className="list">
             {stats.holders.map((h) => (
               <div className="list-row compact-row" key={h.name}>
-                <div><strong>{h.name}</strong><span>معاه دلوقتي</span></div>
+                <div><strong>{h.name}</strong><span>بحوزته حاليًا</span></div>
                 <strong className={h.held >= 0 ? "" : "ledger-net danger"}>{money(h.held)} ج</strong>
               </div>
             ))}
@@ -138,25 +138,25 @@ function TreasuryView({ context, onToast }) {
       <div className="grid two">
         <form className="panel form" onSubmit={submitHold}>
           <div className="panel-title"><ArrowDownCircle size={20} /><h2>تسجيل عهدة / إضافة للخزنة</h2></div>
-          <HolderPicker form={hold} setForm={setHold} employees={employees} whoLabel="مع مين" />
+          <HolderPicker form={hold} setForm={setHold} employees={employees} whoLabel="لدى من" />
           <div className="form-grid">
             <label>المبلغ<input type="number" min="0.5" step="0.01" value={hold.amount} onChange={(e) => setHold((f) => ({ ...f, amount: e.target.value }))} required /></label>
             <label>التاريخ<input type="date" value={hold.date} onChange={(e) => setHold((f) => ({ ...f, date: e.target.value }))} required /></label>
           </div>
-          <label>هي إيه / ملاحظة<input value={hold.note} onChange={(e) => setHold((f) => ({ ...f, note: e.target.value }))} placeholder="مثال: عهدة مشتريات المكتب" /></label>
-          <button className="primary" disabled={busy === "hold"}>{busy === "hold" ? "جار الحفظ..." : "تسجيل العهدة"}</button>
+          <label>البيان / ملاحظة<input value={hold.note} onChange={(e) => setHold((f) => ({ ...f, note: e.target.value }))} placeholder="مثال: عهدة مشتريات المكتب" /></label>
+          <button className="primary" disabled={busy === "hold"}>{busy === "hold" ? "جارٍ الحفظ..." : "تسجيل العهدة"}</button>
         </form>
 
         <form className="panel form" onSubmit={submitSpend}>
           <div className="panel-title"><ArrowUpCircle size={20} /><h2>صرف من الخزنة</h2></div>
-          <HolderPicker form={spend} setForm={setSpend} employees={employees} whoLabel="اتصرف من عهدة مين" />
+          <HolderPicker form={spend} setForm={setSpend} employees={employees} whoLabel="الصرف من عهدة" />
           <div className="form-grid">
             <label>المبلغ<input type="number" min="0.5" step="0.01" value={spend.amount} onChange={(e) => setSpend((f) => ({ ...f, amount: e.target.value }))} required /></label>
             <label>التاريخ<input type="date" value={spend.date} onChange={(e) => setSpend((f) => ({ ...f, date: e.target.value }))} required /></label>
           </div>
-          <label>اتصرف على إيه<input value={spend.note} onChange={(e) => setSpend((f) => ({ ...f, note: e.target.value }))} placeholder="مثال: ورق طباعة" required /></label>
-          <button className="primary" disabled={busy === "spend"}>{busy === "spend" ? "جار الصرف..." : "تسجيل الصرف"}</button>
-          {!isOwner && <p className="muted">الصرف بيتسجل فورًا وبيظهر للـ Owner لتأكيده.</p>}
+          <label>بيان الصرف<input value={spend.note} onChange={(e) => setSpend((f) => ({ ...f, note: e.target.value }))} placeholder="مثال: ورق طباعة" required /></label>
+          <button className="primary" disabled={busy === "spend"}>{busy === "spend" ? "جارٍ الصرف..." : "تسجيل الصرف"}</button>
+          {!isOwner && <p className="muted">الصرف يُسجَّل فورًا ويظهر للمالك لاعتماده.</p>}
         </form>
       </div>
 
@@ -166,7 +166,7 @@ function TreasuryView({ context, onToast }) {
           <table>
             <thead><tr><th>التاريخ</th><th>النوع</th><th>مع/من</th><th>المبلغ</th><th>البيان</th><th>الحالة</th><th>إجراء</th></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan="7">جاري التحميل...</td></tr>}
+              {loading && <tr><td colSpan="7">جارٍ التحميل...</td></tr>}
               {!loading && monthEntries.length === 0 && <tr><td colSpan="7">لا توجد حركة في {month}.</td></tr>}
               {!loading && monthEntries.map((row) => (
                 <tr key={row.id}>

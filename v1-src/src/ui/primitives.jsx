@@ -100,7 +100,7 @@ export function Skeleton({ width = "100%", height = 16, radius, className = "", 
 }
 
 export function EmptyState({
-  title = "مفيش بيانات هنا لسه",
+  title = "لا توجد بيانات بعد",
   description = "أول ما البيانات تتسجل هتظهر في المكان ده.",
   action,
   icon: Icon = Inbox,
@@ -131,7 +131,7 @@ export function ErrorState({
       {action || (onRetry ? (
         <button className="ui-action" type="button" onClick={onRetry}>
           <RotateCcw size={16} aria-hidden="true" />
-          حاول تاني
+          أعد المحاولة
         </button>
       ) : null)}
     </div>
@@ -140,7 +140,7 @@ export function ErrorState({
 
 function LoadingTable({ columns, rows = 5 }) {
   return (
-    <div className="ui-table-scroll" aria-busy="true" aria-label="جاري تحميل الجدول">
+    <div className="ui-table-scroll" aria-busy="true" aria-label="جارٍ تحميل الجدول">
       <table className="ui-table">
         <thead>
           <tr>{columns.map((column) => <th key={column.key}>{column.header}</th>)}</tr>
@@ -367,7 +367,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
           >
-            {busy ? "جاري التنفيذ…" : confirmLabel}
+            {busy ? "جارٍ التنفيذ…" : confirmLabel}
           </button>
         </div>
       </section>

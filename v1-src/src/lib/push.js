@@ -39,7 +39,7 @@ export async function enablePush() {
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("لازم تسمح بالإشعارات. لو رفضت قبل كده، فعّلها من إعدادات الموقع في المتصفح.");
   const { data: key, error } = await supabase.rpc("get_push_public_key_v1");
-  if (error || !key) throw new Error("تعذر تجهيز الإشعارات، حاول تاني.");
+  if (error || !key) throw new Error("تعذر تجهيز الإشعارات، أعد المحاولة.");
   const reg = await navigator.serviceWorker.ready;
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
@@ -55,7 +55,7 @@ export async function enablePush() {
     p_auth: json.keys.auth,
     p_user_agent: navigator.userAgent,
   });
-  if (saveError || data?.error) throw new Error("تعذر حفظ الاشتراك، حاول تاني.");
+  if (saveError || data?.error) throw new Error("تعذر حفظ الاشتراك، أعد المحاولة.");
   return "on";
 }
 

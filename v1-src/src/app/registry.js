@@ -255,7 +255,7 @@ export function createQuickActions(context) {
   return [
     {
       id: "quick-today",
-      label: "فتح حضور النهارده",
+      label: "فتح حضور اليوم",
       description: "تسجيل أو متابعة حضورك اليوم",
       icon: Clock3,
       view: "today",
@@ -280,7 +280,7 @@ export function createQuickActions(context) {
     {
       id: "quick-payroll",
       label: "فتح كشف الرواتب",
-      description: "التقارير والحسابات الخاصة بالـ Owner",
+      description: "التقارير والحسابات الخاصة بالمالك",
       icon: ShieldCheck,
       view: "owner",
       capability: capabilities.owner,

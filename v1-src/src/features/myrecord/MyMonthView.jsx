@@ -127,8 +127,8 @@ function MyMonthView({ context, onToast }) {
               <tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>حضور</th><th>انصراف</th><th>تأخير</th><th>خصم</th><th>ملاحظتي</th></tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan="8">جاري التحميل...</td></tr>}
-              {!loading && rows.length === 0 && <tr><td colSpan="8">لا توجد سجلات في الشهر ده.</td></tr>}
+              {loading && <tr><td colSpan="8">جارٍ التحميل...</td></tr>}
+              {!loading && rows.length === 0 && <tr><td colSpan="8">لا توجد سجلات في هذا الشهر.</td></tr>}
               {!loading && rows.map((row) => (
                 <tr key={row.id || row.work_date}>
                   <td dir="ltr">{row.work_date}</td>

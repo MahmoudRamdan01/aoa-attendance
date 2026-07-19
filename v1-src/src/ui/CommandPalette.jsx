@@ -114,7 +114,7 @@ export default function CommandPalette({
         kind: "view",
         label: view.ar,
         en: view.en,
-        description: view.section === "private" ? "مساحة خاصة بالـ Owner" : "صفحة في النظام",
+        description: view.section === "private" ? "مساحة خاصة بالمالك" : "صفحة في النظام",
         icon: view.icon,
         view: view.id,
       }))
@@ -286,12 +286,12 @@ export default function CommandPalette({
           {!flatResults.length ? (
             <div className="ui-state">
               <span className="ui-state-icon"><Search size={21} aria-hidden="true" /></span>
-              <h3>مفيش نتيجة مطابقة</h3>
+              <h3>لا توجد نتيجة مطابقة</h3>
               <p>جرّب اسم صفحة أو موظف مختلف.</p>
             </div>
           ) : null}
 
-          {employeesLoading && canSearchEmployees ? <p className="ops-palette-group-title">جاري تحميل الموظفين…</p> : null}
+          {employeesLoading && canSearchEmployees ? <p className="ops-palette-group-title">جارٍ تحميل الموظفين…</p> : null}
           {employeesError && canSearchEmployees ? (
             <p className="ops-palette-inline-error" role="status">
               <AlertCircle size={15} aria-hidden="true" />

@@ -81,7 +81,7 @@ function DeductionsEmployee({ context }) {
       <section className="panel">
         <div className="panel-title"><Wallet size={20} /><h2>سلفي</h2></div>
         <div className="list">
-          {loading && <p className="muted">جاري التحميل...</p>}
+          {loading && <p className="muted">جارٍ التحميل...</p>}
           {!loading && loans.length === 0 && <p className="muted">لا توجد سلف مسجلة.</p>}
           {loans.map((loan) => {
             const schedule = installments.filter((i) => i.loan_id === loan.id);
@@ -342,14 +342,14 @@ function DeductionsAdmin({ context, onToast }) {
                 <label>شهر أول قسط<input type="month" value={loanForm.startMonth} onChange={(e) => setLoanForm((f) => ({ ...f, startMonth: e.target.value }))} required /></label>
               </div>
               <label>ملاحظة<input value={loanForm.note} onChange={(e) => setLoanForm((f) => ({ ...f, note: e.target.value }))} placeholder="اختياري" /></label>
-              <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل سلفة"}</button>
+              <button className="primary" disabled={busy}>{busy ? "جارٍ التسجيل..." : "تسجيل سلفة"}</button>
               <p className="muted">القسط بيتخصم تلقائيًا من مرتب كل شهر بداية من شهر أول قسط.</p>
             </form>
             <div className="table-wrap">
               <table>
                 <thead><tr><th>الموظف</th><th>الأصل</th><th>الأقساط</th><th>مسدد</th><th>متبقي</th><th>بداية</th><th>الحالة</th><th>إجراء</th></tr></thead>
                 <tbody>
-                  {loading && <tr><td colSpan="8">جاري التحميل...</td></tr>}
+                  {loading && <tr><td colSpan="8">جارٍ التحميل...</td></tr>}
                   {!loading && filteredLoans.length === 0 && <tr><td colSpan="8">لا توجد سلف.</td></tr>}
                   {!loading && filteredLoans.map((loan) => {
                     const schedule = installments.filter((i) => i.loan_id === loan.id);
@@ -387,7 +387,7 @@ function DeductionsAdmin({ context, onToast }) {
                 <label>التاريخ<input type="date" value={canteenForm.date} onChange={(e) => setCanteenForm((f) => ({ ...f, date: e.target.value }))} required /></label>
               </div>
               <label>ملاحظة<input value={canteenForm.note} onChange={(e) => setCanteenForm((f) => ({ ...f, note: e.target.value }))} placeholder="اختياري" /></label>
-              <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل كانتين"}</button>
+              <button className="primary" disabled={busy}>{busy ? "جارٍ التسجيل..." : "تسجيل كانتين"}</button>
             </form>
             <div className="toolbar">
               <button className="secondary" onClick={() => exportRows("canteen")} disabled={filteredCanteen.length === 0}>
@@ -398,7 +398,7 @@ function DeductionsAdmin({ context, onToast }) {
               <table>
                 <thead><tr><th>التاريخ</th><th>الموظف</th><th>الصنف</th><th>المبلغ</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
                 <tbody>
-                  {loading && <tr><td colSpan="7">جاري التحميل...</td></tr>}
+                  {loading && <tr><td colSpan="7">جارٍ التحميل...</td></tr>}
                   {!loading && filteredCanteen.length === 0 && <tr><td colSpan="7">لا توجد مشتريات في {month}.</td></tr>}
                   {!loading && filteredCanteen.map((row) => (
                     <tr key={row.id}>
@@ -429,7 +429,7 @@ function DeductionsAdmin({ context, onToast }) {
                 <label>التاريخ<input type="date" value={otherForm.date} onChange={(e) => setOtherForm((f) => ({ ...f, date: e.target.value }))} required /></label>
               </div>
               <label>ملاحظة<input value={otherForm.note} onChange={(e) => setOtherForm((f) => ({ ...f, note: e.target.value }))} placeholder="اكتب السبب بوضوح" /></label>
-              <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل استقطاع"}</button>
+              <button className="primary" disabled={busy}>{busy ? "جارٍ التسجيل..." : "تسجيل استقطاع"}</button>
             </form>
             <div className="toolbar">
               <button className="secondary" onClick={() => exportRows("other")} disabled={filteredOthers.length === 0}>
@@ -440,7 +440,7 @@ function DeductionsAdmin({ context, onToast }) {
               <table>
                 <thead><tr><th>التاريخ</th><th>الموظف</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
                 <tbody>
-                  {loading && <tr><td colSpan="8">جاري التحميل...</td></tr>}
+                  {loading && <tr><td colSpan="8">جارٍ التحميل...</td></tr>}
                   {!loading && filteredOthers.length === 0 && <tr><td colSpan="8">لا توجد استقطاعات في {month}.</td></tr>}
                   {!loading && filteredOthers.map((row) => (
                     <tr key={row.id}>

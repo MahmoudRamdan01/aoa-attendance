@@ -21,13 +21,13 @@ import { prepareFaceEngine } from "./useFaceEngine";
 import { startGpsSampler } from "./useGpsSampler";
 
 const ERROR_MESSAGES = {
-  gps_suspect: "تعذر التحقق من الموقع بشكل موثوق. اقفل أي تطبيق Fake GPS وحاول من مكانك الطبيعي.",
-  face_mismatch: "تعذر التحقق من الوجه. اتأكد إن وشك واضح في الإضاءة وحاول تاني.",
-  low_accuracy: "دقة الموقع ضعيفة. شغّل GPS وانتظر لحظة في مكان مكشوف.",
+  gps_suspect: "تعذّر التحقق من الموقع بشكل موثوق. أغلق أي تطبيق لتزييف الموقع (Fake GPS) وأعد المحاولة من مكانك الطبيعي.",
+  face_mismatch: "تعذّر التحقق من الوجه. يُرجى التأكد من وضوح الوجه وجودة الإضاءة ثم إعادة المحاولة.",
+  low_accuracy: "دقة تحديد الموقع ضعيفة. شغّل الـ GPS وانتظر لحظة في مكان مكشوف.",
   outside: "أنت خارج نطاق الشركة.",
-  window_closed: "نافذة التسجيل مقفولة حاليًا.",
-  already: "العملية دي مسجلة بالفعل.",
-  no_checkin: "لازم تسجل حضور الأول.",
+  window_closed: "نافذة التسجيل مغلقة حاليًا.",
+  already: "هذه العملية مسجّلة بالفعل.",
+  no_checkin: "يجب تسجيل الحضور أولًا.",
   update_required: "نسخة التطبيق قديمة. حدّث الصفحة وثبّت آخر إصدار.",
   day_locked: "اليوم مسجل إجازة أو مأمورية أو مرضي، ولا يمكن استبداله بحضور من التطبيق.",
 };
@@ -189,7 +189,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     const draftArgs = attendanceArgs(kind, captureData);
     if (!navigator.onLine) {
       await queueCapture(kind, captureData, draftArgs);
-      onToast("تم حفظ العملية Offline، وهتتزامن تلقائيًا عند رجوع الإنترنت.");
+      onToast("تم حفظ العملية دون اتصال، وستتم مزامنتها تلقائيًا عند عودة الاتصال بالإنترنت.");
       setCapture(null);
       return;
     }
@@ -204,7 +204,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     } catch (error) {
       if (isNetworkError(error)) {
         await queueCapture(kind, captureData, draftArgs);
-        onToast("الاتصال انقطع؛ حفظنا العملية وهتتزامن تلقائيًا.");
+        onToast("انقطع الاتصال؛ تم حفظ العملية وستتم مزامنتها تلقائيًا.");
         setCapture(null);
         return;
       }
@@ -248,7 +248,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
         // A coarse network fix can sit km away from the phone — sending it
         // gets an unfair "خارج النطاق". Be honest instead and ask for a retry.
         if (location.accuracy > 300) {
-          throw new Error(`تحديد الموقع مش دقيق دلوقتي (±${location.accuracy} متر). استنى ثواني في مكان قريب من شباك أو مكشوف وحاول تاني.`);
+          throw new Error(`دقة تحديد الموقع غير كافية حاليًا (±${location.accuracy} متر). يُرجى الانتظار بضع ثوانٍ في مكان مكشوف أو قرب نافذة ثم إعادة المحاولة.`);
         }
         const distance = distanceMeters(location, companyLocation);
         setLocationState({ ...location, distance });
@@ -260,7 +260,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       const args = attendanceArgs(kind, captureData);
       if (!navigator.onLine) {
         await queueCapture(kind, captureData, args);
-        onToast("مفيش إنترنت؛ حفظنا العملية وهتتزامن تلقائيًا.");
+        onToast("لا يوجد اتصال بالإنترنت؛ تم حفظ العملية وستتم مزامنتها تلقائيًا.");
         return;
       }
       try {
@@ -271,7 +271,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       } catch (error) {
         if (isNetworkError(error)) {
           await queueCapture(kind, captureData, args);
-          onToast("الاتصال انقطع؛ حفظنا العملية وهتتزامن تلقائيًا.");
+          onToast("انقطع الاتصال؛ تم حفظ العملية وستتم مزامنتها تلقائيًا.");
           return;
         }
         throw error;
@@ -434,7 +434,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
             <input
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="مثال: اتأخرت بسبب الزحمة"
+              placeholder="مثال: تأخّرت بسبب الزحام"
               maxLength={280}
             />
           </label>
@@ -444,11 +444,11 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
           <div className="actions-row attendance-main-actions">
             <button className="primary capture-action" disabled={busy || !!todayRecord?.check_in || dayLocked} onClick={() => attendance("in")}>
-              <Camera size={19} /> {busy === "in" ? (cameraNeeded ? "جاري فتح الكاميرا…" : "جاري التسجيل…") : "تسجيل حضور"}
+              <Camera size={19} /> {busy === "in" ? (cameraNeeded ? "جارٍ فتح الكاميرا…" : "جارٍ التسجيل…") : "تسجيل حضور"}
             </button>
             <button className="secondary capture-action" disabled={busy || !todayRecord?.check_in || !!todayRecord?.check_out || !checkoutTimeAllowed} onClick={() => attendance("out")}>
               <LogOut size={19} /> {busy === "out"
-                ? (cameraNeeded ? "جاري فتح الكاميرا…" : "جاري التسجيل…")
+                ? (cameraNeeded ? "جارٍ فتح الكاميرا…" : "جارٍ التسجيل…")
                 : checkoutWindow.beforeOpen
                   ? `يفتح ${fmtTime12(checkoutFrom)}`
                   : checkoutWindow.afterClose
@@ -483,11 +483,11 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
             <h2>تسجيل آمن</h2>
           </div>
           <ul className="rules">
-            <li>التحقق من الوجه لحظي زي بصمة الموبايل — من غير حفظ أي صور أو فيديو.</li>
-            <li>اللي بيتخزن بصمة رقمية مشفرة فقط (أرقام لا يمكن تحويلها لصورة).</li>
-            <li>لازم تكون داخل {companyLocation.radiusMeters} متر من موقع الشركة.</li>
-            <li>النظام يفحص تغيرات GPS والجهاز ويرسل تنبيهًا للإدارة عند الاشتباه.</li>
-            <li><QrCode size={15} /> QR اختياري إلا لو الإدارة فعّلته.</li>
+            <li>التحقق من الوجه لحظي مثل بصمة الهاتف — دون حفظ أي صور أو مقاطع فيديو.</li>
+            <li>يُخزَّن فقط بصمة رقمية مشفّرة (أرقام لا يمكن تحويلها إلى صورة).</li>
+            <li>يجب التواجد داخل نطاق {companyLocation.radiusMeters} متر من موقع الشركة.</li>
+            <li>يفحص النظام تغيّرات الموقع (GPS) والجهاز ويُرسل تنبيهًا للإدارة عند الاشتباه.</li>
+            <li><QrCode size={15} /> رمز QR اختياري إلا إذا فعّلته الإدارة.</li>
           </ul>
         </section>
       </div>

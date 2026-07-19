@@ -185,7 +185,7 @@ function InboxPopover({
 
       <div className="ops-inbox-list">
         {loading ? (
-          <div className="ops-inbox-loading" role="status" aria-label="جاري تحميل الإشعارات">
+          <div className="ops-inbox-loading" role="status" aria-label="جارٍ تحميل الإشعارات">
             {[0, 1, 2].map((item) => (
               <div className="ops-inbox-loading-row" key={item}>
                 <Skeleton width={8} height={8} radius="50%" />
@@ -230,7 +230,7 @@ function InboxPopover({
             </button>
           ))
         ) : (
-          <EmptyState title="مفيش إشعارات بعد" description="أي تحديث جديد هيظهر هنا فورًا." compact />
+          <EmptyState title="لا توجد إشعارات بعد" description="سيظهر أي تحديث جديد هنا فورًا." compact />
         )}
       </div>
 
@@ -590,7 +590,7 @@ export default function AppShell({
                 </>
               )}
               title={activeItem?.ar || "لوحة التحكم"}
-              description={activeItem?.private ? "مساحة خاصة ومحمية لحساب الـ Owner." : undefined}
+              description={activeItem?.private ? "مساحة خاصة ومحمية لحساب المالك." : undefined}
               icon={activeItem?.icon}
             />
             <div className="ops-view">

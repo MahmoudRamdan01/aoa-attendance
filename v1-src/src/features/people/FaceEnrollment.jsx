@@ -38,7 +38,7 @@ export default function FaceEnrollment({ employee, onToast }) {
   }
 
   async function saveEnrollment(data) {
-    if (!data.faceEmbedding?.length) throw new Error("تعذر استخراج بصمة الوجه. حاول تاني.");
+    if (!data.faceEmbedding?.length) throw new Error("تعذر استخراج بصمة الوجه. أعد المحاولة.");
     setBusy("save");
     try {
       const { data: result, error } = await supabase.rpc("admin_face_profile_action_v1", {
@@ -58,7 +58,7 @@ export default function FaceEnrollment({ employee, onToast }) {
   }
 
   async function action(actionName, profile) {
-    if (actionName === "delete" && !confirm("حذف بصمة الوجه دي نهائيًا؟")) return;
+    if (actionName === "delete" && !confirm("هل تريد حذف بصمة الوجه هذه نهائيًا؟")) return;
     setBusy(`${actionName}:${profile.id}`);
     const { data, error } = await supabase.rpc("admin_face_profile_action_v1", {
       p_action: actionName,
@@ -90,7 +90,7 @@ export default function FaceEnrollment({ employee, onToast }) {
         <ShieldCheck size={15} /> المعتمد حاليًا: {approved} من 3 بصمات موصى بها لتقليل الرفض الخاطئ.
         سجّلها بحضور الموظف شخصيًا — لا يتم حفظ أي صور، فقط بصمة رقمية مشفرة.
       </p>
-      {loading ? <p className="muted">جاري تحميل بصمات الوجه…</p> : null}
+      {loading ? <p className="muted">جارٍ تحميل بصمات الوجه…</p> : null}
       {!loading && !profiles.length ? <p className="muted">لا توجد بصمة مسجلة للموظف.</p> : null}
       <div className="face-profile-grid">
         {profiles.map((profile) => (

@@ -26,7 +26,7 @@ export default function DeviceHistory({ employee }) {
   return (
     <section className="panel">
       <div className="panel-title"><Smartphone size={20} /><h2>الأجهزة المسجلة</h2></div>
-      {loading ? <p className="muted">جاري التحميل…</p> : null}
+      {loading ? <p className="muted">جارٍ التحميل…</p> : null}
       {!loading && !devices.length ? <p className="muted">لا توجد أجهزة مسجلة حتى الآن.</p> : null}
       <div className="device-history">
         {devices.map((device) => (

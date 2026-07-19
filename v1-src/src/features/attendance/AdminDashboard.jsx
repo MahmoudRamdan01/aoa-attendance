@@ -57,14 +57,14 @@ function AdminDashboard({ context, onToast }) {
   }
 
   async function reset(empId) {
-    const ok = confirm("تمسح سجل اليوم للموظف ده؟ العملية هتتسجل في Audit Log.");
+    const ok = confirm("هل تريد حذف سجل اليوم لهذا الموظف؟ سيتم تسجيل العملية في سجل التدقيق.");
     if (!ok) return;
     const { data, error } = await supabase.rpc("reset_attendance_day_v1", {
       p_employee_id: empId,
       p_date: reportDate,
       p_reason: "تصحيح سجل من لوحة v1",
     });
-    if (error || data?.error) onToast(data?.message || "Owner فقط يقدر يمسح السجل.");
+    if (error || data?.error) onToast(data?.message || "المالك فقط يقدر يمسح السجل.");
     else {
       onToast("تم مسح سجل اليوم.");
       loadAdmin();
@@ -73,7 +73,7 @@ function AdminDashboard({ context, onToast }) {
 
   async function decidePermission(id, approve, hoursApproved, note) {
     if (context.role !== "owner") {
-      onToast("الموافقة على الأذونات Owner فقط.");
+      onToast("الموافقة على الأذونات المالك فقط.");
       return;
     }
     const { data, error } = await supabase.rpc("decide_permission_v1", {
@@ -91,7 +91,7 @@ function AdminDashboard({ context, onToast }) {
 
   async function decideLeave(id, approve, note) {
     if (context.role !== "owner") {
-      onToast("الموافقة على الأجازات Owner فقط.");
+      onToast("الموافقة على الأجازات المالك فقط.");
       return;
     }
     const { data, error } = await supabase.rpc("decide_leave_v1", {
@@ -249,10 +249,10 @@ function AdminDashboard({ context, onToast }) {
         </div>
         {context.role === "owner" && (
           <div className="owner-kpi-strip">
-            <div><span>موجودين دلوقتي</span><strong>{adminStats.currentlyIn}</strong></div>
+            <div><span>متواجدون حاليًا</span><strong>{adminStats.currentlyIn}</strong></div>
             <div><span>نسبة الحضور</span><strong>{adminStats.active ? Math.round((adminStats.checkedIn / adminStats.active) * 100) : 0}%</strong></div>
             <div><span>معلّق للموافقة</span><strong>{adminStats.pending + permissions.length + leaves.length}</strong></div>
-            <div><span>خصم النهارده</span><strong>{adminStats.deductions.toFixed(2)} يوم</strong></div>
+            <div><span>خصم اليوم</span><strong>{adminStats.deductions.toFixed(2)} يوم</strong></div>
           </div>
         )}
         <div className="toolbar table-filters">
@@ -273,7 +273,7 @@ function AdminDashboard({ context, onToast }) {
           <table>
             <thead><tr><th>الموظف</th><th>الحالة</th><th>الوجه</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan="8">جاري التحميل...</td></tr>}
+              {loading && <tr><td colSpan="8">جارٍ التحميل...</td></tr>}
               {!loading && filteredEmployees.length === 0 && <tr><td colSpan="8">لا توجد نتائج مطابقة.</td></tr>}
               {!loading && filteredEmployees.map((emp) => {
                 const rec = recs.get(emp.id);
@@ -309,7 +309,7 @@ function AdminDashboard({ context, onToast }) {
           <div className="panel-title"><QrCode size={20} /><h2>QR اليوم</h2></div>
           <div className="qr-stack">
             <QrDisplay label="اليوم" code={qr.today} date={todayIso()} onToast={onToast} />
-            <QrDisplay label="بكرة" code={qr.tomorrow} date={addDays(todayIso(), 1)} muted onToast={onToast} />
+            <QrDisplay label="الغد" code={qr.tomorrow} date={addDays(todayIso(), 1)} muted onToast={onToast} />
           </div>
           <p className="muted">الكود بيتولد ويتبعت تلقائيًا للفريق مرة واحدة يوميًا. اللوحة هنا للعرض والطباعة فقط.</p>
         </section>
@@ -450,8 +450,8 @@ function RequestsHistory() {
           <option value="rejected">مرفوضة</option>
         </select>
       </div>
-      {loading && <p className="muted">جاري التحميل...</p>}
-      {!loading && filtered.length === 0 && <p className="muted">مفيش سجلات.</p>}
+      {loading && <p className="muted">جارٍ التحميل...</p>}
+      {!loading && filtered.length === 0 && <p className="muted">لا توجد سجلات.</p>}
       {!loading && filtered.length > 0 && tab === "leaves" && (
         <div className="table-wrap">
           <table>
@@ -567,7 +567,7 @@ function Approvals({ title, rows, type, canApprove, onPermission, onLeave }) {
               <p>{row.reason || "بدون سبب"}</p>
             </div>
             <div className="approval-actions">
-              {!canApprove && <span className="badge">قرار Owner فقط</span>}
+              {!canApprove && <span className="badge">قرار المالك فقط</span>}
               {canApprove && type === "permission" && (
                 <>
                   <button onClick={() => onPermission(row.id, true, 1)}>موافقة ساعة</button>

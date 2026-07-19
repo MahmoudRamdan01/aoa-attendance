@@ -13,7 +13,7 @@ function useUid() {
 }
 
 async function voidFinancial(kind, id, onToast, reload) {
-  const reason = prompt("سبب الإلغاء؟ (إجباري — بيتسجل في السجل)");
+  const reason = prompt("سبب الإلغاء (إلزامي — يُسجَّل في السجل):");
   if (reason == null) return;
   if (!reason.trim()) {
     onToast("سبب الإلغاء إجباري.");

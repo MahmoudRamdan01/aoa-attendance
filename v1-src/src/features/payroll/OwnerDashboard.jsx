@@ -59,7 +59,7 @@ function OwnerDashboard({ onToast }) {
       setFinRows([...(inst.data || []), ...(cant.data || []), ...(other.data || [])]);
       setLoading(false);
     }).catch((err) => {
-      setError(err.message || "تعذر تحميل تقارير الـ Owner.");
+      setError(err.message || "تعذر تحميل تقارير المالك.");
       setLoading(false);
     });
   }, [range.from, range.to]);
@@ -321,7 +321,7 @@ function OwnerDashboard({ onToast }) {
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan="7">جاري التحميل...</td></tr>}
+              {loading && <tr><td colSpan="7">جارٍ التحميل...</td></tr>}
               {!loading && stats.payrollRows.length === 0 && <tr><td colSpan="7">لا توجد بيانات مرتبات.</td></tr>}
               {!loading && stats.payrollRows.map((row) => (
                 <tr key={row.employee_id}>
@@ -402,22 +402,22 @@ function AccountManager({ onToast }) {
   return (
     <section className="panel">
       <div className="panel-title"><UserPlus size={20} /><h2>حسابات الموظفين</h2></div>
-      <p className="muted">اعمل إيميل وباسورد دخول لأي موظف مباشرة. سلّمه البيانات وخلّيه يغيّر الباسورد بعد أول دخول.</p>
+      <p className="muted">أنشئ بريدًا إلكترونيًا وكلمة مرور لأي موظف مباشرة. سلّمه البيانات واطلب منه تغيير كلمة المرور بعد أول تسجيل دخول.</p>
       <form className="form account-form" onSubmit={submit}>
         <label>الموظف<select value={form.employeeId} onChange={(e) => setForm((current) => ({ ...current, employeeId: e.target.value }))}>{employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}</select></label>
-        <label>إيميل الحساب<input dir="ltr" type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} required placeholder="employee@airocean.com" /></label>
-        <label>الباسورد<input dir="ltr" type="text" value={form.password} onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} required minLength={6} placeholder="6 حروف على الأقل" /></label>
+        <label>البريد الإلكتروني<input dir="ltr" type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} required placeholder="employee@airocean.com" /></label>
+        <label>كلمة المرور<input dir="ltr" type="text" value={form.password} onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} required minLength={6} placeholder="6 حروف على الأقل" /></label>
         <label>الدور<select value={form.role} onChange={(e) => setForm((current) => ({ ...current, role: e.target.value }))}>{roleOptions.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
-        <button className="primary" disabled={busy}>{busy ? "جاري الإنشاء..." : "إنشاء حساب دخول"}</button>
+        <button className="primary" disabled={busy}>{busy ? "جارٍ الإنشاء..." : "إنشاء حساب دخول"}</button>
       </form>
       {lastCreated && (
         <div className="setup-banner" dir="rtl">
-          تم إنشاء حساب <strong>{lastCreated.name}</strong> — الإيميل: <bdi dir="ltr">{lastCreated.email}</bdi> · الباسورد: <bdi dir="ltr">{lastCreated.password}</bdi>. سلّمهم للموظف.
+          تم إنشاء حساب <strong>{lastCreated.name}</strong> — البريد الإلكتروني: <bdi dir="ltr">{lastCreated.email}</bdi> · كلمة المرور: <bdi dir="ltr">{lastCreated.password}</bdi>. سلّمها للموظف.
         </div>
       )}
       <div className="table-wrap">
         <table>
-          <thead><tr><th>الموظف</th><th>الإيميل</th><th>الدور</th><th>الحالة</th></tr></thead>
+          <thead><tr><th>الموظف</th><th>البريد الإلكتروني</th><th>الدور</th><th>الحالة</th></tr></thead>
           <tbody>
             {accounts.map((row) => (
               <tr key={row.employee_id}>

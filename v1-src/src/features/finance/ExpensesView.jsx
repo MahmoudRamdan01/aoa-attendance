@@ -28,7 +28,7 @@ function ExpensesView({ context, onToast }) {
 
   async function loadData() {
     setLoading(true);
-    // "كل الفلوس الخارجة" = مصروفات الشركة + استقطاعات الموظفين (كانتين+أخرى) + السلف المصروفة الشهر ده.
+    // "كل الفلوس الخارجة" = مصروفات الشركة + استقطاعات الموظفين (كانتين+أخرى) + السلف المصروفة هذا الشهر.
     const [exp, cant, oth, ln] = await Promise.all([
       supabase.from("company_expenses").select("*").gte("expense_date", range.from).lte("expense_date", range.to).order("expense_date", { ascending: false }),
       supabase.from("canteen_entries").select("amount,status").eq("status", "active").gte("entry_date", range.from).lte("entry_date", range.to),
@@ -69,7 +69,7 @@ function ExpensesView({ context, onToast }) {
     setBusy(false);
     if (error || data?.error) onToast(data?.message || "تعذر تسجيل المصروف.");
     else {
-      onToast(data.confirmed ? "تم تسجيل المصروف وتأكيده." : "تم تسجيل المصروف — في انتظار تأكيد الـ Owner.");
+      onToast(data.confirmed ? "تم تسجيل المصروف وتأكيده." : "تم تسجيل المصروف — في انتظار تأكيد المالك.");
       setForm((f) => ({ ...f, amount: "", description: "" }));
       loadData();
     }
@@ -129,14 +129,14 @@ function ExpensesView({ context, onToast }) {
       </section>
 
       <section className="panel">
-        <div className="panel-title"><Wallet size={20} /><h2>إجمالي الفلوس الخارجة — {month}</h2></div>
+        <div className="panel-title"><Wallet size={20} /><h2>إجمالي المدفوعات — {month}</h2></div>
         <div className="stats-grid compact-stats">
           <Metric label="الإجمالي الشامل" value={`${money(summary.grandOut)} ج`} tone="danger" icon={TrendingUp} />
           <Metric label="مصروفات الشركة" value={`${money(summary.total)} ج`} tone="gold" icon={Receipt} />
           <Metric label="استقطاعات الموظفين" value={`${money(summary.canteenTotal + summary.deductionTotal)} ج`} tone="warn" icon={Banknote} />
-          <Metric label="سلف اتصرفت" value={`${money(summary.loansTotal)} ج`} tone="warn" icon={Wallet} />
+          <Metric label="سلف مصروفة" value={`${money(summary.loansTotal)} ج`} tone="warn" icon={Wallet} />
         </div>
-        <p className="muted">الإجمالي الشامل = مصروفات الشركة + الكانتين + الخصومات الأخرى + السلف اللي اتصرفت الشهر ده.</p>
+        <p className="muted">الإجمالي الشامل = مصروفات الشركة + الكانتين + الخصومات الأخرى + السلف المصروفة هذا الشهر.</p>
       </section>
 
       <form className="panel form" onSubmit={submit}>
@@ -149,8 +149,8 @@ function ExpensesView({ context, onToast }) {
           <label>المبلغ<input type="number" min="0.5" step="0.01" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
           <label>الوصف<input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="مثال: فاتورة كهرباء يوليو" /></label>
         </div>
-        <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل مصروف"}</button>
-        {!isOwner && <p className="muted">المصروف بيتسجل فورًا وبيظهر للـ Owner لتأكيده.</p>}
+        <button className="primary" disabled={busy}>{busy ? "جارٍ التسجيل..." : "تسجيل مصروف"}</button>
+        {!isOwner && <p className="muted">المصروف يُسجَّل فورًا ويظهر للمالك لاعتماده.</p>}
       </form>
 
       <section className="panel">
@@ -159,7 +159,7 @@ function ExpensesView({ context, onToast }) {
           <table>
             <thead><tr><th>التاريخ</th><th>البند</th><th>المبلغ</th><th>الوصف</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan="7">جاري التحميل...</td></tr>}
+              {loading && <tr><td colSpan="7">جارٍ التحميل...</td></tr>}
               {!loading && rows.length === 0 && <tr><td colSpan="7">لا توجد مصروفات في {month}.</td></tr>}
               {!loading && rows.map((row) => (
                 <tr key={row.id}>
@@ -176,7 +176,7 @@ function ExpensesView({ context, onToast }) {
                       {row.status === "active" && !row.confirmed_at && (
                         isOwner
                           ? <button onClick={() => confirmExpense(row.id)}>تأكيد</button>
-                          : <span className="badge">قرار Owner فقط</span>
+                          : <span className="badge">قرار المالك فقط</span>
                       )}
                       {row.status === "active" && canVoid(row) && (
                         <button className="danger-link" onClick={() => voidFinancial("expense", row.id, onToast, loadData)}>إلغاء</button>

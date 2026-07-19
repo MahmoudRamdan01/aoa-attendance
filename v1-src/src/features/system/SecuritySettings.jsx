@@ -42,7 +42,7 @@ export default function SecuritySettings({ onToast }) {
     if (error || data?.error) onToast(data?.message || "تعذر حفظ الإعداد.");
     else {
       setSettings((current) => ({ ...current, [key]: value }));
-      onToast("تم حفظ الإعداد وتسجيله في Audit Log.");
+      onToast("تم حفظ الإعداد وتسجيله في سجل التدقيق.");
     }
     setBusy("");
   }
@@ -53,11 +53,11 @@ export default function SecuritySettings({ onToast }) {
       if (!Array.isArray(parsed)) throw new Error();
       await save("late_tiers", parsed);
     } catch {
-      onToast("صيغة شرائح التأخير لازم تكون JSON array صحيحة.");
+      onToast("يجب أن تكون صيغة شرائح التأخير على هيئة JSON array صحيحة.");
     }
   }
 
-  if (loading) return <section className="panel"><p className="muted">جاري تحميل إعدادات الأمان…</p></section>;
+  if (loading) return <section className="panel"><p className="muted">جارٍ تحميل إعدادات الأمان…</p></section>;
 
   return (
     <div className="stack security-settings">
@@ -66,7 +66,7 @@ export default function SecuritySettings({ onToast }) {
           <div><ShieldCheck size={20} /><h2>أمان الحضور</h2></div>
           <button className="secondary" type="button" onClick={load}><RefreshCcw size={16} /> تحديث</button>
         </div>
-        <p className="muted">كل تغيير هنا Owner-only ويتسجل في Audit Log. الانتقال الموصى به: Off ← Warn لمدة أسبوعين ← Enforce.</p>
+        <p className="muted">جميع التغييرات هنا للمالك فقط وتُسجَّل في سجل التدقيق. الانتقال الموصى به: إيقاف ← مراقبة لمدة أسبوعين ← منع.</p>
         <div className="security-metrics">
           <div><span>تحققات وجه · 30 يوم</span><strong>{metrics.face_attempts_30d || 0}</strong></div>
           <div><span>عدم تطابق الوجه</span><strong>{metrics.face_mismatches_30d || 0}</strong></div>

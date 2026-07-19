@@ -107,7 +107,7 @@ function PartnerLedgerView({ context, onToast }) {
     setBusy(false);
     if (error || data?.error) onToast(data?.message || "تعذر تسجيل السداد.");
     else {
-      onToast(data.confirmed ? "تم تسجيل السداد وتأكيده." : "تم تسجيل السداد — في انتظار تأكيد الـ Owner.");
+      onToast(data.confirmed ? "تم تسجيل السداد وتأكيده." : "تم تسجيل السداد — في انتظار تأكيد المالك.");
       setSettleFor(null);
       setSettleForm({ amount: "", date: todayIso(), note: "" });
       loadData();
@@ -175,7 +175,7 @@ function PartnerLedgerView({ context, onToast }) {
           <Metric label="الصافي" value={`${money(Math.abs(totals.net))} ج ${totals.net >= 0 ? "لنا" : "علينا"}`} tone={totals.net >= 0 ? "ok" : "warn"} icon={Scale} />
           <Metric label="سدادات معلقة" value={pendingSettlements.length} tone={pendingSettlements.length ? "warn" : "ok"} icon={Bell} />
         </div>
-        <p className="muted">كل القيود والسدادات محفوظة بالكامل — مفيش حاجة بتتحذف، والإلغاء بيتسجل بأسبابه.</p>
+        <p className="muted">جميع القيود والسدادات محفوظة بالكامل — لا يُحذف أي شيء، ويُسجَّل الإلغاء مع أسبابه.</p>
       </section>
 
       {pendingSettlements.length > 0 && (
@@ -191,7 +191,7 @@ function PartnerLedgerView({ context, onToast }) {
                   <p className="muted">سجله: {maskActor(s.created_by_name, role) || "-"}</p>
                 </div>
                 <div className="approval-actions">
-                  {!isOwner && <span className="badge">قرار Owner فقط</span>}
+                  {!isOwner && <span className="badge">قرار المالك فقط</span>}
                   {isOwner && (
                     <>
                       <button onClick={() => decideSettlement(s.id, true)}>تأكيد</button>
@@ -217,7 +217,7 @@ function PartnerLedgerView({ context, onToast }) {
         </div>
         <label>الوصف<input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} required placeholder="مثال: فاتورة شحن يوليو / سلفة نقدية" /></label>
         <label>تاريخ استحقاق (اختياري)<input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} /></label>
-        <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل القيد"}</button>
+        <button className="primary" disabled={busy}>{busy ? "جارٍ التسجيل..." : "تسجيل القيد"}</button>
       </form>
 
       <section className="panel">
@@ -243,7 +243,7 @@ function PartnerLedgerView({ context, onToast }) {
           </div>
         </div>
         <div className="list">
-          {loading && <p className="muted">جاري التحميل...</p>}
+          {loading && <p className="muted">جارٍ التحميل...</p>}
           {!loading && visible.length === 0 && <p className="muted">لا توجد قيود مطابقة.</p>}
           {!loading && visible.map((entry) => (
             <div className="approval-row" key={entry.id}>
@@ -274,7 +274,7 @@ function PartnerLedgerView({ context, onToast }) {
                     </div>
                     <label>ملاحظة<input value={settleForm.note} onChange={(e) => setSettleForm((f) => ({ ...f, note: e.target.value }))} placeholder="اختياري" /></label>
                     <div className="actions-row">
-                      <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل السداد"}</button>
+                      <button className="primary" disabled={busy}>{busy ? "جارٍ التسجيل..." : "تسجيل السداد"}</button>
                       <button type="button" className="secondary" onClick={() => setSettleFor(null)}>إلغاء</button>
                     </div>
                   </form>

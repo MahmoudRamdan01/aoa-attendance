@@ -5,7 +5,7 @@ let enginePromise;
 const CHALLENGES = [
   { id: "blink", label: "ارمش بعينيك" },
   { id: "smile", label: "ابتسم أو افتح فمك قليلًا" },
-  { id: "turn", label: "لف وشك ناحية اليمين" },
+  { id: "turn", label: "أدر وجهك ناحية اليمين" },
 ];
 
 export function prepareFaceEngine() {
@@ -100,7 +100,7 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
   const challenge = useMemo(() => CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)], []);
   const [state, setState] = useState(() => ({
     status: enabled ? "loading" : "off",
-    instruction: enabled ? "جاري تحميل التحقق من الوجه…" : "",
+    instruction: enabled ? "جارٍ تحميل التحقق من الوجه…" : "",
     data: null,
     unavailable: false,
   }));
@@ -127,7 +127,7 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
       if (!activeRef.current) return;
       setState({
         status: "unavailable",
-        instruction: "تعذر تحميل التحقق من الوجه؛ هيتم التسجيل بالموقع فقط مع تنبيه للإدارة.",
+        instruction: "تعذّر تحميل التحقق من الوجه؛ سيتم التسجيل بالموقع فقط مع إشعار الإدارة.",
         data: { faceScores: { unavailable: true } },
         unavailable: true,
       });
@@ -156,7 +156,7 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
               setState((current) => ({
                 ...current,
                 status: "challenge",
-                instruction: result.face.length > 1 ? "لازم يظهر شخص واحد بس في الكاميرا" : "قرّب وشك وخليه داخل الإطار",
+                instruction: result.face.length > 1 ? "يجب أن يظهر شخص واحد فقط أمام الكاميرا" : "قرّب وجهك واجعله داخل الإطار",
               }));
               return;
             }
@@ -179,7 +179,7 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
                 && antispoof >= antispoofMin && liveness >= 0.5) {
               setState({
                 status: "ready",
-                instruction: "تم التحقق — تقدر تلتقط وتسجّل",
+                instruction: "تم التحقق — يمكنك الالتقاط والتسجيل",
                 unavailable: false,
                 data: {
                   faceEmbedding: face.embedding,
@@ -197,8 +197,8 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
             }
 
             let instruction = challenge.label;
-            if (challengeDone && antispoof < antispoofMin) instruction = "ثبّت الموبايل وحسّن الإضاءة";
-            else if (challengeDone && liveness < 0.5) instruction = "ثبّت وشك لحظة للتأكد من الحيوية";
+            if (challengeDone && antispoof < antispoofMin) instruction = "ثبّت الهاتف وحسّن الإضاءة";
+            else if (challengeDone && liveness < 0.5) instruction = "ثبّت وجهك لحظة للتأكد من الحيوية";
             setState((current) => ({ ...current, status: "challenge", instruction }));
           } catch {
             failures += 1;

@@ -78,25 +78,25 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
   const story = useMemo(() => {
     const facts = [];
     if (pulse.delta != null) {
-      if (pulse.delta > 0) facts.push({ icon: "📈", text: `الالتزام اتحسن ${pulse.delta} نقطة عن الشهر اللي فات (${pulse.score}/100).` });
-      else if (pulse.delta < 0) facts.push({ icon: "📉", text: `الالتزام نزل ${Math.abs(pulse.delta)} نقطة عن الشهر اللي فات (${pulse.score}/100).` });
-      else facts.push({ icon: "➖", text: `الالتزام ثابت زي الشهر اللي فات (${pulse.score}/100).` });
+      if (pulse.delta > 0) facts.push({ icon: "📈", text: `تحسّن الالتزام بمقدار ${pulse.delta} نقطة عن الشهر الماضي (${pulse.score}/100).` });
+      else if (pulse.delta < 0) facts.push({ icon: "📉", text: `انخفض الالتزام بمقدار ${Math.abs(pulse.delta)} نقطة عن الشهر الماضي (${pulse.score}/100).` });
+      else facts.push({ icon: "➖", text: `الالتزام ثابت مقارنةً بالشهر الماضي (${pulse.score}/100).` });
     }
     const ranked = (stats.payrollRows || []).filter((r) => !r.exempt && r.present > 0);
     const best = [...ranked].sort((a, b) => (b.present - b.late * 0.5 - b.absent) - (a.present - a.late * 0.5 - a.absent))[0];
-    if (best) facts.push({ icon: "🏆", text: `${best.name} أكتر واحد ملتزم الشهر ده — ${best.present} يوم حضور و${best.late} تأخير.` });
+    if (best) facts.push({ icon: "🏆", text: `${best.name} الأكثر التزامًا هذا الشهر — ${best.present} يوم حضور و${best.late} حالة تأخير.` });
     // Worst weekday for lateness
     const byDow = new Array(7).fill(0);
     rows.forEach((r) => { if (r.status === "late") byDow[new Date(`${r.work_date}T00:00:00Z`).getUTCDay()] += 1; });
     const maxDow = byDow.indexOf(Math.max(...byDow));
-    if (byDow[maxDow] > 0) facts.push({ icon: "📅", text: `يوم ${WEEKDAYS_AR[maxDow]} أكتر يوم فيه تأخير (${byDow[maxDow]} مرة).` });
+    if (byDow[maxDow] > 0) facts.push({ icon: "📅", text: `${WEEKDAYS_AR[maxDow]} هو الأكثر تأخيرًا خلال الشهر (${byDow[maxDow]} مرة).` });
     // "الخصومات" here = attendance penalties only (تأخير/غياب/انصراف مبكر).
     // Loan installments/canteen are repayments/other and are NOT penalties.
     const penalties = breakdown.attendanceCost + breakdown.absentCost;
-    if (penalties > 0) facts.push({ icon: "💸", text: `خصومات التأخير والغياب الشهر ده حوالي ${money(penalties)} ج.` });
+    if (penalties > 0) facts.push({ icon: "💸", text: `إجمالي خصومات التأخير والغياب هذا الشهر نحو ${money(penalties)} ج.` });
     const late = stats.late || 0;
     const worst = [...ranked].sort((a, b) => b.late - a.late)[0];
-    if (worst && worst.late >= 3) facts.push({ icon: "⚠️", text: `${worst.name} عليه ${worst.late} تأخير الشهر ده — محتاج متابعة.` });
+    if (worst && worst.late >= 3) facts.push({ icon: "⚠️", text: `${worst.name} لديه ${worst.late} حالة تأخير هذا الشهر — يحتاج إلى متابعة.` });
     return facts;
   }, [pulse, stats, rows, breakdown]);
 
@@ -127,7 +127,7 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
   }, [stats.payrollRows]);
 
   if (loading && !report) {
-    return <section className="panel"><p className="muted">جاري تحميل نبض الشركة…</p></section>;
+    return <section className="panel"><p className="muted">جارٍ تحميل نبض الشركة…</p></section>;
   }
 
   const req = report?.requests || {};
@@ -146,7 +146,7 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
           </div>
           {pulse.delta != null && (
             <p className={`pulse-delta tone-${pulse.delta > 0 ? "ok" : pulse.delta < 0 ? "danger" : "muted"}`}>
-              <DeltaIcon size={16} /> {pulse.delta > 0 ? "+" : ""}{pulse.delta} نقطة عن الشهر اللي فات
+              <DeltaIcon size={16} /> {pulse.delta > 0 ? "+" : ""}{pulse.delta} نقطة عن الشهر الماضي
             </p>
           )}
           <div className="pulse-bars">
@@ -161,7 +161,7 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
         <section className="panel">
           <div className="panel-title"><Sparkles size={20} /><h2>قصة الشهر</h2></div>
           <div className="story-list">
-            {story.length === 0 && <p className="muted">مفيش بيانات كافية للشهر ده لسه.</p>}
+            {story.length === 0 && <p className="muted">لا توجد بيانات كافية لهذا الشهر بعد.</p>}
             {story.map((fact, i) => (
               <div className="story-item" key={i}><span className="story-emoji">{fact.icon}</span><p>{fact.text}</p></div>
             ))}
@@ -202,7 +202,7 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
         <BreakdownBar label="تأخير / انصراف مبكر" value={breakdown.attendanceCost} total={breakdown.total} tone="warn" />
         <BreakdownBar label="غياب" value={breakdown.absentCost} total={breakdown.total} tone="danger" />
         <BreakdownBar label="استقطاعات مالية (سلف/كانتين/أخرى)" value={breakdown.financialCost} total={breakdown.total} tone="gold" />
-        {breakdown.total === 0 && <p className="muted">مفيش خصومات في الفترة دي — ممتاز 👏</p>}
+        {breakdown.total === 0 && <p className="muted">لا توجد خصومات في هذه الفترة — ممتاز 👏</p>}
       </section>
 
       {/* Attendance heatmap */}
@@ -257,7 +257,7 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
         <section className="panel">
           <div className="panel-title"><AlertTriangle size={20} /><h2>محتاج متابعة</h2></div>
           <div className="list">
-            {ranking.worst.length === 0 && <p className="muted">مفيش تأخير أو غياب — 👏</p>}
+            {ranking.worst.length === 0 && <p className="muted">لا يوجد تأخير أو غياب — 👏</p>}
             {ranking.worst.map((r) => (
               <div className="list-row compact-row" key={r.employee_id}>
                 <div><strong>{r.name}</strong><span>{r.late} تأخير · {r.absent} غياب · خصم {money(r.deductionAmount + r.financialDeduction)} ج</span></div>

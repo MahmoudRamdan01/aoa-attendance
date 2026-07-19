@@ -77,7 +77,7 @@ function NotificationsView({ context, onToast, routeParam }) {
   }
 
   async function deleteForAll(id) {
-    const ok = confirm("تحذف الإشعار ده من عند كل المستلمين؟");
+    const ok = confirm("هل تريد حذف هذا الإشعار من جميع المستلمين؟");
     if (!ok) return;
     const { data, error } = await supabase.rpc("owner_delete_notification_v1", { p_id: id });
     if (error || data?.error) {
@@ -115,7 +115,7 @@ function NotificationsView({ context, onToast, routeParam }) {
             )}
             <label>العنوان<input value={message.title} onChange={(e) => setMessage((current) => ({ ...current, title: e.target.value }))} required placeholder="عنوان مختصر" /></label>
             <label>الرسالة<textarea value={message.body} onChange={(e) => setMessage((current) => ({ ...current, body: e.target.value }))} required placeholder="نص الإشعار" /></label>
-            <button className="primary" disabled={busy === "send"}><Send size={17} /> {busy === "send" ? "جاري الإرسال..." : "إرسال"}</button>
+            <button className="primary" disabled={busy === "send"}><Send size={17} /> {busy === "send" ? "جارٍ الإرسال..." : "إرسال"}</button>
           </form>
         </section>
       )}
@@ -136,7 +136,7 @@ function NotificationsView({ context, onToast, routeParam }) {
           </div>
         </div>
         <div className="list">
-          {loading && <p className="muted">جاري تحميل الإشعارات...</p>}
+          {loading && <p className="muted">جارٍ تحميل الإشعارات...</p>}
           {!loading && visibleRows.length === 0 && <p className="muted">لا توجد إشعارات بعد.</p>}
           {!loading && visibleRows.map((item) => (
             <div className={cls("list-row notification-row", !item.read_at && "unread")} id={`notif-${item.id}`} key={item.id}>

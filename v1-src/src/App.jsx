@@ -126,7 +126,7 @@ class ViewErrorBoundary extends Component {
     return (
       <section className="panel">
         <h2>فيه تحديث جديد للنظام</h2>
-        <p className="muted">اقفل الصفحة وافتحها تاني عشان تحمّل النسخة الجديدة.</p>
+        <p className="muted">أغلق الصفحة وأعد فتحها لتحميل النسخة الجديدة.</p>
         <button className="primary" type="button" onClick={() => window.location.reload()}>
           تحديث الصفحة
         </button>
@@ -137,7 +137,7 @@ class ViewErrorBoundary extends Component {
 
 function ViewSkeleton() {
   return (
-    <div className="ops-view-loading" role="status" aria-label="جاري تحميل الصفحة">
+    <div className="ops-view-loading" role="status" aria-label="جارٍ تحميل الصفحة">
       <div className="ops-view-loading-head">
         <Skeleton width="34%" height={30} radius={10} />
         <Skeleton width="56%" height={13} radius={8} />
@@ -148,7 +148,7 @@ function ViewSkeleton() {
         <Skeleton height={116} radius={16} />
       </div>
       <Skeleton height={280} radius={18} />
-      <span className="sr-only">جاري تحميل الصفحة…</span>
+      <span className="sr-only">جارٍ تحميل الصفحة…</span>
     </div>
   );
 }
@@ -344,7 +344,7 @@ function App() {
       employee: null,
       migration_required: true,
       setup_message:
-        "شغّل migration v1 عشان employee portal وGPS والـ notifications يشتغلوا بالكامل.",
+        "شغّل ترحيل قاعدة البيانات (v1) لتفعيل بوابة الموظف وتحديد الموقع والإشعارات بالكامل.",
     };
     setContext(fallbackContext);
     writeCachedContext(uid, fallbackContext);

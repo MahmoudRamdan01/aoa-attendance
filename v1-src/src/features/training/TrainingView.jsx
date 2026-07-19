@@ -40,7 +40,7 @@ function TrainingView({ context }) {
           <p>{doc.desc}</p>
           {doc.restricted && (
             <p className="muted">
-              <ShieldCheck size={15} /> متاح لأبرار وندى والـ Owner فقط.
+              <ShieldCheck size={15} /> متاح لأبرار وندى والمالك فقط.
             </p>
           )}
           <div className="actions-row">

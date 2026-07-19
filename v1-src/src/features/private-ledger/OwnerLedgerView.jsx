@@ -387,7 +387,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
             </div>
             <label>ملاحظة<input value={entryForm.note} onChange={(e) => setEntryForm((f) => ({ ...f, note: e.target.value }))} placeholder="اختياري" /></label>
             <div className="actions-row">
-              <button className="primary" disabled={busy}>{busy ? "جار التسجيل..." : "تسجيل"}</button>
+              <button className="primary" disabled={busy}>{busy ? "جارٍ التسجيل..." : "تسجيل"}</button>
               <button type="button" className="secondary" onClick={() => { setShowEntryForm(false); setEntryForm(emptyEntryForm()); }}>إلغاء</button>
             </div>
           </form>
@@ -400,7 +400,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
           </label>
         )}
 
-        {loading && <p className="muted">جاري التحميل...</p>}
+        {loading && <p className="muted">جارٍ التحميل...</p>}
         {!loading && byPerson.length === 0 && <p className="muted">الدفتر فاضي — سجّل أول قيد.</p>}
 
         {filtered.length > 0 && (
@@ -422,7 +422,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
             })}
           </div>
         )}
-        {!loading && byPerson.length > 0 && filtered.length === 0 && <p className="muted">مفيش نتايج للبحث.</p>}
+        {!loading && byPerson.length > 0 && filtered.length === 0 && <p className="muted">لا توجد نتائج للبحث.</p>}
       </section>
     </div>
   );

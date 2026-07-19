@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 
 function locationError(error) {
-  if (error?.code === 1) return new Error("لازم تسمح للموقع عشان التسجيل من مقر الشركة.");
-  if (error?.code === 2) return new Error("تعذر تحديد موقعك. شغّل GPS وحاول تاني.");
-  return new Error("تحديد الموقع أخد وقت طويل. اتأكد إن GPS شغّال وحاول تاني.");
+  if (error?.code === 1) return new Error("يجب السماح بالوصول إلى الموقع لإتمام التسجيل من مقر الشركة.");
+  if (error?.code === 2) return new Error("تعذّر تحديد موقعك. يُرجى تشغيل الـ GPS وإعادة المحاولة.");
+  return new Error("استغرق تحديد الموقع وقتًا طويلاً. يُرجى التأكد من تشغيل الـ GPS وإعادة المحاولة.");
 }
 
 export function startGpsSampler({ timeoutMs = 12000, maxSamples = 10, minSamples = 3, goodAccuracyM = 30 } = {}) {

@@ -160,7 +160,7 @@ function MyRequests({ context, refreshKey }) {
     <section className="panel">
       <div className="panel-title"><CalendarDays size={20} /><h2>طلباتي</h2></div>
       <div className="list">
-        {loading && <p className="muted">جاري تحميل الطلبات...</p>}
+        {loading && <p className="muted">جارٍ تحميل الطلبات...</p>}
         {!loading && rows.length === 0 && <p className="muted">لا توجد طلبات بعد.</p>}
         {rows.map((row, index) => (
           <div className="list-row" key={`${row.type}-${row.date}-${index}`}>

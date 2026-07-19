@@ -5,15 +5,15 @@ import { prepareFaceEngine, useFaceEngine } from "./useFaceEngine";
 
 function cameraError(error) {
   if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
-    return new Error("تم رفض إذن الكاميرا. افتح إعدادات الموقع في المتصفح واسمح بالكاميرا، ثم حاول تاني.");
+    return new Error("تم رفض إذن الكاميرا. يُرجى السماح بالكاميرا من إعدادات المتصفح ثم إعادة المحاولة.");
   }
   if (error?.name === "NotFoundError" || error?.name === "DevicesNotFoundError") {
     return new Error("لم يتم العثور على كاميرا أمامية على الجهاز.");
   }
   if (error?.name === "NotReadableError") {
-    return new Error("الكاميرا مستخدمة في تطبيق تاني. اقفله وحاول من جديد.");
+    return new Error("الكاميرا مُستخدَمة في تطبيق آخر. يُرجى إغلاقه وإعادة المحاولة.");
   }
-  return new Error("تعذر تشغيل الكاميرا. اتأكد من الإذن وحاول تاني.");
+  return new Error("تعذّر تشغيل الكاميرا. يُرجى التأكد من منح الإذن وإعادة المحاولة.");
 }
 
 export async function requestCaptureSession({ faceMode = "off", requireGps = true } = {}) {
@@ -91,9 +91,9 @@ export default function CaptureSheet({
       // on-device face engine, and closing the sheet stops the tracks.
       const samples = await session.gpsSampler.done;
       const location = [...samples].sort((a, b) => a.accuracy - b.accuracy)[0] || null;
-      if (requireGps && !location) throw new Error("تعذر تثبيت الموقع. حاول من مكان مكشوف.");
+      if (requireGps && !location) throw new Error("تعذّر تحديد الموقع. يُرجى المحاولة من مكان مكشوف.");
       if (requireGps && location && location.accuracy > 300) {
-        throw new Error(`تحديد الموقع مش دقيق دلوقتي (±${location.accuracy} متر). استنى ثواني وحاول تاني.`);
+        throw new Error(`دقة تحديد الموقع غير كافية حاليًا (±${location.accuracy} متر). يُرجى الانتظار بضع ثوانٍ ثم إعادة المحاولة.`);
       }
       await onCapture({
         samples,
@@ -135,7 +135,7 @@ export default function CaptureSheet({
           onLoadedMetadata={() => setCameraReady(true)}
         />
         <div className="capture-guide" aria-hidden="true" />
-        <p>{faceMode === "off" ? "خلّي وشك داخل الإطار وابص للكاميرا" : face.instruction}</p>
+        <p>{faceMode === "off" ? "يُرجى توجيه الوجه داخل الإطار والنظر إلى الكاميرا" : face.instruction}</p>
       </div>
 
       <div className="capture-checks" aria-live="polite">
@@ -166,9 +166,9 @@ export default function CaptureSheet({
         disabled={!cameraReady || !gpsReady || !faceReady || busy}
       >
         {busy ? <Loader2 className="spin" size={21} /> : <Camera size={21} />}
-        {busy ? "جاري التحقق والتسجيل…" : "تحقق وتسجيل"}
+        {busy ? "جارٍ التحقق والتسجيل…" : "تحقق وتسجيل"}
       </button>
-      <p className="capture-privacy">لا يتم حفظ أي صور أو فيديو — بيتم استخراج بصمة رقمية مشفرة فقط وتُمسح اللقطات فورًا.</p>
+      <p className="capture-privacy">لا يتم حفظ أي صور أو مقاطع فيديو — يتم استخراج بصمة رقمية مشفّرة فقط وتُحذف اللقطات فورًا.</p>
     </div>
   );
 }

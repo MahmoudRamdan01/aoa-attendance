@@ -136,9 +136,9 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
                 <label>إلى<input type="time" value={addForm.checkout_to} onChange={(e) => setAddForm((f) => ({ ...f, checkout_to: e.target.value }))} /></label>
               </div>
             )}
-            <p className="muted">لو سبت النوافذ فاضية هيستخدم مواعيد النظام الافتراضية. تقدر تربطله حساب دخول بعدين من «الرواتب والتقارير ← حسابات الموظفين».</p>
+            <p className="muted">إذا تُركت النوافذ فارغة، ستُستخدم مواعيد النظام الافتراضية. يمكنك ربط حساب دخول له لاحقًا من «الرواتب والتقارير ← حسابات الموظفين».</p>
             <div className="actions-row">
-              <button className="primary" disabled={busy}>{busy ? "جاري الإضافة..." : "إضافة الموظف"}</button>
+              <button className="primary" disabled={busy}>{busy ? "جارٍ الإضافة..." : "إضافة الموظف"}</button>
               <button type="button" className="secondary" onClick={() => { setShowAdd(false); setAddForm(emptyAdd); }}>إلغاء</button>
             </div>
           </form>
@@ -147,7 +147,7 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
           <Search size={16} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث باسم الموظف..." />
         </label>
-        {loading && <p className="muted">جاري التحميل...</p>}
+        {loading && <p className="muted">جارٍ التحميل...</p>}
         <div className="emp-grid">
           {filtered.map((e) => (
             <button
@@ -168,7 +168,7 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
             </button>
           ))}
         </div>
-        {!loading && filtered.length === 0 && <p className="muted">مفيش نتايج.</p>}
+        {!loading && filtered.length === 0 && <p className="muted">لا توجد نتائج.</p>}
       </section>
 
       {role === "owner" && <AssistantManager employees={employees} onChanged={load} onToast={onToast} />}
@@ -206,10 +206,10 @@ function AssistantManager({ employees, onChanged, onToast }) {
   return (
     <section className="panel">
       <div className="panel-title between">
-        <div><Sparkles size={20} /><h2>المساعد الذكي — مين يشوفه</h2></div>
+        <div><Sparkles size={20} /><h2>المساعد الذكي — من يستخدمه</h2></div>
         <span className="badge">{enabledCount} مفعّل</span>
       </div>
-      <p className="muted">المساعد مخفي عن الكل افتراضيًا (ما عدا المالك). اختار الأشخاص وفعّله أو أوقفه لهم دفعة واحدة.</p>
+      <p className="muted">المساعد مخفي عن الجميع افتراضيًا (باستثناء المالك). اختر الأشخاص ثم فعّله أو أوقفه لهم دفعة واحدة.</p>
       <div className="assistant-pick-grid">
         {people.map((e) => (
           <label key={e.id} className={cls("assistant-pick", picked.has(e.id) && "picked")}>
@@ -347,7 +347,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
         </div>
       </section>
 
-      {loading && <section className="panel"><p className="muted">جاري التحميل...</p></section>}
+      {loading && <section className="panel"><p className="muted">جارٍ التحميل...</p></section>}
 
       {!loading && d && stats && (
         <>
@@ -388,7 +388,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
                   <tfoot><tr><td colSpan={2}>الإجمالي</td><td>{money(stats.dedTotal)} ج</td><td></td></tr></tfoot>
                 </table>
               </div>
-            ) : <p className="muted">مفيش خصومات الشهر ده.</p>}
+            ) : <p className="muted">لا توجد خصومات هذا الشهر.</p>}
             {d.loans.length > 0 && (
               <div className="table-wrap" style={{ marginTop: 12 }}>
                 <table>
@@ -418,7 +418,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
                   </tbody>
                 </table>
               </div>
-            ) : <p className="muted">مفيش أجازات مسجلة.</p>}
+            ) : <p className="muted">لا توجد إجازات مسجلة.</p>}
           </section>
 
           <section className="panel">
@@ -438,7 +438,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
                   </tbody>
                 </table>
               </div>
-            ) : <p className="muted">مفيش أذونات مسجلة.</p>}
+            ) : <p className="muted">لا توجد أذونات مسجلة.</p>}
           </section>
 
           <section className="panel">
@@ -462,7 +462,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
                   </tbody>
                 </table>
               </div>
-            ) : <p className="muted">مفيش حضور مسجل الشهر ده.</p>}
+            ) : <p className="muted">لا يوجد حضور مسجل هذا الشهر.</p>}
           </section>
         </>
       )}

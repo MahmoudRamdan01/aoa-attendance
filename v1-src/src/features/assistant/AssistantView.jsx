@@ -27,7 +27,7 @@ async function streamAssistant(body, { signal, onMeta, onDelta, onResult, onDone
     signal,
   });
   if (!resp.ok || !resp.body) {
-    let msg = "تعذر الوصول للمساعد — حاول تاني.";
+    let msg = "تعذر الوصول للمساعد — أعد المحاولة.";
     try { const j = await resp.json(); if (j?.reply) msg = j.reply; } catch { /* ignore */ }
     throw new Error(msg);
   }
@@ -229,23 +229,23 @@ function AssistantView({ context }) {
     if (role === "owner") {
       return [
         { label: "ملخص المرتبات", direct: "payroll_summary" },
-        { label: "حضور النهارده", direct: "day_attendance" },
+        { label: "حضور اليوم", direct: "day_attendance" },
         { label: "المعلقات المحتاجة قرار", direct: "pending_approvals" },
         { label: "مديونية Air Ocean", direct: "partner_summary" },
       ];
     }
     if (role === "hr") {
       return [
-        { label: "حضور النهارده", direct: "day_attendance" },
+        { label: "حضور اليوم", direct: "day_attendance" },
         { label: "المعلقات المحتاجة قرار", direct: "pending_approvals" },
         { label: "مصروفات الشهر", direct: "expenses" },
         { label: "مديونية Air Ocean", direct: "partner_summary" },
       ];
     }
     return [
-      { label: "حضوري النهارده", direct: "my_today" },
+      { label: "حضوري اليوم", direct: "my_today" },
       { label: "ملخص حضوري الشهر", direct: "my_month_summary" },
-      { label: "استقطاعاتي الشهر ده", direct: "my_deductions" },
+      { label: "استقطاعاتي هذا الشهر", direct: "my_deductions" },
       { label: "حالة طلباتي", direct: "my_requests" },
     ];
   }, [role]);
@@ -465,7 +465,7 @@ function AssistantView({ context }) {
         <aside className={cls("chat-sidebar", sidebarOpen && "open")}>
           <button className="chat-new" onClick={newChat}><Plus size={16} /> محادثة جديدة</button>
           <div className="chat-conv-list">
-            {conversations.length === 0 && <p className="chat-conv-empty">مفيش محادثات لسه</p>}
+            {conversations.length === 0 && <p className="chat-conv-empty">لا توجد محادثات بعد</p>}
             {conversations.map((c) => (
               <div key={c.id} className={cls("chat-conv", activeId === c.id && "active")}>
                 <button className="chat-conv-open" onClick={() => openConversation(c.id)} title={c.title || "محادثة"}>
@@ -506,7 +506,7 @@ function AssistantView({ context }) {
             {!loadingConv && messages.length === 0 && (
               <div className="chat-empty">
                 <Sparkles size={34} />
-                <p>اسألني عن أي حاجة في السيستم — بجاوب من البيانات الحقيقية وأقدر أنفذ عمليات.</p>
+                <p>اسألني عن أي شيء في النظام — أُجيب من البيانات الفعلية، ويمكنني تنفيذ العمليات.</p>
                 <div className="chat-suggestions">
                   {suggestions.map((s) => (
                     <button key={s.label} type="button" onClick={() => (s.direct ? sendDirect(s.direct, s.label) : send(s.label))}>
