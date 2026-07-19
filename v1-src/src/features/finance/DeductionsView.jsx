@@ -6,7 +6,7 @@ import { monthRangeFor } from "../../lib/dates";
 import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { deductionCategoryLabels, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { useUid, voidFinancial } from "./shared";
+import { useUid, voidFinancial, maskActor } from "./shared";
 
 function DeductionsView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -169,7 +169,7 @@ function DeductionsAdmin({ context, onToast }) {
   const role = context?.role || "employee";
   const isOwner = role === "owner";
   const uid = useUid();
-  const [tab, setTab] = useState(isOwner ? "loans" : "canteen");
+  const [tab, setTab] = useState("loans");
   const [employees, setEmployees] = useState([]);
   const [month, setMonth] = useState(() => todayIso().slice(0, 7));
   const [empFilter, setEmpFilter] = useState("all");
@@ -199,29 +199,30 @@ function DeductionsAdmin({ context, onToast }) {
 
   useEffect(() => {
     loadData();
-  }, [range.from, range.to, isOwner]);
+  }, [range.from, range.to]);
 
   async function loadData() {
     setLoading(true);
-    const queries = [
+    // Loans are visible to HR too (owner decision) — the RLS allows it, and
+    // the owner's own name is masked below for non-owner viewers.
+    const [c, o, l, i] = await Promise.all([
       supabase.from("canteen_entries").select("*").gte("entry_date", range.from).lte("entry_date", range.to).order("entry_date", { ascending: false }),
       supabase.from("other_deductions").select("*").gte("entry_date", range.from).lte("entry_date", range.to).order("entry_date", { ascending: false }),
-    ];
-    if (isOwner) {
-      queries.push(supabase.from("emp_loans").select("*").order("created_at", { ascending: false }));
-      queries.push(supabase.from("emp_loan_installments").select("*").order("due_month"));
-    }
-    const [c, o, l, i] = await Promise.all(queries);
+      supabase.from("emp_loans").select("*").order("created_at", { ascending: false }),
+      supabase.from("emp_loan_installments").select("*").order("due_month"),
+    ]);
     setCanteen(c.data || []);
     setOthers(o.data || []);
-    if (isOwner) {
-      setLoans(l?.data || []);
-      setInstallments(i?.data || []);
-    }
+    setLoans(l?.data || []);
+    setInstallments(i?.data || []);
     setLoading(false);
   }
 
-  const empName = useMemo(() => new Map(employees.map((e) => [e.id, e.name])), [employees]);
+  // Employee-name lookup with the owner's name masked for HR (amounts stay).
+  const empName = useMemo(
+    () => new Map(employees.map((e) => [e.id, maskActor(e.name, role) || e.name])),
+    [employees, role]
+  );
   const canVoid = (row) =>
     isOwner || (row.created_by === uid && row.entry_date === todayIso() && row.status === "active");
 
@@ -318,19 +319,19 @@ function DeductionsAdmin({ context, onToast }) {
           <div className="toolbar">
             <select value={empFilter} onChange={(e) => setEmpFilter(e.target.value)}>
               <option value="all">كل الموظفين</option>
-              {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+              {employees.map((emp) => <option key={emp.id} value={emp.id}>{empName.get(emp.id) || emp.name}</option>)}
             </select>
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
             <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
           </div>
         </div>
         <div className="tabs compact-tabs">
-          {isOwner && <button className={cls(tab === "loans" && "active")} onClick={() => setTab("loans")}>سلف</button>}
+          <button className={cls(tab === "loans" && "active")} onClick={() => setTab("loans")}>سلف</button>
           <button className={cls(tab === "canteen" && "active")} onClick={() => setTab("canteen")}>كانتين</button>
           <button className={cls(tab === "other" && "active")} onClick={() => setTab("other")}>أخرى</button>
         </div>
 
-        {tab === "loans" && isOwner && (
+        {tab === "loans" && (
           <div className="stack">
             <form className="form" onSubmit={submitLoan}>
               <div className="form-grid">

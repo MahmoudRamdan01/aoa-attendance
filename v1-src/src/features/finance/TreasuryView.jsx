@@ -207,7 +207,7 @@ function HolderPicker({ form, setForm, employees, whoLabel }) {
       {form.mode === "employee" && (
         <label>الموظف
           <select value={form.employeeId} onChange={(e) => setForm((f) => ({ ...f, employeeId: e.target.value }))}>
-            <option value="">اختار…</option>
+            <option value="">اختر…</option>
             {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
           </select>
         </label>

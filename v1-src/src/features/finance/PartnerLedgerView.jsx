@@ -170,9 +170,9 @@ function PartnerLedgerView({ context, onToast }) {
           </div>
         </div>
         <div className="stats-grid compact-stats">
-          <Metric label="لنا عندهم" value={`${money(totals.toUs)} ج`} tone="ok" icon={TrendingUp} />
-          <Metric label="علينا ليهم" value={`${money(totals.byUs)} ج`} tone="danger" icon={Banknote} />
-          <Metric label="الصافي" value={`${money(Math.abs(totals.net))} ج ${totals.net >= 0 ? "لنا" : "علينا"}`} tone={totals.net >= 0 ? "ok" : "warn"} icon={Scale} />
+          <Metric label="مستحق لنا" value={`${money(totals.toUs)} ج`} tone="ok" icon={TrendingUp} />
+          <Metric label="مستحق علينا" value={`${money(totals.byUs)} ج`} tone="danger" icon={Banknote} />
+          <Metric label="الصافي" value={`${money(Math.abs(totals.net))} ج ${totals.net >= 0 ? "لصالحنا" : "مستحق علينا"}`} tone={totals.net >= 0 ? "ok" : "warn"} icon={Scale} />
           <Metric label="سدادات معلقة" value={pendingSettlements.length} tone={pendingSettlements.length ? "warn" : "ok"} icon={Bell} />
         </div>
         <p className="muted">جميع القيود والسدادات محفوظة بالكامل — لا يُحذف أي شيء، ويُسجَّل الإلغاء مع أسبابه.</p>
@@ -226,8 +226,8 @@ function PartnerLedgerView({ context, onToast }) {
           <div className="toolbar table-filters">
             <div className="tabs compact-tabs no-margin">
               <button className={cls(directionFilter === "all" && "active")} onClick={() => setDirectionFilter("all")}>الكل</button>
-              <button className={cls(directionFilter === "owed_to_us" && "active")} onClick={() => setDirectionFilter("owed_to_us")}>لنا عندهم</button>
-              <button className={cls(directionFilter === "owed_by_us" && "active")} onClick={() => setDirectionFilter("owed_by_us")}>علينا ليهم</button>
+              <button className={cls(directionFilter === "owed_to_us" && "active")} onClick={() => setDirectionFilter("owed_to_us")}>مستحق لنا</button>
+              <button className={cls(directionFilter === "owed_by_us" && "active")} onClick={() => setDirectionFilter("owed_by_us")}>مستحق علينا</button>
             </div>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="all">كل الحالات</option>

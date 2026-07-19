@@ -46,8 +46,8 @@ const partnerKindLabels = {
   other: "أخرى",
 };
 const partnerDirectionLabels = {
-  owed_to_us: "لنا عندهم",
-  owed_by_us: "علينا ليهم",
+  owed_to_us: "مستحق لنا",
+  owed_by_us: "مستحق علينا",
 };
 const roleOptions = [
   { value: "employee", label: "موظف" },

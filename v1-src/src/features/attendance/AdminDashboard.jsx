@@ -64,7 +64,7 @@ function AdminDashboard({ context, onToast }) {
       p_date: reportDate,
       p_reason: "تصحيح سجل من لوحة v1",
     });
-    if (error || data?.error) onToast(data?.message || "المالك فقط يقدر يمسح السجل.");
+    if (error || data?.error) onToast(data?.message || "حذف السجل متاح للمالك فقط.");
     else {
       onToast("تم مسح سجل اليوم.");
       loadAdmin();

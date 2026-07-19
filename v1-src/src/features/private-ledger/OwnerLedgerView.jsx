@@ -221,7 +221,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
           </div>
           <div className="emp-meta">
             <span className={cls("badge", Math.abs(person.net) < 0.01 ? "muted" : person.net > 0 ? "ok" : "danger")}>
-              {Math.abs(person.net) < 0.01 ? "متسوّي" : person.net > 0 ? `ليك ${money(person.net)} ج` : `عليك ${money(-person.net)} ج`}
+              {Math.abs(person.net) < 0.01 ? "مُسوًّى" : person.net > 0 ? `مستحق لك ${money(person.net)} ج` : `مستحق عليك ${money(-person.net)} ج`}
             </span>
             <span className="badge">{person.entries.length} قيد</span>
           </div>
@@ -237,7 +237,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
           {showEntryForm && (
             <form className="form" onSubmit={(e) => submitEntry(e, person.label)}>
               <div className="form-grid">
-                <label>الاتجاه<select value={entryForm.direction} onChange={(e) => setEntryForm((f) => ({ ...f, direction: e.target.value }))}><option value="lent">سلّفته فلوس</option><option value="borrowed">استلفت منه</option></select></label>
+                <label>الاتجاه<select value={entryForm.direction} onChange={(e) => setEntryForm((f) => ({ ...f, direction: e.target.value }))}><option value="lent">أقرضته مبلغًا</option><option value="borrowed">اقترضت منه</option></select></label>
                 <label>المبلغ<input type="number" min="0.5" step="0.01" value={entryForm.amount} onChange={(e) => setEntryForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
               </div>
               <div className="form-grid">
@@ -258,7 +258,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
               <form className="form" onSubmit={(e) => saveEntry(e, entry.id)}>
                 <div className="panel-title"><Pencil size={18} /><h2>تعديل القيد</h2></div>
                 <div className="form-grid">
-                  <label>الاتجاه<select value={editEntryForm.direction} onChange={(e) => setEditEntryForm((f) => ({ ...f, direction: e.target.value }))}><option value="lent">سلّفته فلوس</option><option value="borrowed">استلفت منه</option></select></label>
+                  <label>الاتجاه<select value={editEntryForm.direction} onChange={(e) => setEditEntryForm((f) => ({ ...f, direction: e.target.value }))}><option value="lent">أقرضته مبلغًا</option><option value="borrowed">اقترضت منه</option></select></label>
                   <label>المبلغ<input type="number" min="0.5" step="0.01" value={editEntryForm.amount} onChange={(e) => setEditEntryForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
                 </div>
                 <div className="form-grid">
@@ -379,7 +379,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
           <form className="form" onSubmit={(e) => submitEntry(e)}>
             <div className="form-grid">
               <label>الاسم<input value={entryForm.person} onChange={(e) => setEntryForm((f) => ({ ...f, person: e.target.value }))} required placeholder="اسم الشخص" /></label>
-              <label>الاتجاه<select value={entryForm.direction} onChange={(e) => setEntryForm((f) => ({ ...f, direction: e.target.value }))}><option value="lent">سلّفته فلوس</option><option value="borrowed">استلفت منه</option></select></label>
+              <label>الاتجاه<select value={entryForm.direction} onChange={(e) => setEntryForm((f) => ({ ...f, direction: e.target.value }))}><option value="lent">أقرضته مبلغًا</option><option value="borrowed">اقترضت منه</option></select></label>
             </div>
             <div className="form-grid">
               <label>المبلغ<input type="number" min="0.5" step="0.01" value={entryForm.amount} onChange={(e) => setEntryForm((f) => ({ ...f, amount: e.target.value }))} required /></label>
@@ -413,7 +413,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
                   <span className="emp-card-body">
                     <strong>{p.label}</strong>
                     <span className={cls("ledger-net", settled ? "muted" : p.net > 0 ? "ok" : "danger")}>
-                      {settled ? "متسوّي" : p.net > 0 ? `ليك ${money(p.net)} ج` : `عليك ${money(-p.net)} ج`}
+                      {settled ? "مُسوًّى" : p.net > 0 ? `مستحق لك ${money(p.net)} ج` : `مستحق عليك ${money(-p.net)} ج`}
                     </span>
                   </span>
                   <ChevronLeft size={18} />

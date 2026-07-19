@@ -377,6 +377,22 @@ function AccountManager({ onToast }) {
     }
   }
 
+  // Owner grants/revokes HR for an existing linked account.
+  async function changeRole(employeeId, nextRole) {
+    setBusy(true);
+    const { data, error } = await supabase.rpc("owner_set_role_v1", {
+      p_employee_id: employeeId,
+      p_role: nextRole,
+    });
+    setBusy(false);
+    if (error || data?.error) {
+      onToast(data?.message || "تعذر تغيير الصلاحية.");
+      return;
+    }
+    onToast(nextRole === "hr" ? `تم منح صلاحيات HR لـ ${data.employee}.` : `تم إرجاع ${data.employee} إلى موظف.`);
+    loadAccounts();
+  }
+
   async function submit(event) {
     event.preventDefault();
     setBusy(true);
@@ -417,16 +433,32 @@ function AccountManager({ onToast }) {
       )}
       <div className="table-wrap">
         <table>
-          <thead><tr><th>الموظف</th><th>البريد الإلكتروني</th><th>الدور</th><th>الحالة</th></tr></thead>
+          <thead><tr><th>الموظف</th><th>البريد الإلكتروني</th><th>الدور</th><th>الحالة</th><th>الصلاحية</th></tr></thead>
           <tbody>
-            {accounts.map((row) => (
-              <tr key={row.employee_id}>
-                <td>{row.employee_name}</td>
-                <td dir="ltr">{row.email || "-"}</td>
-                <td>{roleNames[row.admin_role || row.role] || row.admin_role || row.role || "-"}</td>
-                <td>{row.user_id ? <StatusBadge status="approved" /> : "غير مربوط"}</td>
-              </tr>
-            ))}
+            {accounts.map((row) => {
+              const effectiveRole = row.admin_role || row.role || "employee";
+              const isOwnerAccount = effectiveRole === "owner";
+              return (
+                <tr key={row.employee_id}>
+                  <td>{row.employee_name}</td>
+                  <td dir="ltr">{row.email || "-"}</td>
+                  <td>{roleNames[effectiveRole] || effectiveRole}</td>
+                  <td>{row.user_id ? <StatusBadge status="approved" /> : "غير مربوط"}</td>
+                  <td>
+                    {isOwnerAccount || !row.user_id ? "—" : (
+                      <select
+                        value={effectiveRole === "hr" ? "hr" : "employee"}
+                        disabled={busy}
+                        onChange={(e) => changeRole(row.employee_id, e.target.value)}
+                      >
+                        <option value="employee">موظف</option>
+                        <option value="hr">HR</option>
+                      </select>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

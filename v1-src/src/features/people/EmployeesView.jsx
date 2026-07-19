@@ -191,7 +191,7 @@ function AssistantManager({ employees, onChanged, onToast }) {
   }
 
   async function apply(enabled) {
-    if (picked.size === 0) return onToast?.("اختار موظف واحد على الأقل.");
+    if (picked.size === 0) return onToast?.("اختر موظفًا واحدًا على الأقل.");
     setBusy(true);
     const { data, error } = await supabase.rpc("owner_set_assistant_bulk_v1", { p_ids: [...picked], p_enabled: enabled });
     setBusy(false);
