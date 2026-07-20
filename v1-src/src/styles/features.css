@@ -2408,3 +2408,34 @@ table.heatmap th.hm-name, table.heatmap td.hm-name { position: sticky; inset-inl
     font-size: 0.72rem;
   }
 }
+
+/* ===== PR3: dashboards + polish ===== */
+
+/* Report toolbars: period tabs become one horizontally-scrollable row on
+   phones instead of wrapping into a tall stack. */
+@media (max-width: 640px) {
+  .toolbar .tabs {
+    width: 100%;
+    margin-bottom: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .toolbar .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbar .tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
+/* Chat: touch screens have no hover — conversation actions stay visible. */
+@media (hover: none) {
+  .chat-conv-actions {
+    display: flex;
+  }
+}
