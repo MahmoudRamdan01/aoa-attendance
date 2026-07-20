@@ -4,6 +4,7 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  ChevronLeft,
   Inbox,
   Info,
   RotateCcw,
@@ -107,6 +108,28 @@ export function SkeletonList({ rows = 4, height = 46, gap = 10 }) {
     <div className="ui-skeleton-list" style={{ display: "grid", gap: `${gap}px` }} role="status" aria-label="جارٍ التحميل">
       {Array.from({ length: rows }, (_, index) => <Skeleton key={index} height={height} radius={12} />)}
     </div>
+  );
+}
+
+// A panel whose header is a tap-to-expand bar. Heavy analytics sections use
+// it so phones aren't buried under metres of charts: collapsed by default on
+// small screens, open on desktop (and still toggleable there).
+export function CollapsiblePanel({ icon: Icon, title, subtitle, children, defaultOpenMobile = false }) {
+  const [open, setOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const mobile = window.matchMedia?.("(max-width: 640px)")?.matches;
+    return mobile ? defaultOpenMobile : true;
+  });
+  return (
+    <section className={`panel collapsible-panel${open ? " open" : ""}`}>
+      <button type="button" className="section-bar" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        {Icon ? <Icon size={20} aria-hidden="true" /> : null}
+        <span className="section-bar-title">{title}</span>
+        {subtitle ? <span className="dept-bar-count">{subtitle}</span> : null}
+        <ChevronLeft size={18} className="dept-bar-chev" aria-hidden="true" />
+      </button>
+      {open ? children : null}
+    </section>
   );
 }
 

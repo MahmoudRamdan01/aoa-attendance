@@ -10,7 +10,7 @@ import { Bar, Metric, StatusBadge } from "../../ui/legacy";
 import { Area, AreaChart, Bar as ReBar, BarChart as ReBarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import CompanyReports from "./CompanyReports";
 import EmployeeStatement from "./EmployeeStatement";
-import { SkeletonTableRows } from "../../ui/primitives";
+import { CollapsiblePanel, SkeletonTableRows } from "../../ui/primitives";
 
 function OwnerDashboard({ onToast }) {
   const [rows, setRows] = useState([]);
@@ -198,6 +198,10 @@ function OwnerDashboard({ onToast }) {
       }));
   }, [rows, range.from, range.to]);
 
+  // With ~50 people a full vertical bar chart towers over the phone screen —
+  // show the most active few and let the owner expand on demand.
+  const TOP_BARS_LIMIT = 12;
+  const [showAllBars, setShowAllBars] = useState(false);
   const employeeBars = useMemo(
     () =>
       stats.payrollRows
@@ -206,6 +210,7 @@ function OwnerDashboard({ onToast }) {
         .map((row) => ({ name: row.name, حضور: row.present, تأخير: row.late, غياب: row.absent })),
     [stats.payrollRows]
   );
+  const visibleBars = showAllBars ? employeeBars : employeeBars.slice(0, TOP_BARS_LIMIT);
 
   function exportCsv() {
     const employeeMap = new Map(employees.map((emp) => [emp.id, emp.name]));
@@ -335,12 +340,11 @@ function OwnerDashboard({ onToast }) {
           <Bar label="بدون انصراف" value={stats.missingCheckout} max={Math.max(stats.total, 1)} tone="danger" />
         </section>
       </div>
-      <section className="panel">
-        <div className="panel-title"><Users size={20} /><h2>حضور الموظفين ({range.label})</h2></div>
+      <CollapsiblePanel icon={Users} title={`حضور الموظفين (${range.label})`} subtitle={`${employeeBars.length} موظف`}>
         {employeeBars.length > 0 ? (
           <div className="chart-box">
-            <ResponsiveContainer width="100%" height={Math.max(180, employeeBars.length * 34 + 40)}>
-              <ReBarChart data={employeeBars} layout="vertical" margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+            <ResponsiveContainer width="100%" height={Math.max(180, visibleBars.length * 34 + 40)}>
+              <ReBarChart data={visibleBars} layout="vertical" margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                 <YAxis
@@ -357,11 +361,16 @@ function OwnerDashboard({ onToast }) {
                 <ReBar dataKey="غياب" fill="#EF4444" radius={[0, 6, 6, 0]} barSize={12} />
               </ReBarChart>
             </ResponsiveContainer>
+            {employeeBars.length > TOP_BARS_LIMIT && (
+              <button className="secondary chart-expand" type="button" onClick={() => setShowAllBars((v) => !v)}>
+                {showAllBars ? "عرض الأعلى فقط" : `عرض كل الموظفين (${employeeBars.length})`}
+              </button>
+            )}
           </div>
         ) : (
           <p className="muted">لا توجد بيانات موظفين في الفترة.</p>
         )}
-      </section>
+      </CollapsiblePanel>
       <section className="panel">
         <div className="panel-title between">
           <div><Banknote size={20} /><h2>المرتبات والخصومات</h2></div>

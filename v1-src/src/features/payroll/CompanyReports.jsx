@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { money } from "../../lib/format";
 import { getPayrollConfig, payrollDayValues } from "../../lib/payroll";
+import { CollapsiblePanel } from "../../ui/primitives";
 import { datesBetween } from "../../lib/dates";
 import { Bar as ReBar, BarChart as ReBarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 
@@ -209,8 +210,7 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
       </section>
 
       {/* Attendance heatmap */}
-      <section className="panel">
-        <div className="panel-title"><CalendarRange size={20} /><h2>خريطة الحضور</h2></div>
+      <CollapsiblePanel icon={CalendarRange} title="خريطة الحضور" subtitle={`${heatmap.people.length} موظف`}>
         {heatmap.people.length > 0 && heatmap.days.length > 0 ? (
           <div className="heatmap-scroll">
             <table className="heatmap">
@@ -242,7 +242,7 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
           <span><i className="hm-leave" /> إجازة</span>
           <span><i className="hm-none" /> لم يسجل</span>
         </div>
-      </section>
+      </CollapsiblePanel>
 
       {/* Compliance ranking */}
       <div className="grid two">
