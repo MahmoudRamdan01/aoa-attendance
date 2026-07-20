@@ -21,6 +21,14 @@ function OwnerDashboard({ onToast }) {
   const [customRange, setCustomRange] = useState({ from: `${todayIso().slice(0, 7)}-01`, to: todayIso() });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Narrow screens squeeze the employee bar chart — shrink its Arabic Y-axis.
+  const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 640px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const onChange = (event) => setNarrow(event.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
   const range = useMemo(() => {
     if (period === "range") {
       const from = customRange.from;
@@ -318,7 +326,14 @@ function OwnerDashboard({ onToast }) {
               <ReBarChart data={employeeBars} layout="vertical" margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="name" orientation="right" width={92} tick={{ fontSize: 12 }} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  orientation="right"
+                  width={narrow ? 68 : 92}
+                  tick={{ fontSize: narrow ? 11 : 12 }}
+                  tickFormatter={narrow ? (name) => (String(name).length > 8 ? `${String(name).slice(0, 8)}…` : name) : undefined}
+                />
                 <ChartTooltip />
                 <ReBar dataKey="حضور" fill="#FCC107" radius={[0, 6, 6, 0]} barSize={12} />
                 <ReBar dataKey="تأخير" fill="#F59E0B" radius={[0, 6, 6, 0]} barSize={12} />
