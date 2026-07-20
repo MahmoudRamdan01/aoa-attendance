@@ -9,6 +9,7 @@ import { Metric, StatusBadge } from "../../ui/legacy";
 import { ConfirmDialog } from "../../ui/primitives";
 import FaceEnrollment from "./FaceEnrollment";
 import DeviceHistory from "./DeviceHistory";
+import EmployeeStatement from "../payroll/EmployeeStatement";
 
 const EMPLOYEES_CACHE_PREFIX = "aoa:employees:v1:";
 const EMPLOYEES_CACHE_MAX_AGE = 10 * 60 * 1000;
@@ -359,6 +360,9 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
           onCancel={() => setConfirmDelete(false)}
         />
       </section>
+
+      {/* كشف حساب كامل (نفس صفحة الرواتب): صافي المرتب + الخصومات + فلتر فترة. */}
+      {isOwner && <EmployeeStatement fixedEmployeeId={employee.id} fixedEmployeeName={employee.name} onToast={onToast} />}
 
       {loading && <section className="panel"><p className="muted">جارٍ التحميل...</p></section>}
 
