@@ -8,6 +8,7 @@ import { roleNames, roleOptions, statusLabels } from "../../lib/labels";
 import { Bar, Metric, StatusBadge } from "../../ui/legacy";
 import { Area, AreaChart, Bar as ReBar, BarChart as ReBarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import CompanyReports from "./CompanyReports";
+import EmployeeStatement from "./EmployeeStatement";
 
 function OwnerDashboard({ onToast }) {
   const [rows, setRows] = useState([]);
@@ -394,6 +395,7 @@ function OwnerDashboard({ onToast }) {
           ))}
         </div>
       </section>
+      <EmployeeStatement onToast={onToast} />
       <AccountManager onToast={onToast} />
     </div>
   );
