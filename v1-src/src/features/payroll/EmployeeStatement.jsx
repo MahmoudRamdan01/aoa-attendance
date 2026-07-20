@@ -1,27 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, CalendarDays, FileSpreadsheet, FileText, PiggyBank, Wallet } from "lucide-react";
+import { Banknote, CalendarDays, FileSpreadsheet, FileText, PiggyBank, TrendingDown, Wallet } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { csvCell, downloadTextFile, fmtTime12, money } from "../../lib/format";
 import { deductionCategoryLabels, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 
-// كشف حساب موظف — owner-only (lives inside the owner-only payroll view):
-// pick an employee + a period and get salary, itemized deductions
-// (attendance + financial) and the estimated net, with the day-by-day log.
-function EmployeeStatement({ onToast }) {
+// كشف حساب موظف — owner-only: pick an employee + a period and get salary,
+// itemized deductions (attendance + financial) and the net, with the daily
+// log. Pass fixedEmployeeId to lock it to one person (embedded in the
+// Employees page) — the selector is then hidden.
+function EmployeeStatement({ onToast, fixedEmployeeId = null, fixedEmployeeName = "" }) {
   const [employees, setEmployees] = useState([]);
-  const [employeeId, setEmployeeId] = useState("");
+  const [employeeId, setEmployeeId] = useState(fixedEmployeeId ? String(fixedEmployeeId) : "");
   const [from, setFrom] = useState(() => `${todayIso().slice(0, 7)}-01`);
   const [to, setTo] = useState(todayIso());
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
 
   useEffect(() => {
+    if (fixedEmployeeId) { setEmployeeId(String(fixedEmployeeId)); return; }
     supabase.from("employees").select("id,name,active").eq("active", true).order("id").then(({ data: rows }) => {
       setEmployees(rows || []);
       setEmployeeId((current) => current || String(rows?.[0]?.id || ""));
     });
-  }, []);
+  }, [fixedEmployeeId]);
 
   useEffect(() => {
     if (!employeeId) return;
@@ -62,7 +64,7 @@ function EmployeeStatement({ onToast }) {
     return () => { cancelled = true; };
   }, [employeeId, from, to]);
 
-  const employeeName = employees.find((emp) => String(emp.id) === String(employeeId))?.name || "";
+  const employeeName = fixedEmployeeId ? fixedEmployeeName : (employees.find((emp) => String(emp.id) === String(employeeId))?.name || "");
 
   const statement = useMemo(() => {
     if (!data) return null;
@@ -132,11 +134,13 @@ function EmployeeStatement({ onToast }) {
   return (
     <section className="panel">
       <div className="panel-title between">
-        <div><FileText size={20} /><h2>كشف حساب موظف</h2></div>
+        <div><FileText size={20} /><h2>{fixedEmployeeId ? `كشف حساب — ${fixedEmployeeName}` : "كشف حساب موظف"}</h2></div>
         <div className="toolbar">
-          <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
-            {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-          </select>
+          {!fixedEmployeeId && (
+            <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+              {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+            </select>
+          )}
           <input type="date" value={from} aria-label="من تاريخ" title="من تاريخ" onChange={(e) => { setFrom(e.target.value); if (to < e.target.value) setTo(e.target.value); }} />
           <input type="date" value={to} min={from} aria-label="إلى تاريخ" title="إلى تاريخ" onChange={(e) => setTo(e.target.value)} />
           <button className="secondary" onClick={exportCsv} disabled={loading || !statement}>
@@ -151,9 +155,10 @@ function EmployeeStatement({ onToast }) {
         <div className="stack">
           <div className="stats-grid compact-stats">
             <Metric label="المرتب الشهري (قبل الخصم)" value={`${money(data.salary)} ج`} icon={Banknote} />
-            <Metric label="خصومات الحضور" value={`${money(statement.attendanceDeduction)} ج`} sub={`${statement.deductionDays.toFixed(2)} يوم`} tone="warn" icon={CalendarDays} />
+            <Metric label="خصومات الحضور والغياب" value={`${money(statement.attendanceDeduction)} ج`} sub={`${statement.deductionDays.toFixed(2)} يوم`} tone="warn" icon={CalendarDays} />
             <Metric label="استقطاعات مالية" value={`${money(statement.financialTotal)} ج`} tone="gold" icon={Wallet} />
-            <Metric label="الصافي بعد الخصم" value={`${money(statement.net)} ج`} tone="ok" icon={PiggyBank} />
+            <Metric label="إجمالي الخصومات" value={`${money(statement.totalDeductions)} ج`} tone="danger" icon={TrendingDown} />
+            <Metric label="صافي المرتب (بعد الخصم)" value={`${money(statement.net)} ج`} tone="ok" icon={PiggyBank} />
           </div>
           <p className="muted">
             الفترة: {from} إلى {to} · حضور {statement.present} يوم · تأخير {statement.late} مرة ({statement.lateMinutes} دقيقة)
