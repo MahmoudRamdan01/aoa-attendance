@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, Coins, HandCoins, Landmark, RefreshCcw, Scale, Users, Banknote } from "lucide-react";
+import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, Coins, HandCoins, Landmark, Pencil, RefreshCcw, Scale, Users, Banknote } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { money } from "../../lib/format";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { useVoidDialog, maskActor } from "./shared";
+import { useVoidDialog, maskActor, FinanceEditModal } from "./shared";
 
 function TreasuryView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -18,6 +18,25 @@ function TreasuryView({ context, onToast }) {
   const [hold, setHold] = useState({ mode: "safe", employeeId: "", name: "", amount: "", note: "", date: todayIso() });
   const [spend, setSpend] = useState({ mode: "safe", employeeId: "", name: "", amount: "", note: "", date: todayIso() });
   const { requestVoid, voidDialog } = useVoidDialog(onToast, () => loadData());
+  const [editRow, setEditRow] = useState(null);
+  const [editBusy, setEditBusy] = useState(false);
+
+  async function saveEdit(values) {
+    setEditBusy(true);
+    const { data, error } = await supabase.rpc("edit_treasury_entry_v1", {
+      p_id: editRow.id,
+      p_amount: Number(values.amount),
+      p_note: values.note || null,
+      p_date: values.date,
+      p_holder_employee_id: null,
+      p_holder_name: values.holder || null,
+    });
+    setEditBusy(false);
+    if (error || data?.error) return onToast(data?.message || "تعذر تعديل الحركة.");
+    setEditRow(null);
+    onToast("تم تعديل الحركة.");
+    loadData();
+  }
 
   useEffect(() => { loadData(); }, []);
 
@@ -194,6 +213,7 @@ function TreasuryView({ context, onToast }) {
 
   return (
     <div className="stack">
+      {isOwner && (
       <section className="panel">
         <div className="panel-title"><Landmark size={20} /><h2>المركز المالي للشركة</h2></div>
         <div className="stats-grid compact-stats">
@@ -225,6 +245,7 @@ function TreasuryView({ context, onToast }) {
           {netPayroll !== null && " مرتبات الشهر تُعرض كالتزام مستحق بعد كل الخصومات، والصافي بعد سدادها = الإجمالي − المرتبات."}
         </p>
       </section>
+      )}
 
       <section className="panel">
         <div className="panel-title between">
@@ -300,10 +321,15 @@ function TreasuryView({ context, onToast }) {
                   <td data-label="المبلغ">{money(row.amount)} ج</td>
                   <td data-label="البيان" className="note-cell">{row.note || (row.direction === "out" ? "صرف" : "-")}</td>
                   <td data-label="الحالة">{row.status === "voided" ? <StatusBadge status="voided" /> : <StatusBadge status="active" />}</td>
-                  <td data-label="إجراء">
-                    {row.status === "active" && canVoid(row) && (
-                      <button className="danger-link" onClick={() => requestVoid("treasury", row.id)}>إلغاء</button>
-                    )}
+                  <td data-label="إجراء" className="card-actions">
+                    <span className="approval-actions">
+                      {isOwner && row.status === "active" && (
+                        <button className="link" onClick={() => setEditRow(row)}><Pencil size={14} /> تعديل</button>
+                      )}
+                      {row.status === "active" && canVoid(row) && (
+                        <button className="danger-link" onClick={() => requestVoid("treasury", row.id)}>إلغاء</button>
+                      )}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -312,6 +338,19 @@ function TreasuryView({ context, onToast }) {
         </div>
       </section>
       {voidDialog}
+      <FinanceEditModal
+        open={Boolean(editRow)}
+        title={editRow?.direction === "in" ? "تعديل العهدة" : "تعديل الصرف"}
+        busy={editBusy}
+        fields={editRow ? [
+          { name: "date", label: "التاريخ", type: "date", value: editRow.entry_date },
+          { name: "amount", label: "المبلغ", type: "number", min: "0.5", step: "0.01", value: String(editRow.amount) },
+          { name: "holder", label: "مع/من", type: "text", value: editRow.holder_name || "" },
+          { name: "note", label: "البيان", type: "text", value: editRow.note || "" },
+        ] : []}
+        onSubmit={saveEdit}
+        onCancel={() => setEditRow(null)}
+      />
     </div>
   );
 }
