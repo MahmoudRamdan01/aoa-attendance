@@ -121,7 +121,7 @@ function MyMonthView({ context, onToast }) {
 
       <section className="panel">
         <div className="panel-title"><CalendarDays size={20} /><h2>تفاصيل الأيام</h2></div>
-        <div className="table-wrap">
+        <div className="table-wrap sticky-table">
           <table>
             <thead>
               <tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>حضور</th><th>انصراف</th><th>تأخير</th><th>خصم</th><th>ملاحظتي</th></tr>

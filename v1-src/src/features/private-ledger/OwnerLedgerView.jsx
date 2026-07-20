@@ -4,6 +4,7 @@ import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { money, normalizeArabicName } from "../../lib/format";
 import { Metric, StatusBadge } from "../../ui/legacy";
+import { ConfirmDialog } from "../../ui/primitives";
 
 const emptyEntryForm = () => ({ person: "", direction: "lent", amount: "", date: todayIso(), note: "" });
 const emptyPayForm = () => ({ amount: "", date: todayIso(), note: "" });
@@ -159,8 +160,10 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
     setEditEntryId(null);
     loadData();
   }
+  const [deleteEntryId, setDeleteEntryId] = useState(null);
+  const [deletePayId, setDeletePayId] = useState(null);
+
   async function removeEntry(id) {
-    if (!confirm("هل تريد حذف هذا القيد وجميع دفعاته نهائيًا؟")) return;
     const { error } = await supabase.from("owner_ledger_entries").delete().eq("id", id);
     if (error) return onToast("تعذر الحذف: " + error.message);
     onToast("تم الحذف.");
@@ -202,7 +205,6 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
     loadData();
   }
   async function removePayment(id) {
-    if (!confirm("هل تريد حذف هذه الدفعة؟")) return;
     const { error } = await supabase.from("owner_ledger_payments").delete().eq("id", id);
     if (error) return onToast("تعذر الحذف: " + error.message);
     onToast("تم حذف الدفعة.");
@@ -286,17 +288,17 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
                 </p>
 
                 {entry.payments.length > 0 && (
-                  <div className="table-wrap">
+                  <div className="table-wrap cards-on-mobile">
                     <table>
                       <thead><tr><th>التاريخ</th><th>المبلغ</th><th>ملاحظة</th><th>إجراء</th></tr></thead>
                       <tbody>
                         {entry.payments.map((p) => (
                           editPayId === p.id ? (
                             <tr key={p.id}>
-                              <td dir="ltr"><input type="date" value={editPayForm.date} onChange={(e) => setEditPayForm((f) => ({ ...f, date: e.target.value }))} /></td>
-                              <td><input type="number" min="0.5" step="0.01" value={editPayForm.amount} onChange={(e) => setEditPayForm((f) => ({ ...f, amount: e.target.value }))} /></td>
-                              <td><input value={editPayForm.note} onChange={(e) => setEditPayForm((f) => ({ ...f, note: e.target.value }))} placeholder="ملاحظة" /></td>
-                              <td>
+                              <td data-label="التاريخ" dir="ltr"><input type="date" value={editPayForm.date} onChange={(e) => setEditPayForm((f) => ({ ...f, date: e.target.value }))} /></td>
+                              <td data-label="المبلغ"><input type="number" min="0.5" step="0.01" value={editPayForm.amount} onChange={(e) => setEditPayForm((f) => ({ ...f, amount: e.target.value }))} /></td>
+                              <td data-label="ملاحظة"><input value={editPayForm.note} onChange={(e) => setEditPayForm((f) => ({ ...f, note: e.target.value }))} placeholder="ملاحظة" /></td>
+                              <td data-label="إجراء">
                                 <div className="actions-row tight">
                                   <button className="link" type="button" onClick={(e) => savePayment(e, p.id)} disabled={busy}>حفظ</button>
                                   <button className="danger-link" type="button" onClick={() => setEditPayId(null)}>إلغاء</button>
@@ -305,13 +307,13 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
                             </tr>
                           ) : (
                             <tr key={p.id}>
-                              <td dir="ltr">{p.pay_date}</td>
-                              <td>{money(p.amount)} ج</td>
-                              <td className="note-cell">{p.note || "—"}</td>
-                              <td>
+                              <td data-label="التاريخ" dir="ltr">{p.pay_date}</td>
+                              <td data-label="المبلغ">{money(p.amount)} ج</td>
+                              <td data-label="ملاحظة" className="note-cell">{p.note || "—"}</td>
+                              <td data-label="إجراء">
                                 <div className="actions-row tight">
                                   <button className="link" type="button" onClick={() => startEditPayment(p)}><Pencil size={14} /> تعديل</button>
-                                  <button className="danger-link" type="button" onClick={() => removePayment(p.id)}><Trash2 size={14} /> حذف</button>
+                                  <button className="danger-link" type="button" onClick={() => setDeletePayId(p.id)}><Trash2 size={14} /> حذف</button>
                                 </div>
                               </td>
                             </tr>
@@ -342,13 +344,31 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
                       </button>
                     )}
                     <button className="secondary" type="button" onClick={() => startEditEntry(entry)}><Pencil size={16} /> تعديل القيد</button>
-                    <button className="danger-link" type="button" onClick={() => removeEntry(entry.id)}><Trash2 size={16} /> حذف القيد</button>
+                    <button className="danger-link" type="button" onClick={() => setDeleteEntryId(entry.id)}><Trash2 size={16} /> حذف القيد</button>
                   </div>
                 )}
               </>
             )}
           </section>
         ))}
+        <ConfirmDialog
+          open={deleteEntryId !== null}
+          title="حذف القيد"
+          message="سيتم حذف هذا القيد وجميع دفعاته نهائيًا."
+          tone="danger"
+          confirmLabel="حذف نهائيًا"
+          onConfirm={() => { const id = deleteEntryId; setDeleteEntryId(null); removeEntry(id); }}
+          onCancel={() => setDeleteEntryId(null)}
+        />
+        <ConfirmDialog
+          open={deletePayId !== null}
+          title="حذف الدفعة"
+          message="سيتم حذف هذه الدفعة نهائيًا."
+          tone="danger"
+          confirmLabel="حذف الدفعة"
+          onConfirm={() => { const id = deletePayId; setDeletePayId(null); removePayment(id); }}
+          onCancel={() => setDeletePayId(null)}
+        />
       </div>
     );
   }

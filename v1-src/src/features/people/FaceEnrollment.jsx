@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Camera, Check, Loader2, ScanFace, ShieldCheck, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import CaptureSheet, { requestCaptureSession } from "../attendance/CaptureSheet";
+import { ConfirmDialog } from "../../ui/primitives";
 
 // Enrollment is done live by HR in the employee's presence: the camera feeds
 // the on-device face engine only. No photo is captured or stored anywhere —
@@ -57,8 +58,14 @@ export default function FaceEnrollment({ employee, onToast }) {
     }
   }
 
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
   async function action(actionName, profile) {
-    if (actionName === "delete" && !confirm("هل تريد حذف بصمة الوجه هذه نهائيًا؟")) return;
+    if (actionName === "delete" && deleteTarget?.id !== profile.id) {
+      setDeleteTarget(profile);
+      return;
+    }
+    setDeleteTarget(null);
     setBusy(`${actionName}:${profile.id}`);
     const { data, error } = await supabase.rpc("admin_face_profile_action_v1", {
       p_action: actionName,
@@ -123,6 +130,15 @@ export default function FaceEnrollment({ employee, onToast }) {
           onCancel={() => setCapture(null)}
         />
       ) : null}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="حذف بصمة الوجه"
+        message="سيتم حذف بصمة الوجه هذه نهائيًا ولن يمكن استرجاعها."
+        tone="danger"
+        confirmLabel="حذف نهائيًا"
+        onConfirm={() => action("delete", deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </section>
   );
 }

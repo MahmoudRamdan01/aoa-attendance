@@ -6,7 +6,7 @@ import { monthRangeFor } from "../../lib/dates";
 import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { expenseCategoryLabels, statusLabels } from "../../lib/labels";
 import { Bar, Metric, StatusBadge } from "../../ui/legacy";
-import { useUid, voidFinancial, maskActor } from "./shared";
+import { useUid, useVoidDialog, maskActor } from "./shared";
 
 function ExpensesView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -20,6 +20,7 @@ function ExpensesView({ context, onToast }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ date: todayIso(), category: "electricity", amount: "", description: "" });
+  const { requestVoid, voidDialog } = useVoidDialog(onToast, () => loadData());
   const range = useMemo(() => monthRangeFor(month), [month]);
 
   useEffect(() => {
@@ -155,7 +156,7 @@ function ExpensesView({ context, onToast }) {
 
       <section className="panel">
         <div className="panel-title"><FileSpreadsheet size={20} /><h2>مصروفات {month}</h2></div>
-        <div className="table-wrap">
+        <div className="table-wrap cards-on-mobile">
           <table>
             <thead><tr><th>التاريخ</th><th>البند</th><th>المبلغ</th><th>الوصف</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
             <tbody>
@@ -163,15 +164,15 @@ function ExpensesView({ context, onToast }) {
               {!loading && rows.length === 0 && <tr><td colSpan="7">لا توجد مصروفات في {month}.</td></tr>}
               {!loading && rows.map((row) => (
                 <tr key={row.id}>
-                  <td dir="ltr">{row.expense_date}</td>
-                  <td>{expenseCategoryLabels[row.category] || row.category}</td>
-                  <td>{money(row.amount)} ج</td>
-                  <td className="note-cell">{row.description || "-"}</td>
-                  <td>{maskActor(row.created_by_name, role) || "-"}</td>
-                  <td>
+                  <td data-label="التاريخ" dir="ltr">{row.expense_date}</td>
+                  <td data-label="البند">{expenseCategoryLabels[row.category] || row.category}</td>
+                  <td data-label="المبلغ">{money(row.amount)} ج</td>
+                  <td data-label="الوصف" className="note-cell">{row.description || "-"}</td>
+                  <td data-label="سجّله">{maskActor(row.created_by_name, role) || "-"}</td>
+                  <td data-label="الحالة">
                     {row.status === "voided" ? <StatusBadge status="voided" /> : row.confirmed_at ? <StatusBadge status="confirmed" /> : <StatusBadge status="pending" />}
                   </td>
-                  <td>
+                  <td data-label="إجراء">
                     <span className="approval-actions">
                       {row.status === "active" && !row.confirmed_at && (
                         isOwner
@@ -179,7 +180,7 @@ function ExpensesView({ context, onToast }) {
                           : <span className="badge">قرار المالك فقط</span>
                       )}
                       {row.status === "active" && canVoid(row) && (
-                        <button className="danger-link" onClick={() => voidFinancial("expense", row.id, onToast, loadData)}>إلغاء</button>
+                        <button className="danger-link" onClick={() => requestVoid("expense", row.id)}>إلغاء</button>
                       )}
                     </span>
                   </td>
@@ -189,6 +190,7 @@ function ExpensesView({ context, onToast }) {
           </table>
         </div>
       </section>
+      {voidDialog}
     </div>
   );
 }

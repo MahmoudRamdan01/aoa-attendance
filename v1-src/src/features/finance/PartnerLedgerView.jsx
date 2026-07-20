@@ -6,7 +6,7 @@ import { cls } from "../../lib/cls";
 import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { partnerDirectionLabels, partnerKindLabels, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { voidFinancial, maskActor } from "./shared";
+import { useVoidDialog, maskActor } from "./shared";
 
 function PartnerLedgerView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -22,6 +22,7 @@ function PartnerLedgerView({ context, onToast }) {
   const [settleFor, setSettleFor] = useState(null);
   const [settleForm, setSettleForm] = useState({ amount: "", date: todayIso(), note: "" });
   const [expanded, setExpanded] = useState(null);
+  const { requestVoid, voidDialog } = useVoidDialog(onToast, () => loadData());
 
   useEffect(() => {
     loadData();
@@ -291,13 +292,14 @@ function PartnerLedgerView({ context, onToast }) {
                   <button type="button" onClick={() => { setSettleFor(entry.id); setSettleForm({ amount: String(entry.remaining), date: todayIso(), note: "" }); }}>سداد</button>
                 )}
                 {entry.status === "active" && isOwner && (
-                  <button className="danger-link" type="button" onClick={() => voidFinancial("partner_entry", entry.id, onToast, loadData)}>إلغاء القيد</button>
+                  <button className="danger-link" type="button" onClick={() => requestVoid("partner_entry", entry.id)}>إلغاء القيد</button>
                 )}
               </div>
             </div>
           ))}
         </div>
       </section>
+      {voidDialog}
     </div>
   );
 }

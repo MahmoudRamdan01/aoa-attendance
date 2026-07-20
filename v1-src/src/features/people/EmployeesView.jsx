@@ -6,6 +6,7 @@ import { monthRangeFor } from "../../lib/dates";
 import { fmtTime12, money } from "../../lib/format";
 import { deductionCategoryLabels, reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
+import { ConfirmDialog } from "../../ui/primitives";
 import FaceEnrollment from "./FaceEnrollment";
 import DeviceHistory from "./DeviceHistory";
 
@@ -263,8 +264,10 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
     onChanged?.();
   }
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   async function removeEmployee() {
-    if (!confirm(`تحذف ${employee.name} نهائيًا؟ الأفضل التوقيف لو عليه سجل.`)) return;
+    setConfirmDelete(false);
     setActing(true);
     const { data, error } = await supabase.rpc("owner_delete_employee_v1", { p_employee_id: employee.id });
     setActing(false);
@@ -340,11 +343,21 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
             </button>
           )}
           {isOwner && (
-            <button className="danger-link" type="button" onClick={removeEmployee} disabled={acting}>
+            <button className="danger-link" type="button" onClick={() => setConfirmDelete(true)} disabled={acting}>
               <Trash2 size={16} /> حذف نهائي
             </button>
           )}
         </div>
+        <ConfirmDialog
+          open={confirmDelete}
+          title={`حذف ${employee.name} نهائيًا`}
+          message="سيتم حذف الموظف وكل بياناته نهائيًا. إذا كان لديه سجل حضور أو ماليات، يفضَّل إيقافه بدلًا من الحذف."
+          tone="danger"
+          confirmLabel="حذف نهائيًا"
+          busy={acting}
+          onConfirm={removeEmployee}
+          onCancel={() => setConfirmDelete(false)}
+        />
       </section>
 
       {loading && <section className="panel"><p className="muted">جارٍ التحميل...</p></section>}
@@ -369,7 +382,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
           <section className="panel">
             <div className="panel-title"><Banknote size={20} /><h2>الخصومات والاستقطاعات — {month}</h2></div>
             {(stats.attDedDays > 0 || stats.instMonth > 0 || d.cant.length || d.oth.length) ? (
-              <div className="table-wrap">
+              <div className="table-wrap sticky-table">
                 <table>
                   <thead><tr><th>النوع</th><th>التاريخ/الشهر</th><th>المبلغ</th><th>ملاحظة</th></tr></thead>
                   <tbody>
@@ -390,7 +403,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
               </div>
             ) : <p className="muted">لا توجد خصومات هذا الشهر.</p>}
             {d.loans.length > 0 && (
-              <div className="table-wrap" style={{ marginTop: 12 }}>
+              <div className="table-wrap sticky-table" style={{ marginTop: 12 }}>
                 <table>
                   <thead><tr><th>السلفة</th><th>المبلغ</th><th>أقساط</th><th>البداية</th><th>الحالة</th></tr></thead>
                   <tbody>
@@ -404,7 +417,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
           <section className="panel">
             <div className="panel-title"><CalendarDays size={20} /><h2>سجل الأجازات</h2></div>
             {d.leaves.length ? (
-              <div className="table-wrap">
+              <div className="table-wrap sticky-table">
                 <table>
                   <thead><tr><th>من</th><th>إلى</th><th>أيام</th><th>الحالة</th><th>البديل</th><th>السبب</th></tr></thead>
                   <tbody>
@@ -424,7 +437,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
           <section className="panel">
             <div className="panel-title"><Clock3 size={20} /><h2>سجل الأذونات</h2></div>
             {d.perms.length ? (
-              <div className="table-wrap">
+              <div className="table-wrap sticky-table">
                 <table>
                   <thead><tr><th>التاريخ</th><th>ساعات مطلوبة</th><th>ساعات متوافقة</th><th>الحالة</th><th>السبب</th></tr></thead>
                   <tbody>
@@ -444,7 +457,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
           <section className="panel">
             <div className="panel-title"><History size={20} /><h2>الحضور — {month}</h2></div>
             {d.att.length ? (
-              <div className="table-wrap">
+              <div className="table-wrap sticky-table">
                 <table>
                   <thead><tr><th>التاريخ</th><th>الحالة</th><th>دخول</th><th>انصراف</th><th>تأخير (د)</th><th>خصم</th><th>ملاحظة</th></tr></thead>
                   <tbody>

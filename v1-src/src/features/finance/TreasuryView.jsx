@@ -3,7 +3,7 @@ import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, Coins, HandCo
 import { supabase, todayIso } from "../../lib/supabase";
 import { money } from "../../lib/format";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { voidFinancial, maskActor } from "./shared";
+import { useVoidDialog, maskActor } from "./shared";
 
 function TreasuryView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -16,6 +16,7 @@ function TreasuryView({ context, onToast }) {
   const [month, setMonth] = useState(() => todayIso().slice(0, 7));
   const [hold, setHold] = useState({ mode: "safe", employeeId: "", name: "", amount: "", note: "", date: todayIso() });
   const [spend, setSpend] = useState({ mode: "safe", employeeId: "", name: "", amount: "", note: "", date: todayIso() });
+  const { requestVoid, voidDialog } = useVoidDialog(onToast, () => loadData());
 
   useEffect(() => { loadData(); }, []);
 
@@ -228,7 +229,7 @@ function TreasuryView({ context, onToast }) {
 
       <section className="panel">
         <div className="panel-title"><Vault size={20} /><h2>حركة الخزنة — {month}</h2></div>
-        <div className="table-wrap">
+        <div className="table-wrap cards-on-mobile">
           <table>
             <thead><tr><th>التاريخ</th><th>النوع</th><th>مع/من</th><th>المبلغ</th><th>البيان</th><th>الحالة</th><th>إجراء</th></tr></thead>
             <tbody>
@@ -236,17 +237,17 @@ function TreasuryView({ context, onToast }) {
               {!loading && monthEntries.length === 0 && <tr><td colSpan="7">لا توجد حركة في {month}.</td></tr>}
               {!loading && monthEntries.map((row) => (
                 <tr key={row.id}>
-                  <td dir="ltr">{row.entry_date}</td>
-                  <td>{row.direction === "in"
+                  <td data-label="التاريخ" dir="ltr">{row.entry_date}</td>
+                  <td data-label="النوع">{row.direction === "in"
                     ? <span className="badge ok">عهدة</span>
                     : <span className="badge warn">صرف</span>}</td>
-                  <td>{maskActor(row.holder_name, role) || "الخزنة"}</td>
-                  <td>{money(row.amount)} ج</td>
-                  <td className="note-cell">{row.note || (row.direction === "out" ? "صرف" : "-")}</td>
-                  <td>{row.status === "voided" ? <StatusBadge status="voided" /> : <StatusBadge status="active" />}</td>
-                  <td>
+                  <td data-label="مع/من">{maskActor(row.holder_name, role) || "الخزنة"}</td>
+                  <td data-label="المبلغ">{money(row.amount)} ج</td>
+                  <td data-label="البيان" className="note-cell">{row.note || (row.direction === "out" ? "صرف" : "-")}</td>
+                  <td data-label="الحالة">{row.status === "voided" ? <StatusBadge status="voided" /> : <StatusBadge status="active" />}</td>
+                  <td data-label="إجراء">
                     {row.status === "active" && canVoid(row) && (
-                      <button className="danger-link" onClick={() => voidFinancial("treasury", row.id, onToast, loadData)}>إلغاء</button>
+                      <button className="danger-link" onClick={() => requestVoid("treasury", row.id)}>إلغاء</button>
                     )}
                   </td>
                 </tr>
@@ -255,6 +256,7 @@ function TreasuryView({ context, onToast }) {
           </table>
         </div>
       </section>
+      {voidDialog}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { monthRangeFor } from "../../lib/dates";
 import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { deductionCategoryLabels, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { useUid, voidFinancial, maskActor } from "./shared";
+import { useUid, useVoidDialog, maskActor } from "./shared";
 
 function DeductionsView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -182,6 +182,7 @@ function DeductionsAdmin({ context, onToast }) {
   const [canteenForm, setCanteenForm] = useState({ employeeId: "", item: "", amount: "", date: todayIso(), note: "" });
   const [otherForm, setOtherForm] = useState({ employeeId: "", category: "damage", amount: "", date: todayIso(), note: "" });
   const [busy, setBusy] = useState(false);
+  const { requestVoid, voidDialog } = useVoidDialog(onToast, () => loadData());
   const range = useMemo(() => monthRangeFor(month), [month]);
 
   useEffect(() => {
@@ -346,7 +347,7 @@ function DeductionsAdmin({ context, onToast }) {
               <button className="primary" disabled={busy}>{busy ? "جارٍ التسجيل..." : "تسجيل سلفة"}</button>
               <p className="muted">القسط بيتخصم تلقائيًا من مرتب كل شهر بداية من شهر أول قسط.</p>
             </form>
-            <div className="table-wrap">
+            <div className="table-wrap cards-on-mobile">
               <table>
                 <thead><tr><th>الموظف</th><th>الأصل</th><th>الأقساط</th><th>مسدد</th><th>متبقي</th><th>بداية</th><th>الحالة</th><th>إجراء</th></tr></thead>
                 <tbody>
@@ -359,14 +360,14 @@ function DeductionsAdmin({ context, onToast }) {
                       : 0;
                     return (
                       <tr key={loan.id}>
-                        <td>{empName.get(loan.employee_id) || loan.employee_id}</td>
-                        <td>{money(loan.amount)} ج</td>
-                        <td>{loan.installments_count} × {money(schedule[0]?.amount || loan.amount / loan.installments_count)} ج</td>
-                        <td>{money(paid)} ج</td>
-                        <td><strong>{money(Math.max(0, loan.amount - paid))} ج</strong></td>
-                        <td dir="ltr">{loan.start_month}</td>
-                        <td><StatusBadge status={loan.status} /></td>
-                        <td>{loan.status === "active" ? <button className="danger-link" onClick={() => voidFinancial("loan", loan.id, onToast, loadData)}>إلغاء</button> : "-"}</td>
+                        <td data-label="الموظف">{empName.get(loan.employee_id) || loan.employee_id}</td>
+                        <td data-label="الأصل">{money(loan.amount)} ج</td>
+                        <td data-label="الأقساط">{loan.installments_count} × {money(schedule[0]?.amount || loan.amount / loan.installments_count)} ج</td>
+                        <td data-label="مسدد">{money(paid)} ج</td>
+                        <td data-label="متبقي"><strong>{money(Math.max(0, loan.amount - paid))} ج</strong></td>
+                        <td data-label="بداية" dir="ltr">{loan.start_month}</td>
+                        <td data-label="الحالة"><StatusBadge status={loan.status} /></td>
+                        <td data-label="إجراء">{loan.status === "active" ? <button className="danger-link" onClick={() => requestVoid("loan", loan.id)}>إلغاء</button> : "-"}</td>
                       </tr>
                     );
                   })}
@@ -395,7 +396,7 @@ function DeductionsAdmin({ context, onToast }) {
                 <FileSpreadsheet size={16} /> Excel
               </button>
             </div>
-            <div className="table-wrap">
+            <div className="table-wrap cards-on-mobile">
               <table>
                 <thead><tr><th>التاريخ</th><th>الموظف</th><th>الصنف</th><th>المبلغ</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
                 <tbody>
@@ -403,13 +404,13 @@ function DeductionsAdmin({ context, onToast }) {
                   {!loading && filteredCanteen.length === 0 && <tr><td colSpan="7">لا توجد مشتريات في {month}.</td></tr>}
                   {!loading && filteredCanteen.map((row) => (
                     <tr key={row.id}>
-                      <td dir="ltr">{row.entry_date}</td>
-                      <td>{empName.get(row.employee_id) || row.employee_id}</td>
-                      <td>{row.item}</td>
-                      <td>{money(row.amount)} ج</td>
-                      <td>{row.created_by_name || "-"}</td>
-                      <td><StatusBadge status={row.status} /></td>
-                      <td>{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => voidFinancial("canteen", row.id, onToast, loadData)}>إلغاء</button> : "-"}</td>
+                      <td data-label="التاريخ" dir="ltr">{row.entry_date}</td>
+                      <td data-label="الموظف">{empName.get(row.employee_id) || row.employee_id}</td>
+                      <td data-label="الصنف">{row.item}</td>
+                      <td data-label="المبلغ">{money(row.amount)} ج</td>
+                      <td data-label="سجّله">{row.created_by_name || "-"}</td>
+                      <td data-label="الحالة"><StatusBadge status={row.status} /></td>
+                      <td data-label="إجراء">{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => requestVoid("canteen", row.id)}>إلغاء</button> : "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -437,7 +438,7 @@ function DeductionsAdmin({ context, onToast }) {
                 <FileSpreadsheet size={16} /> Excel
               </button>
             </div>
-            <div className="table-wrap">
+            <div className="table-wrap cards-on-mobile">
               <table>
                 <thead><tr><th>التاريخ</th><th>الموظف</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
                 <tbody>
@@ -445,14 +446,14 @@ function DeductionsAdmin({ context, onToast }) {
                   {!loading && filteredOthers.length === 0 && <tr><td colSpan="8">لا توجد استقطاعات في {month}.</td></tr>}
                   {!loading && filteredOthers.map((row) => (
                     <tr key={row.id}>
-                      <td dir="ltr">{row.entry_date}</td>
-                      <td>{empName.get(row.employee_id) || row.employee_id}</td>
-                      <td>{deductionCategoryLabels[row.category] || row.category}</td>
-                      <td>{money(row.amount)} ج</td>
-                      <td className="note-cell">{row.note || "-"}</td>
-                      <td>{row.created_by_name || "-"}</td>
-                      <td><StatusBadge status={row.status} /></td>
-                      <td>{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => voidFinancial("other", row.id, onToast, loadData)}>إلغاء</button> : "-"}</td>
+                      <td data-label="التاريخ" dir="ltr">{row.entry_date}</td>
+                      <td data-label="الموظف">{empName.get(row.employee_id) || row.employee_id}</td>
+                      <td data-label="النوع">{deductionCategoryLabels[row.category] || row.category}</td>
+                      <td data-label="المبلغ">{money(row.amount)} ج</td>
+                      <td data-label="ملاحظة" className="note-cell">{row.note || "-"}</td>
+                      <td data-label="سجّله">{row.created_by_name || "-"}</td>
+                      <td data-label="الحالة"><StatusBadge status={row.status} /></td>
+                      <td data-label="إجراء">{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => requestVoid("other", row.id)}>إلغاء</button> : "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -461,6 +462,7 @@ function DeductionsAdmin({ context, onToast }) {
           </div>
         )}
       </section>
+      {voidDialog}
     </div>
   );
 }
