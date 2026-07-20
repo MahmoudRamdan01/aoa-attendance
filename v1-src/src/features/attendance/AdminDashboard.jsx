@@ -7,7 +7,7 @@ import { addDays, datesBetween } from "../../lib/dates";
 import { csvCell, downloadTextFile, fmtSubmittedAt, fmtTime12 } from "../../lib/format";
 import { reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { ConfirmDialog, PromptDialog } from "../../ui/primitives";
+import { ConfirmDialog, PromptDialog, SkeletonList, SkeletonTableRows } from "../../ui/primitives";
 import QRCodeLib from "qrcode";
 import { Cell, Pie, PieChart as RePieChart, ResponsiveContainer, Tooltip as ChartTooltip } from "recharts";
 
@@ -280,7 +280,7 @@ function AdminDashboard({ context, onToast }) {
           <table>
             <thead><tr><th>الموظف</th><th>الحالة</th><th>الوجه</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan="8">جارٍ التحميل...</td></tr>}
+              {loading && <SkeletonTableRows colSpan={8} />}
               {!loading && filteredEmployees.length === 0 && <tr><td colSpan="8">لا توجد نتائج مطابقة.</td></tr>}
               {!loading && filteredEmployees.map((emp) => {
                 const rec = recs.get(emp.id);
@@ -466,7 +466,7 @@ function RequestsHistory() {
           <option value="rejected">مرفوضة</option>
         </select>
       </div>
-      {loading && <p className="muted">جارٍ التحميل...</p>}
+      {loading && <SkeletonList />}
       {!loading && filtered.length === 0 && <p className="muted">لا توجد سجلات.</p>}
       {!loading && filtered.length > 0 && tab === "leaves" && (
         <div className="table-wrap sticky-table">

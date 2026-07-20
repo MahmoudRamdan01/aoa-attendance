@@ -7,6 +7,7 @@ import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { expenseCategoryLabels, statusLabels } from "../../lib/labels";
 import { Bar, Metric, StatusBadge } from "../../ui/legacy";
 import { useUid, useVoidDialog, maskActor, FinanceEditModal } from "./shared";
+import { SkeletonTableRows } from "../../ui/primitives";
 
 const PAID_FROM_LABELS = { treasury: "من الخزنة", external: "من مكان آخر" };
 
@@ -209,7 +210,7 @@ function ExpensesView({ context, onToast }) {
           <table>
             <thead><tr><th>التاريخ</th><th>البند</th><th>المبلغ</th><th>المصدر</th><th>الوصف</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan="8">جارٍ التحميل...</td></tr>}
+              {loading && <SkeletonTableRows colSpan={8} />}
               {!loading && rows.length === 0 && <tr><td colSpan="8">لا توجد مصروفات في {month}.</td></tr>}
               {!loading && rows.map((row) => (
                 <tr key={row.id}>

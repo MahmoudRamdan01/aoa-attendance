@@ -7,6 +7,7 @@ import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { partnerDirectionLabels, partnerKindLabels, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import { useVoidDialog, maskActor } from "./shared";
+import { SkeletonList } from "../../ui/primitives";
 
 function PartnerLedgerView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -244,7 +245,7 @@ function PartnerLedgerView({ context, onToast }) {
           </div>
         </div>
         <div className="list">
-          {loading && <p className="muted">جارٍ التحميل...</p>}
+          {loading && <SkeletonList />}
           {!loading && visible.length === 0 && <p className="muted">لا توجد قيود مطابقة.</p>}
           {!loading && visible.map((entry) => (
             <div className="approval-row" key={entry.id}>

@@ -8,6 +8,7 @@ import { deductionCategoryLabels, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import { Pencil } from "lucide-react";
 import { useUid, useVoidDialog, maskActor, FinanceEditModal } from "./shared";
+import { SkeletonList, SkeletonTableRows } from "../../ui/primitives";
 
 function DeductionsView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -82,7 +83,7 @@ function DeductionsEmployee({ context }) {
       <section className="panel">
         <div className="panel-title"><Wallet size={20} /><h2>سلفي</h2></div>
         <div className="list">
-          {loading && <p className="muted">جارٍ التحميل...</p>}
+          {loading && <SkeletonList />}
           {!loading && loans.length === 0 && <p className="muted">لا توجد سلف مسجلة.</p>}
           {loans.map((loan) => {
             const schedule = installments.filter((i) => i.loan_id === loan.id);
@@ -394,7 +395,7 @@ function DeductionsAdmin({ context, onToast }) {
               <table>
                 <thead><tr><th>الموظف</th><th>الأصل</th><th>الأقساط</th><th>مسدد</th><th>متبقي</th><th>بداية</th><th>الحالة</th><th>إجراء</th></tr></thead>
                 <tbody>
-                  {loading && <tr><td colSpan="8">جارٍ التحميل...</td></tr>}
+                  {loading && <SkeletonTableRows colSpan={8} />}
                   {!loading && filteredLoans.length === 0 && <tr><td colSpan="8">لا توجد سلف.</td></tr>}
                   {!loading && filteredLoans.map((loan) => {
                     const schedule = installments.filter((i) => i.loan_id === loan.id);
@@ -448,7 +449,7 @@ function DeductionsAdmin({ context, onToast }) {
               <table>
                 <thead><tr><th>التاريخ</th><th>الموظف</th><th>الصنف</th><th>المبلغ</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
                 <tbody>
-                  {loading && <tr><td colSpan="7">جارٍ التحميل...</td></tr>}
+                  {loading && <SkeletonTableRows colSpan={7} />}
                   {!loading && filteredCanteen.length === 0 && <tr><td colSpan="7">لا توجد مشتريات في {month}.</td></tr>}
                   {!loading && filteredCanteen.map((row) => (
                     <tr key={row.id}>
@@ -495,7 +496,7 @@ function DeductionsAdmin({ context, onToast }) {
               <table>
                 <thead><tr><th>التاريخ</th><th>الموظف</th><th>النوع</th><th>المبلغ</th><th>ملاحظة</th><th>سجّله</th><th>الحالة</th><th>إجراء</th></tr></thead>
                 <tbody>
-                  {loading && <tr><td colSpan="8">جارٍ التحميل...</td></tr>}
+                  {loading && <SkeletonTableRows colSpan={8} />}
                   {!loading && filteredOthers.length === 0 && <tr><td colSpan="8">لا توجد استقطاعات في {month}.</td></tr>}
                   {!loading && filteredOthers.map((row) => (
                     <tr key={row.id}>

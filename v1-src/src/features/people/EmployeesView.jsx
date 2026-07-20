@@ -5,7 +5,7 @@ import { cls } from "../../lib/cls";
 import { fmtTime12, money } from "../../lib/format";
 import { deductionCategoryLabels, reqStatusLabel } from "../../lib/labels";
 import { StatusBadge } from "../../ui/legacy";
-import { ConfirmDialog } from "../../ui/primitives";
+import { ConfirmDialog, SkeletonList } from "../../ui/primitives";
 import FaceEnrollment from "./FaceEnrollment";
 import DeviceHistory from "./DeviceHistory";
 import EmployeeStatement from "../payroll/EmployeeStatement";
@@ -173,7 +173,7 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
           <Search size={16} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث باسم الموظف..." />
         </label>
-        {loading && <p className="muted">جارٍ التحميل...</p>}
+        {loading && <SkeletonList />}
         {departments ? (
           <div className="dept-list">
             {departments.map((dept) => {
@@ -416,7 +416,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
         />
       )}
 
-      {loading && <section className="panel"><p className="muted">جارٍ التحميل...</p></section>}
+      {loading && <section className="panel"><SkeletonList /></section>}
 
       {!loading && d && stats && (
         <>

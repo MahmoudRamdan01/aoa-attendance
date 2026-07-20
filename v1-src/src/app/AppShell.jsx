@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cls } from "../lib/cls";
+import { haptic } from "../lib/haptics";
 import {
   Bell,
   CheckCheck,
@@ -474,12 +475,77 @@ export default function AppShell({
     setMobileMoreOpen(true);
   };
 
+  // Pull-to-refresh (touch devices): pulling down from the very top shows a
+  // circular indicator; past the threshold it triggers the same full refresh
+  // as the topbar button. DOM-driven (refs, no re-render per frame).
+  const ptrRef = useRef(null);
+  const ptrBusyRef = useRef(false);
+  useEffect(() => {
+    if (!window.matchMedia?.("(pointer: coarse)")?.matches) return undefined;
+    const scroller = () => document.scrollingElement || document.documentElement;
+    let startY = 0;
+    let pull = 0;
+    let pulling = false;
+    const indicator = () => ptrRef.current;
+    const setPull = (next) => {
+      pull = next;
+      const el = indicator();
+      if (!el) return;
+      el.style.opacity = String(Math.min(1, pull / 58));
+      el.style.transform = `translateY(${Math.min(72, pull * 0.62)}px) rotate(${pull * 2.4}deg)`;
+    };
+    const onStart = (event) => {
+      if (ptrBusyRef.current || scroller().scrollTop > 0) { pulling = false; return; }
+      pulling = true;
+      startY = event.touches[0].clientY;
+      setPull(0);
+    };
+    const onMove = (event) => {
+      if (!pulling) return;
+      if (scroller().scrollTop > 0) { pulling = false; setPull(0); return; }
+      const dy = event.touches[0].clientY - startY;
+      setPull(Math.max(0, Math.min(110, dy * 0.5)));
+    };
+    const onEnd = () => {
+      if (!pulling) return;
+      pulling = false;
+      const el = indicator();
+      if (pull > 58 && !ptrBusyRef.current) {
+        ptrBusyRef.current = true;
+        haptic();
+        el?.setAttribute("data-busy", "true");
+        el && (el.style.opacity = "1", el.style.transform = "translateY(52px)");
+        onRefresh?.();
+        window.setTimeout(() => {
+          ptrBusyRef.current = false;
+          el?.removeAttribute("data-busy");
+          setPull(0);
+        }, 1100);
+      } else {
+        setPull(0);
+      }
+    };
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd, { passive: true });
+    window.addEventListener("touchcancel", onEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, [onRefresh]);
+
   return (
     <div
       className="ops-shell"
       data-section={activeItem?.accent || activeItem?.section || "home"}
       data-employee-tabs={showBottomNav ? "true" : undefined}
     >
+      <div ref={ptrRef} className="ops-ptr" aria-hidden="true">
+        <RefreshCcw size={17} />
+      </div>
       <a
         className="skip-link"
         href="#main-content"
