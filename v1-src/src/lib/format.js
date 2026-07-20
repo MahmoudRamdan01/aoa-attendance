@@ -63,7 +63,12 @@ function downloadTextFile(filename, text) {
 }
 
 function csvCell(value) {
-  const text = String(value ?? "");
+  let text = String(value ?? "");
+  // CSV formula injection guard: a cell starting with = + - @ (or a control
+  // char) is executed as a formula by Excel/Sheets. Names, notes and
+  // descriptions come from users, so neutralize the trigger with a leading
+  // apostrophe before quoting.
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
 

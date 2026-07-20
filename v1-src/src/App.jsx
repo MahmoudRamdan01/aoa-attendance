@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 import AppShell from "./app/AppShell";
 import { allowedViews, canAccessView, createViewRegistry, getFallbackView } from "./app/registry";
 import { useHashRouter } from "./app/router";
+import { clearAttendanceQueue } from "./lib/offlineQueue";
 import { Skeleton, Toast } from "./ui/primitives";
 import EmployeeToday from "./features/home";
 import MyMonthView from "./features/myrecord/MyMonthView";
@@ -73,6 +74,10 @@ function clearAllAppCaches() {
   } catch {
     /* no-op */
   }
+  // Also purge the offline attendance queue — it can hold a raw face template,
+  // GPS samples and the device id until synced. Fire-and-forget so sign-out
+  // stays instant.
+  clearAttendanceQueue();
 }
 
 function writeCachedContext(userId, value) {

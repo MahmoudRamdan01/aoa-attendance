@@ -65,6 +65,17 @@ export async function removeQueuedAttendance(id) {
   await withStore("readwrite", (store) => store.delete(id));
 }
 
+// Sign-out cleanup: purge any queued rows (they hold the raw face template,
+// GPS samples and device id) so nothing sensitive survives on a shared device.
+export async function clearAttendanceQueue() {
+  try {
+    if (!("indexedDB" in window)) return;
+    await withStore("readwrite", (store) => store.clear());
+  } catch {
+    /* Best-effort; sign-out must never be blocked by storage errors. */
+  }
+}
+
 export async function listQueuedAttendance() {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
