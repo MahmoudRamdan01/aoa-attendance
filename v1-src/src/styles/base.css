@@ -19,8 +19,12 @@ html {
 body {
   min-inline-size: 320px;
   min-block-size: 100vh;
+  min-block-size: 100dvh;
   margin: 0;
   overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background: var(--canvas);
   color: var(--text);
   line-height: 1.65;

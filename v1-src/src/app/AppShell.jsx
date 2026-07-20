@@ -23,6 +23,7 @@ import {
   getFallbackView,
   groupViewsBySection,
 } from "./registry";
+import { useBackClose } from "./router";
 import { useTheme } from "./theme";
 
 const roleNames = { employee: "موظف", hr: "HR", owner: "Owner" };
@@ -283,6 +284,9 @@ export default function AppShell({
   const mobileMoreTriggerRef = useRef(null);
   const mobileMoreRestoreFocusRef = useRef(null);
   const { theme, toggleTheme } = useTheme();
+  // Hardware Back closes open surfaces instead of leaving the app.
+  useBackClose(mobileMoreOpen, () => setMobileMoreOpen(false));
+  useBackClose(inboxOpen, () => setInboxOpen(false));
   const accessibleViews = useMemo(() => allowedViews(views, context), [views, context]);
   const activeItem = accessibleViews.find((view) => view.id === activeView) || accessibleViews[0];
   const navGroups = useMemo(() => groupViewsBySection(accessibleViews), [accessibleViews]);

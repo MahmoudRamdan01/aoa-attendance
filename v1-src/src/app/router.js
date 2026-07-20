@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 function safeDecode(value) {
   try {
@@ -22,6 +22,34 @@ export function buildHash(view, params = []) {
     .filter((part) => part !== undefined && part !== null && String(part) !== "")
     .map((part) => encodeURIComponent(String(part)));
   return `#/${encoded.join("/")}`;
+}
+
+// Make the hardware/browser Back button close an open overlay (sheet, dialog,
+// palette, capture) instead of leaving the page or exiting the installed PWA.
+// While `open`, one same-URL history entry is pushed; Back pops it → onClose.
+// Closing any other way (X, Esc, backdrop) consumes that entry silently.
+// The URL hash never changes, so useHashRouter's listeners see no route change.
+export function useBackClose(open, onClose) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let pushed = true;
+    window.history.pushState({ aoaOverlay: true }, "");
+    const onPop = () => {
+      pushed = false;
+      onCloseRef.current?.();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      // Consume our entry only if it is still on top — if the app navigated
+      // meanwhile (hash change pushed a new entry), going back would undo
+      // that navigation instead of just removing the overlay entry.
+      if (pushed && window.history.state?.aoaOverlay) window.history.back();
+    };
+  }, [open]);
 }
 
 export function useHashRouter(defaultView = "today") {
