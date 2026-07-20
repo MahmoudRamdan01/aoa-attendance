@@ -100,6 +100,27 @@ export function Skeleton({ width = "100%", height = 16, radius, className = "", 
   return <span className={["ui-skeleton", className].filter(Boolean).join(" ")} style={style} aria-hidden="true" {...props} />;
 }
 
+// Shimmer placeholders while a panel's data loads (replaces the old
+// «جارٍ التحميل...» text so layouts stop jumping).
+export function SkeletonList({ rows = 4, height = 46, gap = 10 }) {
+  return (
+    <div className="ui-skeleton-list" style={{ display: "grid", gap: `${gap}px` }} role="status" aria-label="جارٍ التحميل">
+      {Array.from({ length: rows }, (_, index) => <Skeleton key={index} height={height} radius={12} />)}
+    </div>
+  );
+}
+
+// Same idea inside a <tbody>: one spanning row holding shimmer bars.
+export function SkeletonTableRows({ colSpan, rows = 4 }) {
+  return (
+    <tr>
+      <td colSpan={colSpan}>
+        <SkeletonList rows={rows} height={30} gap={8} />
+      </td>
+    </tr>
+  );
+}
+
 export function EmptyState({
   title = "لا توجد بيانات بعد",
   description = "أول ما البيانات تتسجل هتظهر في المكان ده.",

@@ -10,6 +10,7 @@ import { Bar, Metric, StatusBadge } from "../../ui/legacy";
 import { Area, AreaChart, Bar as ReBar, BarChart as ReBarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import CompanyReports from "./CompanyReports";
 import EmployeeStatement from "./EmployeeStatement";
+import { SkeletonTableRows } from "../../ui/primitives";
 
 function OwnerDashboard({ onToast }) {
   const [rows, setRows] = useState([]);
@@ -398,7 +399,7 @@ function OwnerDashboard({ onToast }) {
               )}
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={stats.payMode === "daily" ? 10 : 7}>جارٍ التحميل...</td></tr>}
+              {loading && <SkeletonTableRows colSpan={stats.payMode === "daily" ? 10 : 7} />}
               {!loading && stats.payrollRows.length === 0 && <tr><td colSpan={stats.payMode === "daily" ? 10 : 7}>لا توجد بيانات مرتبات.</td></tr>}
               {!loading && stats.payrollRows.map((row) => (
                 <tr key={row.employee_id}>

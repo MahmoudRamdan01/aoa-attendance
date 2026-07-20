@@ -1160,3 +1160,38 @@
     animation: none;
   }
 }
+
+/* Pull-to-refresh indicator (driven from AppShell via refs). */
+.ops-ptr {
+  position: fixed;
+  inset-inline-start: 50%;
+  margin-inline-start: -20px;
+  inset-block-start: calc(var(--topbar-h) + env(safe-area-inset-top, 0px) - 34px);
+  inline-size: 40px;
+  block-size: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--gold-line);
+  background: var(--surface-raised);
+  color: var(--gold-text);
+  box-shadow: var(--shadow-raised);
+  z-index: 210;
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.ops-ptr[data-busy] svg {
+  animation: ops-ptr-spin 0.8s linear infinite;
+}
+
+@keyframes ops-ptr-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Scroll containment inside floating surfaces. */
+.ops-mobile-more,
+.ops-inbox-list {
+  overscroll-behavior: contain;
+}

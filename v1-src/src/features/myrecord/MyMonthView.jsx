@@ -5,6 +5,7 @@ import { supabase, todayIso } from "../../lib/supabase";
 import { csvCell, downloadTextFile, fmtTime12 } from "../../lib/format";
 import { statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
+import { SkeletonTableRows } from "../../ui/primitives";
 
 function weekdayName(date) {
   return new Intl.DateTimeFormat("ar-EG", { weekday: "long", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
@@ -127,7 +128,7 @@ function MyMonthView({ context, onToast }) {
               <tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>حضور</th><th>انصراف</th><th>تأخير</th><th>خصم</th><th>ملاحظتي</th></tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan="8">جارٍ التحميل...</td></tr>}
+              {loading && <SkeletonTableRows colSpan={8} />}
               {!loading && rows.length === 0 && <tr><td colSpan="8">لا توجد سجلات في هذا الشهر.</td></tr>}
               {!loading && rows.map((row) => (
                 <tr key={row.id || row.work_date}>

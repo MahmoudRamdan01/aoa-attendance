@@ -4,7 +4,7 @@ import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { money, normalizeArabicName } from "../../lib/format";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { ConfirmDialog } from "../../ui/primitives";
+import { ConfirmDialog, SkeletonList } from "../../ui/primitives";
 
 const emptyEntryForm = () => ({ person: "", direction: "lent", amount: "", date: todayIso(), note: "" });
 const emptyPayForm = () => ({ amount: "", date: todayIso(), note: "" });
@@ -420,7 +420,7 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
           </label>
         )}
 
-        {loading && <p className="muted">جارٍ التحميل...</p>}
+        {loading && <SkeletonList />}
         {!loading && byPerson.length === 0 && <p className="muted">الدفتر فارغ — سجّل أول قيد.</p>}
 
         {filtered.length > 0 && (

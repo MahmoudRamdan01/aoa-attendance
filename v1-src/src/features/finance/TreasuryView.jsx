@@ -4,6 +4,7 @@ import { supabase, todayIso } from "../../lib/supabase";
 import { money } from "../../lib/format";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import { useVoidDialog, maskActor, FinanceEditModal } from "./shared";
+import { SkeletonTableRows } from "../../ui/primitives";
 
 function TreasuryView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -355,7 +356,7 @@ function TreasuryView({ context, onToast }) {
           <table>
             <thead><tr><th>التاريخ</th><th>النوع</th><th>مع/من</th><th>المبلغ</th><th>البيان</th><th>الحالة</th><th>إجراء</th></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan="7">جارٍ التحميل...</td></tr>}
+              {loading && <SkeletonTableRows colSpan={7} />}
               {!loading && monthEntries.length === 0 && <tr><td colSpan="7">لا توجد حركة في {month}.</td></tr>}
               {!loading && monthEntries.map((row) => (
                 <tr key={row.id}>

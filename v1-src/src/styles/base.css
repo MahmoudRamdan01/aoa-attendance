@@ -186,3 +186,10 @@ bdi[dir="ltr"],
     color: #111111 !important;
   }
 }
+
+/* App-like scrolling: no browser pull-to-refresh / bounce chaining (the in-app
+   pull-to-refresh in the shell handles that gesture). */
+html,
+body {
+  overscroll-behavior-y: none;
+}
