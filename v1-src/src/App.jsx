@@ -260,6 +260,25 @@ function App() {
     }
   }, [context?.role, context?.employee?.id, activeView, navigate, viewRegistry]);
 
+  // Browsers without the View Transitions API (router-side) still get a page
+  // transition: re-run the entry animation on the container that just became
+  // visible. Mounted views keep their state — only a class toggles.
+  useEffect(() => {
+    if (typeof document.startViewTransition === "function") return undefined;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return undefined;
+    const el = document.querySelector(".ops-mounted-view:not([hidden])");
+    if (!el) return undefined;
+    el.classList.remove("view-entering");
+    void el.offsetWidth;
+    el.classList.add("view-entering");
+    const done = () => el.classList.remove("view-entering");
+    el.addEventListener("animationend", done, { once: true });
+    return () => {
+      el.removeEventListener("animationend", done);
+      el.classList.remove("view-entering");
+    };
+  }, [activeView]);
+
   // Download the small view chunks while the browser is idle. Heavy face
   // recognition files remain on-demand so they never compete with navigation.
   useEffect(() => {

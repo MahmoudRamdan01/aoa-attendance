@@ -574,3 +574,16 @@
     animation: none !important;
   }
 }
+
+/* Toast: springy native-style entrance from the bottom edge. */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-toast {
+    animation: ui-toast-spring 340ms var(--ease-emphasized) both;
+  }
+}
+
+@keyframes ui-toast-spring {
+  0% { opacity: 0; transform: translateY(26px) scale(0.97); }
+  62% { opacity: 1; transform: translateY(-4px) scale(1.004); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}

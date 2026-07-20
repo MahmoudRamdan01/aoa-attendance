@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cls } from "../lib/cls";
 import {
   Bell,
   CheckCheck,
@@ -24,7 +25,7 @@ import {
   getFallbackView,
   groupViewsBySection,
 } from "./registry";
-import { useBackClose } from "./router";
+import { useBackClose, useSheetDrag } from "./router";
 import { useTheme } from "./theme";
 
 const roleNames = { employee: "موظف", hr: "HR", owner: "Owner" };
@@ -88,6 +89,8 @@ function ThemeButton({ theme, onToggle, mobile = false }) {
 function InboxPopover({
   id,
   open,
+  closing,
+  panelRef,
   onClose,
   unread,
   setUnread,
@@ -159,13 +162,15 @@ function InboxPopover({
 
   return (
     <section
-      className="ops-inbox"
+      ref={panelRef}
+      className={cls("ops-inbox", closing && "ops-closing")}
       id={id}
       role="dialog"
       aria-labelledby={`${id}-title`}
       aria-busy={loading || undefined}
     >
-      <header className="ops-inbox-head">
+      {/* The list scrolls, so only the header acts as the drag handle. */}
+      <header className="ops-inbox-head" data-sheet-handle>
         <div>
           <h2 id={`${id}-title`}>صندوق الإشعارات</h2>
           <span className="ui-page-eyebrow">
@@ -285,9 +290,40 @@ export default function AppShell({
   const mobileMoreTriggerRef = useRef(null);
   const mobileMoreRestoreFocusRef = useRef(null);
   const { theme, toggleTheme } = useTheme();
+  // Animated dismissal: mark the surface as closing, unmount after the exit
+  // animation. Drag-to-dismiss finishes its own slide then unmounts directly.
+  const [moreClosing, setMoreClosing] = useState(false);
+  const [inboxClosing, setInboxClosing] = useState(false);
+  const closeMore = useCallback(() => {
+    setMoreClosing((already) => {
+      if (already) return already;
+      window.setTimeout(() => {
+        setMobileMoreOpen(() => false);
+        setMoreClosing(() => false);
+      }, 175);
+      return true;
+    });
+  }, []);
+  const closeInbox = useCallback(() => {
+    setInboxClosing((already) => {
+      if (already) return already;
+      window.setTimeout(() => {
+        setInboxOpen(() => false);
+        setInboxClosing(() => false);
+      }, 175);
+      return true;
+    });
+  }, []);
+  const inboxPanelRef = useRef(null);
+  useSheetDrag(mobileMoreRef, () => setMobileMoreOpen(() => false), mobileMoreOpen);
+  useSheetDrag(
+    inboxPanelRef,
+    () => setInboxOpen(() => false),
+    inboxOpen && (typeof window === "undefined" || window.matchMedia("(max-width: 820px)").matches)
+  );
   // Hardware Back closes open surfaces instead of leaving the app.
-  useBackClose(mobileMoreOpen, () => setMobileMoreOpen(false));
-  useBackClose(inboxOpen, () => setInboxOpen(false));
+  useBackClose(mobileMoreOpen, () => closeMore());
+  useBackClose(inboxOpen, () => closeInbox());
   const accessibleViews = useMemo(() => allowedViews(views, context), [views, context]);
   const activeItem = accessibleViews.find((view) => view.id === activeView) || accessibleViews[0];
   const navGroups = useMemo(() => groupViewsBySection(accessibleViews), [accessibleViews]);
@@ -319,8 +355,8 @@ export default function AppShell({
         setPaletteOpen((current) => {
           const next = !current;
           if (next) {
-            setInboxOpen(false);
-            setMobileMoreOpen(false);
+            closeInbox();
+            closeMore();
           }
           return next;
         });
@@ -330,8 +366,8 @@ export default function AppShell({
           window.requestAnimationFrame(() => inboxTriggerRef.current?.focus());
         }
         setPaletteOpen(false);
-        setInboxOpen(false);
-        setMobileMoreOpen(false);
+        closeInbox();
+        closeMore();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -352,7 +388,7 @@ export default function AppShell({
   useEffect(() => {
     if (!inboxOpen) return undefined;
     const onPointerDown = (event) => {
-      if (!inboxWrapRef.current?.contains(event.target)) setInboxOpen(false);
+      if (!inboxWrapRef.current?.contains(event.target)) closeInbox();
     };
     document.addEventListener("pointerdown", onPointerDown);
     // Lock the page behind the inbox so swiping the list doesn't scroll the app.
@@ -375,7 +411,7 @@ export default function AppShell({
     });
     const mobileQuery = window.matchMedia("(max-width: 820px)");
     const closeOnDesktop = (event) => {
-      if (!event.matches) setMobileMoreOpen(false);
+      if (!event.matches) closeMore();
     };
     mobileQuery.addEventListener?.("change", closeOnDesktop);
 
@@ -393,7 +429,7 @@ export default function AppShell({
   const handleMobileMoreKeyDown = (event) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      setMobileMoreOpen(false);
+      closeMore();
       return;
     }
     if (event.key !== "Tab") return;
@@ -416,25 +452,25 @@ export default function AppShell({
   const navigate = (view, params = []) => {
     onNavigate?.(view, params);
     setPaletteOpen(false);
-    setInboxOpen(false);
-    setMobileMoreOpen(false);
+    closeInbox();
+    closeMore();
   };
 
   const openPalette = () => {
-    setInboxOpen(false);
-    setMobileMoreOpen(false);
+    closeInbox();
+    closeMore();
     setPaletteOpen(true);
   };
 
   const openInbox = () => {
     setPaletteOpen(false);
-    setMobileMoreOpen(false);
+    closeMore();
     setInboxOpen((current) => !current);
   };
 
   const openMore = () => {
     setPaletteOpen(false);
-    setInboxOpen(false);
+    closeInbox();
     setMobileMoreOpen(true);
   };
 
@@ -518,7 +554,9 @@ export default function AppShell({
               <InboxPopover
                 id="ops-inbox"
                 open={inboxOpen}
-                onClose={() => setInboxOpen(false)}
+                closing={inboxClosing}
+                panelRef={inboxPanelRef}
+                onClose={() => closeInbox()}
                 unread={unread}
                 setUnread={setUnread}
                 onNavigate={navigate}
@@ -634,7 +672,7 @@ export default function AppShell({
       ) : null}
 
       {mobileMoreOpen ? (
-        <div className="ops-sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setMobileMoreOpen(false); }}>
+        <div className={cls("ops-sheet-backdrop", moreClosing && "ops-closing")} onMouseDown={(event) => { if (event.target === event.currentTarget) closeMore(); }}>
           <section
             ref={mobileMoreRef}
             className="ops-mobile-more"
@@ -647,7 +685,7 @@ export default function AppShell({
             <span className="ops-mobile-more-handle" aria-hidden="true" />
             <header className="ops-mobile-more-head">
               <h2 id="ops-mobile-more-title">القائمة</h2>
-              <button className="ops-mobile-more-close" type="button" onClick={() => setMobileMoreOpen(false)} aria-label="إغلاق القائمة">
+              <button className="ops-mobile-more-close" type="button" onClick={() => closeMore()} aria-label="إغلاق القائمة">
                 <X size={18} aria-hidden="true" />
               </button>
             </header>
