@@ -270,7 +270,10 @@ function AdminDashboard({ context, onToast }) {
             <option value="leave">أجازة</option>
           </select>
         </div>
-        <div className="table-wrap cards-on-mobile">
+        {/* Owner decision: the attendance board stays a TABLE on phones —
+            scanning the whole team at once beats per-row cards here. Sticky
+            header + sticky name column keep it readable while scrolling. */}
+        <div className="table-wrap sticky-table">
           <table>
             <thead><tr><th>الموظف</th><th>الحالة</th><th>الوجه</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
             <tbody>
