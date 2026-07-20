@@ -458,6 +458,8 @@ function AccountManager({ onToast }) {
   const [form, setForm] = useState({ employeeId: "", email: "", password: "", role: "employee" });
   const [busy, setBusy] = useState(false);
   const [lastCreated, setLastCreated] = useState(null);
+  const [showPw, setShowPw] = useState(false);
+  const [revealNew, setRevealNew] = useState(false);
 
   useEffect(() => {
     loadAccounts();
@@ -508,6 +510,7 @@ function AccountManager({ onToast }) {
     }
     const empName = employees.find((emp) => String(emp.id) === String(form.employeeId))?.name || "";
     setLastCreated({ name: empName, email: form.email.trim(), password: form.password });
+    setRevealNew(false);
     setForm((current) => ({ ...current, email: "", password: "" }));
     onToast("تم إنشاء حساب الدخول.");
     loadAccounts();
@@ -520,13 +523,23 @@ function AccountManager({ onToast }) {
       <form className="form account-form" onSubmit={submit}>
         <label>الموظف<select value={form.employeeId} onChange={(e) => setForm((current) => ({ ...current, employeeId: e.target.value }))}>{employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}</select></label>
         <label>البريد الإلكتروني<input dir="ltr" type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} required placeholder="employee@airocean.com" /></label>
-        <label>كلمة المرور<input dir="ltr" type="text" value={form.password} onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} required minLength={6} placeholder="6 حروف على الأقل" /></label>
+        <label>كلمة المرور
+          <span className="pw-field">
+            <input dir="ltr" type={showPw ? "text" : "password"} autoComplete="new-password" value={form.password} onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} required minLength={6} placeholder="6 حروف على الأقل" />
+            <button type="button" className="link" onClick={() => setShowPw((v) => !v)}>{showPw ? "إخفاء" : "إظهار"}</button>
+          </span>
+        </label>
         <label>الدور<select value={form.role} onChange={(e) => setForm((current) => ({ ...current, role: e.target.value }))}>{roleOptions.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
         <button className="primary" disabled={busy}>{busy ? "جارٍ الإنشاء..." : "إنشاء حساب دخول"}</button>
       </form>
       {lastCreated && (
         <div className="setup-banner" dir="rtl">
-          تم إنشاء حساب <strong>{lastCreated.name}</strong> — البريد الإلكتروني: <bdi dir="ltr">{lastCreated.email}</bdi> · كلمة المرور: <bdi dir="ltr">{lastCreated.password}</bdi>. سلّمها للموظف.
+          تم إنشاء حساب <strong>{lastCreated.name}</strong> — البريد الإلكتروني: <bdi dir="ltr">{lastCreated.email}</bdi> · كلمة المرور:{" "}
+          {revealNew
+            ? <bdi dir="ltr">{lastCreated.password}</bdi>
+            : <button type="button" className="link" onClick={() => setRevealNew(true)}>••••••• (اضغط للعرض)</button>}
+          . سلّمها للموظف واطلب منه تغييرها بعد أول دخول.
+          <button type="button" className="link" style={{ marginInlineStart: 10 }} onClick={() => { setLastCreated(null); setRevealNew(false); }}>تم</button>
         </div>
       )}
       <div className="table-wrap cards-on-mobile">
