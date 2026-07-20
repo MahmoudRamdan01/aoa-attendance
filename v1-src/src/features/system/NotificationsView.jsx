@@ -5,6 +5,7 @@ import { cls } from "../../lib/cls";
 
 import { fmtDateTime } from "../../lib/format";
 import { notificationCategoryLabels } from "../../lib/labels";
+import { ConfirmDialog } from "../../ui/primitives";
 
 function NotificationsView({ context, onToast, routeParam }) {
   const [rows, setRows] = useState([]);
@@ -76,9 +77,9 @@ function NotificationsView({ context, onToast, routeParam }) {
     loadNotifications();
   }
 
+  const [deleteId, setDeleteId] = useState(null);
+
   async function deleteForAll(id) {
-    const ok = confirm("هل تريد حذف هذا الإشعار من جميع المستلمين؟");
-    if (!ok) return;
     const { data, error } = await supabase.rpc("owner_delete_notification_v1", { p_id: id });
     if (error || data?.error) {
       onToast?.(data?.message || "تعذر حذف الإشعار.");
@@ -147,12 +148,21 @@ function NotificationsView({ context, onToast, routeParam }) {
               <p>{item.body}</p>
               <div className="notification-actions">
                 {!item.read_at && <button className="secondary" onClick={() => markRead(item.id)}>تمت القراءة</button>}
-                {role === "owner" && <button className="danger-link" onClick={() => deleteForAll(item.id)}><Trash2 size={15} /> حذف من الكل</button>}
+                {role === "owner" && <button className="danger-link" onClick={() => setDeleteId(item.id)}><Trash2 size={15} /> حذف من الكل</button>}
               </div>
             </div>
           ))}
         </div>
       </section>
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="حذف الإشعار"
+        message="سيتم حذف هذا الإشعار من جميع المستلمين."
+        tone="danger"
+        confirmLabel="حذف من الكل"
+        onConfirm={() => { const id = deleteId; setDeleteId(null); deleteForAll(id); }}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

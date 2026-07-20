@@ -391,6 +391,19 @@
   gap: 8px;
 }
 
+.ui-dialog-field {
+  display: grid;
+  gap: 6px;
+  margin-block-end: 16px;
+  text-align: start;
+}
+
+.ui-dialog-field > span {
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+
 .ui-tabs {
   max-inline-size: 100%;
   padding: 4px;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Menu, MessageSquare, Send, Sparkles, Trash2, Zap, Plus, Square, Pencil, Archive } from "lucide-react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
+import { ConfirmDialog, PromptDialog } from "../../ui/primitives";
 
 const ASSISTANT_FN_URL = `${SUPABASE_URL}/functions/v1/assistant`;
 const uuid = () =>
@@ -439,10 +440,12 @@ function AssistantView({ context }) {
           : m));
   }
 
-  async function renameConversation(id, curTitle) {
-    const title = prompt("اسم المحادثة:", curTitle || "");
-    if (title == null) return;
+  const [renameTarget, setRenameTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  async function renameConversation(id, title) {
     await supabase.from("chat_conversations").update({ title: title.slice(0, 80) }).eq("id", id);
+    setRenameTarget(null);
     refreshConversations();
   }
   async function archiveConversation(id) {
@@ -451,9 +454,9 @@ function AssistantView({ context }) {
     refreshConversations();
   }
   async function deleteConversation(id) {
-    if (!confirm("تمسح المحادثة نهائيًا؟")) return;
     await supabase.from("chat_conversations").delete().eq("id", id);
     if (activeId === id) newChat();
+    setDeleteTarget(null);
     refreshConversations();
   }
 
@@ -472,9 +475,9 @@ function AssistantView({ context }) {
                   <MessageSquare size={14} /> <span>{c.title || "محادثة"}</span>
                 </button>
                 <div className="chat-conv-actions">
-                  <button title="إعادة تسمية" onClick={() => renameConversation(c.id, c.title)}><Pencil size={13} /></button>
+                  <button title="إعادة تسمية" onClick={() => setRenameTarget(c)}><Pencil size={13} /></button>
                   <button title="أرشفة" onClick={() => archiveConversation(c.id)}><Archive size={13} /></button>
-                  <button title="حذف" onClick={() => deleteConversation(c.id)}><Trash2 size={13} /></button>
+                  <button title="حذف" onClick={() => setDeleteTarget(c)}><Trash2 size={13} /></button>
                 </div>
               </div>
             ))}
@@ -564,6 +567,25 @@ function AssistantView({ context }) {
           </form>
         </div>
       </div>
+      <PromptDialog
+        open={Boolean(renameTarget)}
+        title="إعادة تسمية المحادثة"
+        label="اسم المحادثة"
+        initialValue={renameTarget?.title || ""}
+        required
+        confirmLabel="حفظ الاسم"
+        onSubmit={(title) => renameConversation(renameTarget.id, title)}
+        onCancel={() => setRenameTarget(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="حذف المحادثة"
+        message="سيتم حذف المحادثة نهائيًا ولن يمكن استرجاعها."
+        tone="danger"
+        confirmLabel="حذف نهائيًا"
+        onConfirm={() => deleteConversation(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </section>
   );
 }

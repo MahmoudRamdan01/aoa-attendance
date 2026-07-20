@@ -6,6 +6,7 @@ import { addDays, datesBetween } from "../../lib/dates";
 import { csvCell, downloadTextFile, fmtSubmittedAt, fmtTime12 } from "../../lib/format";
 import { reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
+import { ConfirmDialog, PromptDialog } from "../../ui/primitives";
 import QRCodeLib from "qrcode";
 import { Cell, Pie, PieChart as RePieChart, ResponsiveContainer, Tooltip as ChartTooltip } from "recharts";
 
@@ -56,9 +57,9 @@ function AdminDashboard({ context, onToast }) {
     setLoading(false);
   }
 
+  const [resetTarget, setResetTarget] = useState(null);
+
   async function reset(empId) {
-    const ok = confirm("هل تريد حذف سجل اليوم لهذا الموظف؟ سيتم تسجيل العملية في سجل التدقيق.");
-    if (!ok) return;
     const { data, error } = await supabase.rpc("reset_attendance_day_v1", {
       p_employee_id: empId,
       p_date: reportDate,
@@ -269,7 +270,7 @@ function AdminDashboard({ context, onToast }) {
             <option value="leave">أجازة</option>
           </select>
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap cards-on-mobile">
           <table>
             <thead><tr><th>الموظف</th><th>الحالة</th><th>الوجه</th><th>حضور</th><th>انصراف</th><th>خصم</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
             <tbody>
@@ -279,20 +280,20 @@ function AdminDashboard({ context, onToast }) {
                 const rec = recs.get(emp.id);
                 return (
                   <tr key={emp.id}>
-                    <td>{emp.name}</td>
-                    <td>{rec ? <StatusBadge status={rec.status} /> : "لم يسجل"}</td>
-                    <td><FaceBadge record={rec} /></td>
-                    <td dir="ltr">{fmtTime12(rec?.check_in) || "-"}</td>
-                    <td dir="ltr">{fmtTime12(rec?.check_out) || "-"}</td>
-                    <td>{rec?.deduction_days || 0} يوم</td>
-                    <td>
+                    <td data-label="الموظف"><strong>{emp.name}</strong></td>
+                    <td data-label="الحالة">{rec ? <StatusBadge status={rec.status} /> : "لم يسجل"}</td>
+                    <td data-label="الوجه"><FaceBadge record={rec} /></td>
+                    <td data-label="حضور" dir="ltr">{fmtTime12(rec?.check_in) || "-"}</td>
+                    <td data-label="انصراف" dir="ltr">{fmtTime12(rec?.check_out) || "-"}</td>
+                    <td data-label="خصم">{rec?.deduction_days || 0} يوم</td>
+                    <td data-label="ملاحظات">
                       <AdminNoteCell empId={emp.id} rec={rec} reportDate={reportDate} onToast={onToast} onSaved={loadAdmin} />
                     </td>
-                    <td>
+                    <td data-label="إجراء">
                       {context.role === "owner" ? (
                         <span className="approval-actions">
                           <button className="secondary" onClick={() => setCorrecting({ empId: emp.id, name: emp.name, rec })}><Wrench size={14} /> تصحيح</button>
-                          {rec && <button className="danger-link" onClick={() => reset(emp.id)}>تراجع</button>}
+                          {rec && <button className="danger-link" onClick={() => setResetTarget(emp.id)}>تراجع</button>}
                         </span>
                       ) : "-"}
                     </td>
@@ -340,6 +341,15 @@ function AdminDashboard({ context, onToast }) {
       {correcting && (
         <CorrectionModal target={correcting} date={reportDate} onApply={applyCorrection} onClose={() => setCorrecting(null)} />
       )}
+      <ConfirmDialog
+        open={resetTarget !== null}
+        title="حذف سجل اليوم"
+        message="سيتم حذف سجل اليوم لهذا الموظف وتسجيل العملية في سجل التدقيق."
+        tone="danger"
+        confirmLabel="حذف السجل"
+        onConfirm={() => { const id = resetTarget; setResetTarget(null); reset(id); }}
+        onCancel={() => setResetTarget(null)}
+      />
     </div>
   );
 }
@@ -453,7 +463,7 @@ function RequestsHistory() {
       {loading && <p className="muted">جارٍ التحميل...</p>}
       {!loading && filtered.length === 0 && <p className="muted">لا توجد سجلات.</p>}
       {!loading && filtered.length > 0 && tab === "leaves" && (
-        <div className="table-wrap">
+        <div className="table-wrap sticky-table">
           <table>
             <thead><tr><th>الموظف</th><th>من</th><th>إلى</th><th>أيام</th><th>الحالة</th><th>السبب</th></tr></thead>
             <tbody>
@@ -470,7 +480,7 @@ function RequestsHistory() {
         </div>
       )}
       {!loading && filtered.length > 0 && tab === "perms" && (
-        <div className="table-wrap">
+        <div className="table-wrap sticky-table">
           <table>
             <thead><tr><th>الموظف</th><th>التاريخ</th><th>ساعات</th><th>الحالة</th><th>السبب</th></tr></thead>
             <tbody>
@@ -553,6 +563,7 @@ function AdminNoteCell({ empId, rec, reportDate, onToast, onSaved }) {
 }
 
 function Approvals({ title, rows, type, canApprove, onPermission, onLeave }) {
+  const [rejectId, setRejectId] = useState(null);
   return (
     <section className="panel">
       <div className="panel-title"><Bell size={20} /><h2>{title}</h2></div>
@@ -573,19 +584,34 @@ function Approvals({ title, rows, type, canApprove, onPermission, onLeave }) {
                 <>
                   <button onClick={() => onPermission(row.id, true, 1)}>موافقة ساعة</button>
                   <button onClick={() => onPermission(row.id, true, 2)}>موافقة ساعتين</button>
-                  <button className="danger-link" onClick={() => { const r = prompt("سبب الرفض (اختياري):"); if (r === null) return; onPermission(row.id, false, null, r.trim() || null); }}>رفض</button>
+                  <button className="danger-link" onClick={() => setRejectId(row.id)}>رفض</button>
                 </>
               )}
               {canApprove && type === "leave" && (
                 <>
                   <button onClick={() => onLeave(row.id, true)}>موافقة</button>
-                  <button className="danger-link" onClick={() => { const r = prompt("سبب الرفض (اختياري):"); if (r === null) return; onLeave(row.id, false, r.trim() || null); }}>رفض</button>
+                  <button className="danger-link" onClick={() => setRejectId(row.id)}>رفض</button>
                 </>
               )}
             </div>
           </div>
         ))}
       </div>
+      <PromptDialog
+        open={rejectId !== null}
+        title={type === "permission" ? "رفض طلب الإذن" : "رفض طلب الأجازة"}
+        message="سيصل سبب الرفض للموظف مع الإشعار."
+        label="سبب الرفض"
+        tone="danger"
+        confirmLabel="رفض الطلب"
+        onSubmit={(reason) => {
+          const id = rejectId;
+          setRejectId(null);
+          if (type === "permission") onPermission(id, false, null, reason || null);
+          else onLeave(id, false, reason || null);
+        }}
+        onCancel={() => setRejectId(null)}
+      />
     </section>
   );
 }

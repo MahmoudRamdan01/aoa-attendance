@@ -337,7 +337,7 @@ function OwnerDashboard({ onToast }) {
             <FileSpreadsheet size={16} /> Excel مرتبات
           </button>
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap sticky-table">
           <table>
             <thead>
               <tr>
@@ -461,7 +461,7 @@ function AccountManager({ onToast }) {
           تم إنشاء حساب <strong>{lastCreated.name}</strong> — البريد الإلكتروني: <bdi dir="ltr">{lastCreated.email}</bdi> · كلمة المرور: <bdi dir="ltr">{lastCreated.password}</bdi>. سلّمها للموظف.
         </div>
       )}
-      <div className="table-wrap">
+      <div className="table-wrap cards-on-mobile">
         <table>
           <thead><tr><th>الموظف</th><th>البريد الإلكتروني</th><th>الدور</th><th>الحالة</th><th>الصلاحية</th></tr></thead>
           <tbody>
@@ -470,11 +470,11 @@ function AccountManager({ onToast }) {
               const isOwnerAccount = effectiveRole === "owner";
               return (
                 <tr key={row.employee_id}>
-                  <td>{row.employee_name}</td>
-                  <td dir="ltr">{row.email || "-"}</td>
-                  <td>{roleNames[effectiveRole] || effectiveRole}</td>
-                  <td>{row.user_id ? <StatusBadge status="approved" /> : "غير مربوط"}</td>
-                  <td>
+                  <td data-label="الموظف">{row.employee_name}</td>
+                  <td data-label="البريد" dir="ltr">{row.email || "-"}</td>
+                  <td data-label="الدور">{roleNames[effectiveRole] || effectiveRole}</td>
+                  <td data-label="الحالة">{row.user_id ? <StatusBadge status="approved" /> : "غير مربوط"}</td>
+                  <td data-label="الصلاحية">
                     {isOwnerAccount || !row.user_id ? "—" : (
                       <select
                         value={effectiveRole === "hr" ? "hr" : "employee"}

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertCircle,
@@ -378,6 +378,81 @@ export function ConfirmDialog({
       </section>
     </div>,
     document.body,
+  );
+}
+
+// Text-input variant of ConfirmDialog — the in-app replacement for prompt().
+// Reuses ConfirmDialog's whole skeleton (portal, trap, Esc, Back, backdrop).
+export function PromptDialog({
+  open,
+  title = "إدخال",
+  message,
+  label = "القيمة",
+  placeholder = "",
+  initialValue = "",
+  required = false,
+  multiline = false,
+  confirmLabel = "حفظ",
+  cancelLabel = "إلغاء",
+  tone = "primary",
+  busy = false,
+  onSubmit,
+  onCancel,
+}) {
+  const [value, setValue] = useState(initialValue);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) setValue(initialValue);
+  }, [open, initialValue]);
+
+  // Focus the field after ConfirmDialog's own initial-focus frame runs.
+  useEffect(() => {
+    if (!open) return undefined;
+    const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
+
+  const submit = () => {
+    const trimmed = value.trim();
+    if (required && !trimmed) {
+      inputRef.current?.focus();
+      return;
+    }
+    onSubmit?.(trimmed);
+  };
+
+  const Field = multiline ? "textarea" : "input";
+  return (
+    <ConfirmDialog
+      open={open}
+      title={title}
+      message={message}
+      confirmLabel={confirmLabel}
+      cancelLabel={cancelLabel}
+      tone={tone}
+      busy={busy}
+      onConfirm={submit}
+      onCancel={onCancel}
+    >
+      <label className="ui-dialog-field">
+        <span>{label}{required ? "" : " (اختياري)"}</span>
+        <Field
+          ref={inputRef}
+          value={value}
+          placeholder={placeholder}
+          rows={multiline ? 3 : undefined}
+          disabled={busy}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (!multiline && event.key === "Enter") {
+              event.preventDefault();
+              submit();
+            }
+          }}
+        />
+      </label>
+    </ConfirmDialog>
   );
 }
 

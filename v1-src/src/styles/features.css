@@ -2305,3 +2305,106 @@ table.heatmap th.hm-name, table.heatmap td.hm-name { position: sticky; inset-inl
     height: 22px;
   }
 }
+
+/* ===== PR2: mobile table patterns ===== */
+
+/* Action tables become stacked label/value cards on phones. Each td carries
+   its column name in data-label; cells without one span full width. */
+@media (max-width: 640px) {
+  .table-wrap.cards-on-mobile {
+    overflow-x: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .cards-on-mobile table,
+  .cards-on-mobile tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .cards-on-mobile thead {
+    display: none;
+  }
+
+  .cards-on-mobile tr {
+    display: block;
+    margin-block-end: 10px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+  }
+
+  .cards-on-mobile td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border: 0;
+    border-block-end: 1px solid var(--line-subtle);
+    white-space: normal;
+    text-align: start;
+  }
+
+  .cards-on-mobile td:last-child {
+    border-block-end: 0;
+  }
+
+  .cards-on-mobile td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .cards-on-mobile td input,
+  .cards-on-mobile td select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .cards-on-mobile td .actions-row,
+  .cards-on-mobile td .actions-row.tight {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* Read-only tables keep scrolling but gain a sticky header + sticky first
+   column so the row identity never scrolls away. */
+.table-wrap.sticky-table {
+  -webkit-overflow-scrolling: touch;
+}
+
+.sticky-table thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background: var(--panel);
+}
+
+.sticky-table th:first-child,
+.sticky-table td:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--panel);
+}
+
+.sticky-table thead th:first-child {
+  z-index: 3;
+}
+
+/* Heatmap cells get a touch-friendly size bump. */
+@media (pointer: coarse) {
+  table.heatmap td,
+  table.heatmap th {
+    min-width: 30px;
+    padding: 8px 6px;
+    font-size: 0.72rem;
+  }
+}
