@@ -1,6 +1,53 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { PromptDialog } from "../../ui/primitives";
+import { ConfirmDialog, PromptDialog } from "../../ui/primitives";
+
+// Owner edit modal, reused by every finance view. `fields` describe the
+// inputs; onSubmit gets a { name: value } object. Wraps ConfirmDialog so it
+// inherits the focus trap, Esc/Back dismissal and backdrop.
+function FinanceEditModal({ open, title, fields = [], busy = false, onSubmit, onCancel }) {
+  const [values, setValues] = useState({});
+  useEffect(() => {
+    if (open) setValues(Object.fromEntries(fields.map((f) => [f.name, f.value ?? ""])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const set = (name, value) => setValues((v) => ({ ...v, [name]: value }));
+
+  return (
+    <ConfirmDialog
+      open={open}
+      title={title}
+      confirmLabel="حفظ التعديل"
+      cancelLabel="إلغاء"
+      busy={busy}
+      onConfirm={() => onSubmit?.(values)}
+      onCancel={onCancel}
+    >
+      <div className="form" style={{ marginBlock: "6px 14px" }}>
+        {fields.map((f) => (
+          <label key={f.name}>
+            {f.label}
+            {f.type === "select" ? (
+              <select value={values[f.name] ?? ""} onChange={(e) => set(f.name, e.target.value)}>
+                {(f.options || []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            ) : (
+              <input
+                type={f.type || "text"}
+                value={values[f.name] ?? ""}
+                min={f.min}
+                step={f.step}
+                placeholder={f.placeholder}
+                onChange={(e) => set(f.name, e.target.value)}
+              />
+            )}
+          </label>
+        ))}
+      </div>
+    </ConfirmDialog>
+  );
+}
 
 // Current auth uid — used to decide which rows HR can self-void (same-day rule).
 function useUid() {
@@ -68,4 +115,4 @@ function maskActor(name, role) {
   return name;
 }
 
-export { useUid, useVoidDialog, maskActor };
+export { useUid, useVoidDialog, maskActor, FinanceEditModal };

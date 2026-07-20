@@ -6,7 +6,8 @@ import { monthRangeFor } from "../../lib/dates";
 import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { deductionCategoryLabels, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
-import { useUid, useVoidDialog, maskActor } from "./shared";
+import { Pencil } from "lucide-react";
+import { useUid, useVoidDialog, maskActor, FinanceEditModal } from "./shared";
 
 function DeductionsView({ context, onToast }) {
   const role = context?.role || "employee";
@@ -182,8 +183,50 @@ function DeductionsAdmin({ context, onToast }) {
   const [canteenForm, setCanteenForm] = useState({ employeeId: "", item: "", amount: "", date: todayIso(), note: "" });
   const [otherForm, setOtherForm] = useState({ employeeId: "", category: "damage", amount: "", date: todayIso(), note: "" });
   const [busy, setBusy] = useState(false);
+  const [edit, setEdit] = useState(null); // { kind, row }
+  const [editBusy, setEditBusy] = useState(false);
   const { requestVoid, voidDialog } = useVoidDialog(onToast, () => loadData());
   const range = useMemo(() => monthRangeFor(month), [month]);
+
+  async function saveEdit(values) {
+    setEditBusy(true);
+    const rpc = { loan: "edit_loan_v1", canteen: "edit_canteen_entry_v1", other: "edit_other_deduction_v1" }[edit.kind];
+    const args = edit.kind === "loan"
+      ? { p_id: edit.row.id, p_amount: Number(values.amount), p_installments: Number(values.installments), p_start_month: values.startMonth, p_note: values.note || null }
+      : edit.kind === "canteen"
+        ? { p_id: edit.row.id, p_item: values.item, p_amount: Number(values.amount), p_date: values.date, p_note: values.note || null }
+        : { p_id: edit.row.id, p_category: values.category, p_amount: Number(values.amount), p_date: values.date, p_note: values.note || null };
+    const { data, error } = await supabase.rpc(rpc, args);
+    setEditBusy(false);
+    if (error || data?.error) return onToast(data?.message || "تعذر التعديل.");
+    setEdit(null);
+    onToast("تم التعديل.");
+    loadData();
+  }
+
+  const editFields = () => {
+    if (!edit) return [];
+    const r = edit.row;
+    if (edit.kind === "loan") return [
+      { name: "amount", label: "المبلغ", type: "number", min: "0.5", step: "0.01", value: String(r.amount) },
+      { name: "installments", label: "عدد الأقساط", type: "number", min: "1", value: String(r.installments_count) },
+      { name: "startMonth", label: "شهر البداية", type: "month", value: r.start_month },
+      { name: "note", label: "ملاحظة", type: "text", value: r.note || "" },
+    ];
+    if (edit.kind === "canteen") return [
+      { name: "date", label: "التاريخ", type: "date", value: r.entry_date },
+      { name: "item", label: "الصنف", type: "text", value: r.item || "" },
+      { name: "amount", label: "المبلغ", type: "number", min: "0.5", step: "0.01", value: String(r.amount) },
+      { name: "note", label: "ملاحظة", type: "text", value: r.note || "" },
+    ];
+    return [
+      { name: "date", label: "التاريخ", type: "date", value: r.entry_date },
+      { name: "category", label: "النوع", type: "select", value: r.category,
+        options: Object.entries(deductionCategoryLabels).map(([value, label]) => ({ value, label })) },
+      { name: "amount", label: "المبلغ", type: "number", min: "0.5", step: "0.01", value: String(r.amount) },
+      { name: "note", label: "ملاحظة", type: "text", value: r.note || "" },
+    ];
+  };
 
   useEffect(() => {
     supabase.from("employees").select("id,name,active").eq("active", true).order("id").then(({ data }) => {
@@ -367,7 +410,12 @@ function DeductionsAdmin({ context, onToast }) {
                         <td data-label="متبقي"><strong>{money(Math.max(0, loan.amount - paid))} ج</strong></td>
                         <td data-label="بداية" dir="ltr">{loan.start_month}</td>
                         <td data-label="الحالة"><StatusBadge status={loan.status} /></td>
-                        <td data-label="إجراء">{loan.status === "active" ? <button className="danger-link" onClick={() => requestVoid("loan", loan.id)}>إلغاء</button> : "-"}</td>
+                        <td data-label="إجراء" className="card-actions">{loan.status === "active" ? (
+                          <span className="approval-actions">
+                            {isOwner && <button className="link" onClick={() => setEdit({ kind: "loan", row: loan })}><Pencil size={14} /> تعديل</button>}
+                            <button className="danger-link" onClick={() => requestVoid("loan", loan.id)}>إلغاء</button>
+                          </span>
+                        ) : "-"}</td>
                       </tr>
                     );
                   })}
@@ -410,7 +458,12 @@ function DeductionsAdmin({ context, onToast }) {
                       <td data-label="المبلغ">{money(row.amount)} ج</td>
                       <td data-label="سجّله">{maskActor(row.created_by_name, role) || "-"}</td>
                       <td data-label="الحالة"><StatusBadge status={row.status} /></td>
-                      <td data-label="إجراء">{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => requestVoid("canteen", row.id)}>إلغاء</button> : "-"}</td>
+                      <td data-label="إجراء" className="card-actions">{row.status === "active" ? (
+                        <span className="approval-actions">
+                          {isOwner && <button className="link" onClick={() => setEdit({ kind: "canteen", row })}><Pencil size={14} /> تعديل</button>}
+                          {canVoid(row) && <button className="danger-link" onClick={() => requestVoid("canteen", row.id)}>إلغاء</button>}
+                        </span>
+                      ) : "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -453,7 +506,12 @@ function DeductionsAdmin({ context, onToast }) {
                       <td data-label="ملاحظة" className="note-cell">{row.note || "-"}</td>
                       <td data-label="سجّله">{maskActor(row.created_by_name, role) || "-"}</td>
                       <td data-label="الحالة"><StatusBadge status={row.status} /></td>
-                      <td data-label="إجراء">{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => requestVoid("other", row.id)}>إلغاء</button> : "-"}</td>
+                      <td data-label="إجراء" className="card-actions">{row.status === "active" ? (
+                        <span className="approval-actions">
+                          {isOwner && <button className="link" onClick={() => setEdit({ kind: "other", row })}><Pencil size={14} /> تعديل</button>}
+                          {canVoid(row) && <button className="danger-link" onClick={() => requestVoid("other", row.id)}>إلغاء</button>}
+                        </span>
+                      ) : "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -463,6 +521,14 @@ function DeductionsAdmin({ context, onToast }) {
         )}
       </section>
       {voidDialog}
+      <FinanceEditModal
+        open={Boolean(edit)}
+        title={edit?.kind === "loan" ? "تعديل السلفة" : edit?.kind === "canteen" ? "تعديل الكانتين" : "تعديل الاستقطاع"}
+        busy={editBusy}
+        fields={editFields()}
+        onSubmit={saveEdit}
+        onCancel={() => setEdit(null)}
+      />
     </div>
   );
 }
