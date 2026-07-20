@@ -77,17 +77,42 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
     if (!employees.length) setLoading(true);
     const { data } = await supabase
       .from("employees")
-      .select("id,name,active,attendance_exempt,leave_balance,checkin_from,checkin_to,checkout_from,checkout_to,assistant_enabled")
+      // select * so the optional `department` column (Air Ocean DB) comes
+      // along without breaking databases that don't have it.
+      .select("*")
       .order("id");
     const rows = data || [];
     setEmployees(rows);
     writeEmployeesCache(userId, rows);
     setLoading(false);
   }
+  // Department accordion (Air Ocean): employees carry a `department` value →
+  // one clickable bar per department. Databases without departments (our
+  // original system) keep the flat grid untouched.
+  const [openDepts, setOpenDepts] = useState(() => new Set());
   const filtered = useMemo(() => {
     const q = query.trim();
     return employees.filter((e) => !q || (e.name || "").includes(q));
   }, [employees, query]);
+
+  const departments = useMemo(() => {
+    if (!employees.some((e) => e.department)) return null;
+    const groups = new Map();
+    filtered.forEach((e) => {
+      const dept = e.department || "بدون قسم";
+      if (!groups.has(dept)) groups.set(dept, []);
+      groups.get(dept).push(e);
+    });
+    return [...groups.entries()].map(([name, members]) => ({ name, members }));
+  }, [employees, filtered]);
+
+  function toggleDept(name) {
+    setOpenDepts((current) => {
+      const next = new Set(current);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }
 
   if (selected) {
     return (
@@ -149,31 +174,50 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث باسم الموظف..." />
         </label>
         {loading && <p className="muted">جارٍ التحميل...</p>}
-        <div className="emp-grid">
-          {filtered.map((e) => (
-            <button
-              key={e.id}
-              type="button"
-              className="emp-card"
-              onClick={() => {
-                setSelected(e);
-                onNavigate?.("team", [e.id]);
-              }}
-            >
-              <span className="emp-avatar">{(e.name || "?").slice(0, 1)}</span>
-              <span className="emp-card-body">
-                <strong>{e.name}</strong>
-                <span className="muted">{e.active ? (e.attendance_exempt ? "مرتبات فقط" : "نشط") : "موقوف"}</span>
-              </span>
-              <ChevronLeft size={18} />
-            </button>
-          ))}
-        </div>
+        {departments ? (
+          <div className="dept-list">
+            {departments.map((dept) => {
+              // Searching auto-opens the sections that contain matches.
+              const open = query.trim() ? true : openDepts.has(dept.name);
+              return (
+                <div className={cls("dept-group", open && "open")} key={dept.name}>
+                  <button type="button" className="dept-bar" aria-expanded={open} onClick={() => toggleDept(dept.name)}>
+                    <span className="dept-bar-name">{dept.name}</span>
+                    <span className="dept-bar-count">{dept.members.length} موظف</span>
+                    <ChevronLeft size={18} className="dept-bar-chev" />
+                  </button>
+                  {open && (
+                    <div className="emp-grid">
+                      {dept.members.map((e) => <EmployeeCard key={e.id} employee={e} onOpen={() => { setSelected(e); onNavigate?.("team", [e.id]); }} />)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="emp-grid">
+            {filtered.map((e) => <EmployeeCard key={e.id} employee={e} onOpen={() => { setSelected(e); onNavigate?.("team", [e.id]); }} />)}
+          </div>
+        )}
         {!loading && filtered.length === 0 && <p className="muted">لا توجد نتائج.</p>}
       </section>
 
       {role === "owner" && <AssistantManager employees={employees} onChanged={load} onToast={onToast} />}
     </div>
+  );
+}
+
+function EmployeeCard({ employee, onOpen }) {
+  return (
+    <button type="button" className="emp-card" onClick={onOpen}>
+      <span className="emp-avatar">{(employee.name || "?").slice(0, 1)}</span>
+      <span className="emp-card-body">
+        <strong>{employee.name}</strong>
+        <span className="muted">{employee.active ? (employee.attendance_exempt ? "مرتبات فقط" : "نشط") : "موقوف"}</span>
+      </span>
+      <ChevronLeft size={18} />
+    </button>
   );
 }
 
