@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AlertCircle, Search, UserRound, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { canAccessView } from "../app/registry";
+import { useBackClose } from "../app/router";
 
 function normalizeSearch(value) {
   return String(value || "")
@@ -47,6 +48,7 @@ export default function CommandPalette({
   const optionRefs = useRef([]);
   const listId = useId();
   const canSearchEmployees = context?.role === "hr" || context?.role === "owner";
+  useBackClose(open, onClose);
 
   useEffect(() => {
     if (!open || !canSearchEmployees) {

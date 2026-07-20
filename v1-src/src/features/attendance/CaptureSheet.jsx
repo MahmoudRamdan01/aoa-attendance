@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, CheckCircle2, Loader2, LocateFixed, ShieldCheck, X } from "lucide-react";
 import { startGpsSampler } from "./useGpsSampler";
 import { prepareFaceEngine, useFaceEngine } from "./useFaceEngine";
+import { useBackClose } from "../../app/router";
 
 function cameraError(error) {
   if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
@@ -61,6 +62,8 @@ export default function CaptureSheet({
   onCancel,
 }) {
   const videoRef = useRef(null);
+  // The sheet only mounts while open, so Back should always dismiss it.
+  useBackClose(true, onCancel);
   const [cameraReady, setCameraReady] = useState(false);
   const [gpsReady, setGpsReady] = useState(!requireGps);
   const [busy, setBusy] = useState(false);

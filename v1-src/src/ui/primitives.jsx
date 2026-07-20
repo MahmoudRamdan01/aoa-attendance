@@ -9,6 +9,7 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
+import { useBackClose } from "../app/router";
 
 export function Panel({
   as: Component = "section",
@@ -282,6 +283,10 @@ export function ConfirmDialog({
 
   busyRef.current = busy;
   onCancelRef.current = onCancel;
+
+  useBackClose(open, () => {
+    if (!busyRef.current) onCancelRef.current?.();
+  });
 
   useEffect(() => {
     if (!open || typeof document === "undefined") return undefined;

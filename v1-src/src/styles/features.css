@@ -281,8 +281,8 @@
   }
 
   .icon-btn {
-    width: 40px;
-    min-height: 40px;
+    width: 44px;
+    min-height: 44px;
     border-radius: 10px;
     display: inline-flex;
     align-items: center;
@@ -343,7 +343,7 @@
   .secondary,
   .warning-btn,
   .approval-actions button {
-    min-height: 40px;
+    min-height: 44px;
     border-radius: 10px;
     display: inline-flex;
     align-items: center;
@@ -716,6 +716,7 @@
   }
 
   .tabs button {
+    min-height: 44px;
     background: var(--panel-soft);
     border: 1px solid var(--line);
     color: var(--muted);
@@ -1387,10 +1388,15 @@
   }
 
   .grid.two,
-  .stats-grid,
   .account-form,
   .message-form {
     grid-template-columns: 1fr;
+  }
+
+  /* Tablets keep 2-up stats — dropping to a single column here made
+     641-980px look worse than phones. */
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .message-form label:last-of-type,
@@ -1532,6 +1538,7 @@
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 170px);
+  min-height: calc(100dvh - 170px);
   padding: 0;
   overflow: hidden;
 }
@@ -1541,6 +1548,7 @@
   display: flex;
   flex: 1;
   min-height: calc(100vh - 170px);
+  min-height: calc(100dvh - 170px);
 }
 
 .chat-sidebar {
@@ -1921,7 +1929,7 @@ a.secondary {
 .badge.muted { background: var(--panel-soft); color: var(--muted); border-color: var(--line); }
 
 .field-search { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-soft); margin-bottom: 12px; color: var(--muted); }
-.field-search input { flex: 1; border: 0; background: transparent; outline: none; color: var(--ink); font-size: 15px; font-weight: 600; }
+.field-search input { flex: 1; border: 0; background: transparent; outline: none; color: var(--ink); font-size: 16px; font-weight: 600; }
 .field-inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .field-inline input { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--panel-soft); color: var(--ink); font-weight: 700; }
 
@@ -2281,4 +2289,19 @@ table.heatmap th.hm-name, table.heatmap td.hm-name { position: sticky; inset-inl
 @media (max-width: 640px) {
   .capture-lightbox article { grid-template-columns: 1fr; }
   .capture-lightbox article > img { min-height: 260px; max-height: 55vh; }
+}
+
+/* ===== Mobile foundations: touch ergonomics (PR1) ===== */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 48px;
+  }
+
+  .check-inline input,
+  .assistant-pick input {
+    width: 22px;
+    height: 22px;
+  }
 }
