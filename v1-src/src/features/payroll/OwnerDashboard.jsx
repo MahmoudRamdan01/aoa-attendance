@@ -140,6 +140,10 @@ function OwnerDashboard({ onToast }) {
         exempt: !!emp.attendance_exempt,
         salary: Number(salaryRow.monthly_salary || 0),
         gross: pay.gross,
+        allowanceEarned: pay.allowanceEarned,
+        creditedDays: pay.creditedDays,
+        dayRate: pay.dayRate,
+        extras: (pay.fixedAllowance || 0) + (pay.bonus || 0),
         deductionDays: pay.deductionDays,
         deductionAmount: pay.attendanceDeduction,
         financialDeduction,
@@ -156,6 +160,7 @@ function OwnerDashboard({ onToast }) {
     const grossTotal = payrollRows.reduce((sum, row) => sum + row.gross, 0);
     const netTotal = payrollRows.reduce((sum, row) => sum + row.netSalary, 0);
     return {
+      payMode: payConfig?.mode === "daily" ? "daily" : "monthly",
       total,
       expected,
       checkedIn,
@@ -217,10 +222,14 @@ function OwnerDashboard({ onToast }) {
   }
 
   function exportPayrollCsv() {
-    const header = ["الموظف", "المرتب الشهري", "خصم أيام", "قيمة الخصم", "استقطاعات مالية", "الصافي التقديري", "تأخير", "غياب", "بدون انصراف"];
+    const daily = stats.payMode === "daily";
+    const header = daily
+      ? ["الموظف", "الأساسي", "الانتظام", "أيام محتسبة", "بدلات ومكافآت", "الإجمالي", "خصم أيام", "قيمة الخصم", "استقطاعات مالية", "الصافي التقديري", "تأخير", "غياب", "بدون انصراف"]
+      : ["الموظف", "المرتب الشهري", "خصم أيام", "قيمة الخصم", "استقطاعات مالية", "الصافي التقديري", "تأخير", "غياب", "بدون انصراف"];
     const lines = stats.payrollRows.map((row) => [
       row.name,
       row.salary,
+      ...(daily ? [row.allowanceEarned.toFixed(2), row.creditedDays, row.extras.toFixed(2), row.gross.toFixed(2)] : []),
       row.deductionDays.toFixed(2),
       row.deductionAmount.toFixed(2),
       row.financialDeduction.toFixed(2),
@@ -362,23 +371,49 @@ function OwnerDashboard({ onToast }) {
         <div className="table-wrap sticky-table">
           <table>
             <thead>
-              <tr>
-                <th>الموظف</th>
-                <th>المرتب الشهري</th>
-                <th>خصم أيام</th>
-                <th>قيمة الخصم</th>
-                <th>استقطاعات مالية</th>
-                <th>الصافي التقديري</th>
-                <th>مؤشرات</th>
-              </tr>
+              {/* نظام «أساسي + انتظام»: الأساسي والانتظام أعمدة منفصلة والخصم من الإجمالي. */}
+              {stats.payMode === "daily" ? (
+                <tr>
+                  <th>الموظف</th>
+                  <th>الأساسي</th>
+                  <th>الانتظام</th>
+                  <th>بدلات ومكافآت</th>
+                  <th>الإجمالي</th>
+                  <th>خصم أيام</th>
+                  <th>قيمة الخصم</th>
+                  <th>استقطاعات مالية</th>
+                  <th>الصافي التقديري</th>
+                  <th>مؤشرات</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th>الموظف</th>
+                  <th>المرتب الشهري</th>
+                  <th>خصم أيام</th>
+                  <th>قيمة الخصم</th>
+                  <th>استقطاعات مالية</th>
+                  <th>الصافي التقديري</th>
+                  <th>مؤشرات</th>
+                </tr>
+              )}
             </thead>
             <tbody>
-              {loading && <tr><td colSpan="7">جارٍ التحميل...</td></tr>}
-              {!loading && stats.payrollRows.length === 0 && <tr><td colSpan="7">لا توجد بيانات مرتبات.</td></tr>}
+              {loading && <tr><td colSpan={stats.payMode === "daily" ? 10 : 7}>جارٍ التحميل...</td></tr>}
+              {!loading && stats.payrollRows.length === 0 && <tr><td colSpan={stats.payMode === "daily" ? 10 : 7}>لا توجد بيانات مرتبات.</td></tr>}
               {!loading && stats.payrollRows.map((row) => (
                 <tr key={row.employee_id}>
                   <td>{row.name}</td>
                   <td>{money(row.salary)} ج</td>
+                  {stats.payMode === "daily" && (
+                    <>
+                      <td>
+                        {money(row.allowanceEarned)} ج
+                        {row.dayRate > 0 && <div className="muted" style={{ fontSize: "11.5px" }}>{row.creditedDays} يوم × {money(row.dayRate)}</div>}
+                      </td>
+                      <td>{money(row.extras)} ج</td>
+                      <td><strong>{money(row.gross)} ج</strong></td>
+                    </>
+                  )}
                   <td>{row.deductionDays.toFixed(2)} يوم</td>
                   <td>{money(row.deductionAmount)} ج</td>
                   <td>{money(row.financialDeduction)} ج</td>
