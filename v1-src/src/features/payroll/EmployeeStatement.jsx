@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, CalendarDays, FileSpreadsheet, FileText, PiggyBank, TrendingDown, Wallet } from "lucide-react";
+import { Banknote, CalendarDays, Clock3, FileSpreadsheet, FileText, PiggyBank, TrendingDown, UserCheck, UserX, Wallet } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { csvCell, downloadTextFile, fmtTime12, money } from "../../lib/format";
 import { deductionCategoryLabels, statusLabels } from "../../lib/labels";
@@ -9,11 +9,21 @@ import { Metric, StatusBadge } from "../../ui/legacy";
 // itemized deductions (attendance + financial) and the net, with the daily
 // log. Pass fixedEmployeeId to lock it to one person (embedded in the
 // Employees page) — the selector is then hidden.
-function EmployeeStatement({ onToast, fixedEmployeeId = null, fixedEmployeeName = "" }) {
+function EmployeeStatement({
+  onToast, fixedEmployeeId = null, fixedEmployeeName = "",
+  from: fromProp, to: toProp, setFrom: setFromProp, setTo: setToProp,
+}) {
   const [employees, setEmployees] = useState([]);
   const [employeeId, setEmployeeId] = useState(fixedEmployeeId ? String(fixedEmployeeId) : "");
-  const [from, setFrom] = useState(() => `${todayIso().slice(0, 7)}-01`);
-  const [to, setTo] = useState(todayIso());
+  // Period can be controlled by the parent (so an embedding page shares one
+  // date range with its other sections) or managed internally (payroll page).
+  const [fromState, setFromState] = useState(() => `${todayIso().slice(0, 7)}-01`);
+  const [toState, setToState] = useState(todayIso());
+  const controlled = Boolean(setFromProp && setToProp);
+  const from = controlled ? fromProp : fromState;
+  const to = controlled ? toProp : toState;
+  const setFrom = controlled ? setFromProp : setFromState;
+  const setTo = controlled ? setToProp : setToState;
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
 
@@ -153,6 +163,12 @@ function EmployeeStatement({ onToast, fixedEmployeeId = null, fixedEmployeeName 
 
       {!loading && data && statement && (
         <div className="stack">
+          <div className="stats-grid compact-stats">
+            <Metric label="حضور" value={statement.present} tone="ok" icon={UserCheck} />
+            <Metric label="تأخير" value={statement.late} sub={`${statement.lateMinutes} دقيقة`} tone="warn" icon={Clock3} />
+            <Metric label="غياب" value={statement.absent} tone="danger" icon={UserX} />
+            <Metric label="أجازة" value={statement.leave} icon={CalendarDays} />
+          </div>
           <div className="stats-grid compact-stats">
             <Metric label="المرتب الشهري (قبل الخصم)" value={`${money(data.salary)} ج`} icon={Banknote} />
             <Metric label="خصومات الحضور والغياب" value={`${money(statement.attendanceDeduction)} ج`} sub={`${statement.deductionDays.toFixed(2)} يوم`} tone="warn" icon={CalendarDays} />

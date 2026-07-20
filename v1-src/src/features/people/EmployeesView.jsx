@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, CalendarDays, ChevronLeft, Clock3, History, Plus, Power, RefreshCcw, Search, Sparkles, Trash2, UserCheck, UserPlus, Users, UserX } from "lucide-react";
+import { Banknote, CalendarDays, ChevronLeft, Clock3, Plus, Power, RefreshCcw, Search, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
-import { monthRangeFor } from "../../lib/dates";
 import { fmtTime12, money } from "../../lib/format";
-import { deductionCategoryLabels, reqStatusLabel, statusLabels } from "../../lib/labels";
-import { Metric, StatusBadge } from "../../ui/legacy";
+import { deductionCategoryLabels, reqStatusLabel } from "../../lib/labels";
+import { StatusBadge } from "../../ui/legacy";
 import { ConfirmDialog } from "../../ui/primitives";
 import FaceEnrollment from "./FaceEnrollment";
 import DeviceHistory from "./DeviceHistory";
@@ -234,14 +233,17 @@ function AssistantManager({ employees, onChanged, onToast }) {
 }
 
 function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast }) {
-  const [month, setMonth] = useState(() => todayIso().slice(0, 7));
+  // One from/to period drives the statement cards and every table below.
+  const [from, setFrom] = useState(() => `${todayIso().slice(0, 7)}-01`);
+  const [to, setTo] = useState(todayIso());
   const [d, setD] = useState(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [active, setActive] = useState(employee.active);
   const [assistantOn, setAssistantOn] = useState(employee.assistant_enabled !== false);
   const isOwner = role === "owner";
-  const range = useMemo(() => monthRangeFor(month), [month]);
+  const fromMonth = from.slice(0, 7);
+  const toMonth = to.slice(0, 7);
 
   async function toggleActive() {
     setActing(true);
@@ -277,18 +279,18 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
     onDeleted?.();
   }
 
-  useEffect(() => { load(); }, [employee.id, range.from, range.to]);
+  useEffect(() => { load(); }, [employee.id, from, to]);
   async function load() {
     setLoading(true);
     const id = employee.id;
     const [att, cant, oth, loans, inst, leaves, perms, sal] = await Promise.all([
-      supabase.from("attendance").select("*").eq("employee_id", id).gte("work_date", range.from).lte("work_date", range.to).order("work_date", { ascending: false }),
-      supabase.from("canteen_entries").select("*").eq("employee_id", id).gte("entry_date", range.from).lte("entry_date", range.to).order("entry_date", { ascending: false }),
-      supabase.from("other_deductions").select("*").eq("employee_id", id).gte("entry_date", range.from).lte("entry_date", range.to).order("entry_date", { ascending: false }),
+      supabase.from("attendance").select("*").eq("employee_id", id).gte("work_date", from).lte("work_date", to).order("work_date", { ascending: false }),
+      supabase.from("canteen_entries").select("*").eq("employee_id", id).gte("entry_date", from).lte("entry_date", to).order("entry_date", { ascending: false }),
+      supabase.from("other_deductions").select("*").eq("employee_id", id).gte("entry_date", from).lte("entry_date", to).order("entry_date", { ascending: false }),
       supabase.from("emp_loans").select("*").eq("employee_id", id).order("created_at", { ascending: false }),
       supabase.from("emp_loan_installments").select("*").eq("employee_id", id).order("due_month"),
-      supabase.from("leave_requests").select("*, cover:employees!leave_requests_cover_employee_id_fkey(name)").eq("employee_id", id).order("from_date", { ascending: false }),
-      supabase.from("permissions").select("*").eq("employee_id", id).order("perm_date", { ascending: false }),
+      supabase.from("leave_requests").select("*, cover:employees!leave_requests_cover_employee_id_fkey(name)").eq("employee_id", id).lte("from_date", to).gte("to_date", from).order("from_date", { ascending: false }),
+      supabase.from("permissions").select("*").eq("employee_id", id).gte("perm_date", from).lte("perm_date", to).order("perm_date", { ascending: false }),
       role === "owner" ? supabase.from("salaries").select("monthly_salary").eq("employee_id", id).maybeSingle() : Promise.resolve({ data: null }),
     ]);
     setD({
@@ -306,13 +308,13 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
     const cantTotal = d.cant.filter((x) => x.status === "active").reduce((s, x) => s + Number(x.amount), 0);
     const othTotal = d.oth.filter((x) => x.status === "active").reduce((s, x) => s + Number(x.amount), 0);
     const activeLoanIds = new Set(d.loans.filter((l) => l.status === "active").map((l) => l.id));
-    const instMonth = d.inst.filter((i) => activeLoanIds.has(i.loan_id) && i.due_month === month).reduce((s, i) => s + Number(i.amount), 0);
+    const instMonth = d.inst.filter((i) => activeLoanIds.has(i.loan_id) && i.due_month >= fromMonth && i.due_month <= toMonth).reduce((s, i) => s + Number(i.amount), 0);
     // خصم الحضور/الغياب: أيام مخصومة للتأخير + كل يوم غياب = يوم كامل. القيمة = أيام × (المرتب/30).
     const attDedDays = d.att.reduce((s, r) => s + Number(r.deduction_days || 0) + (r.status === "absent" ? 1 : 0), 0);
     const dailyRate = d.salary != null ? Number(d.salary) / 30 : null;
     const attDedAmount = dailyRate != null ? attDedDays * dailyRate : 0;
     return { present, late, absent, cantTotal, othTotal, instMonth, attDedDays, attDedAmount, dedTotal: cantTotal + othTotal + instMonth + attDedAmount };
-  }, [d, month]);
+  }, [d, fromMonth, toMonth]);
 
   return (
     <div className="stack">
@@ -330,10 +332,6 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
           )}
           {role === "owner" && d?.salary != null && <span className="badge ok">المرتب: {money(d.salary)} ج</span>}
         </div>
-        <label className="field-inline">
-          <span>شهر الحضور والخصومات</span>
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-        </label>
         <div className="actions-row">
           <button className="secondary" type="button" onClick={toggleActive} disabled={acting}>
             <Power size={16} /> {active ? "توقيف الموظف" : "تفعيل الموظف"}
@@ -361,30 +359,25 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
         />
       </section>
 
-      {/* كشف حساب كامل (نفس صفحة الرواتب): صافي المرتب + الخصومات + فلتر فترة. */}
-      {isOwner && <EmployeeStatement fixedEmployeeId={employee.id} fixedEmployeeName={employee.name} onToast={onToast} />}
+      {/* كشف حساب كامل (نفس صفحة الرواتب): الكروت + الحضور اليومي، بفلتر الفترة. */}
+      {isOwner && (
+        <EmployeeStatement
+          fixedEmployeeId={employee.id}
+          fixedEmployeeName={employee.name}
+          from={from}
+          to={to}
+          setFrom={setFrom}
+          setTo={setTo}
+          onToast={onToast}
+        />
+      )}
 
       {loading && <section className="panel"><p className="muted">جارٍ التحميل...</p></section>}
 
       {!loading && d && stats && (
         <>
-          {!employee.attendance_exempt && (
-            <>
-              <FaceEnrollment employee={employee} onToast={onToast} />
-              <DeviceHistory employee={employee} />
-            </>
-          )}
           <section className="panel">
-            <div className="stats-grid compact-stats">
-              <Metric label="حضور" value={stats.present} tone="ok" icon={UserCheck} />
-              <Metric label="تأخير" value={stats.late} tone="warn" icon={Clock3} />
-              <Metric label="غياب" value={stats.absent} tone="danger" icon={UserX} />
-              <Metric label={`خصومات ${month}`} value={`${money(stats.dedTotal)} ج`} tone="danger" icon={Banknote} />
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-title"><Banknote size={20} /><h2>الخصومات والاستقطاعات — {month}</h2></div>
+            <div className="panel-title"><Banknote size={20} /><h2>الخصومات والاستقطاعات</h2></div>
             {(stats.attDedDays > 0 || stats.instMonth > 0 || d.cant.length || d.oth.length) ? (
               <div className="table-wrap sticky-table">
                 <table>
@@ -393,19 +386,19 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
                     {stats.attDedDays > 0 && (
                       <tr>
                         <td>خصم حضور وغياب</td>
-                        <td dir="ltr">{month}</td>
+                        <td dir="ltr">{from} → {to}</td>
                         <td>{d.salary != null ? `${money(stats.attDedAmount)} ج` : "—"}</td>
                         <td>{stats.attDedDays.toFixed(2).replace(/\.?0+$/, "")} يوم</td>
                       </tr>
                     )}
-                    {stats.instMonth > 0 && <tr><td>قسط سلفة</td><td dir="ltr">{month}</td><td>{money(stats.instMonth)} ج</td><td>—</td></tr>}
+                    {stats.instMonth > 0 && <tr><td>قسط سلفة</td><td dir="ltr">{fromMonth}{fromMonth !== toMonth ? ` → ${toMonth}` : ""}</td><td>{money(stats.instMonth)} ج</td><td>—</td></tr>}
                     {d.cant.filter((x) => x.status === "active").map((x) => <tr key={`c${x.id}`}><td>كانتين: {x.item}</td><td dir="ltr">{x.entry_date}</td><td>{money(x.amount)} ج</td><td className="note-cell">{x.note || "—"}</td></tr>)}
                     {d.oth.filter((x) => x.status === "active").map((x) => <tr key={`o${x.id}`}><td>{deductionCategoryLabels[x.category] || x.category}</td><td dir="ltr">{x.entry_date}</td><td>{money(x.amount)} ج</td><td className="note-cell">{x.note || "—"}</td></tr>)}
                   </tbody>
                   <tfoot><tr><td colSpan={2}>الإجمالي</td><td>{money(stats.dedTotal)} ج</td><td></td></tr></tfoot>
                 </table>
               </div>
-            ) : <p className="muted">لا توجد خصومات هذا الشهر.</p>}
+            ) : <p className="muted">لا توجد خصومات في الفترة.</p>}
             {d.loans.length > 0 && (
               <div className="table-wrap sticky-table" style={{ marginTop: 12 }}>
                 <table>
@@ -435,7 +428,7 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
                   </tbody>
                 </table>
               </div>
-            ) : <p className="muted">لا توجد إجازات مسجلة.</p>}
+            ) : <p className="muted">لا توجد إجازات في الفترة.</p>}
           </section>
 
           <section className="panel">
@@ -455,32 +448,16 @@ function EmployeeDetail({ employee, role, onBack, onChanged, onDeleted, onToast 
                   </tbody>
                 </table>
               </div>
-            ) : <p className="muted">لا توجد أذونات مسجلة.</p>}
+            ) : <p className="muted">لا توجد أذونات في الفترة.</p>}
           </section>
 
-          <section className="panel">
-            <div className="panel-title"><History size={20} /><h2>الحضور — {month}</h2></div>
-            {d.att.length ? (
-              <div className="table-wrap sticky-table">
-                <table>
-                  <thead><tr><th>التاريخ</th><th>الحالة</th><th>دخول</th><th>انصراف</th><th>تأخير (د)</th><th>خصم</th><th>ملاحظة</th></tr></thead>
-                  <tbody>
-                    {d.att.map((r) => (
-                      <tr key={r.id}>
-                        <td dir="ltr">{r.work_date}</td>
-                        <td><span className={cls("status-badge", r.status)}>{statusLabels[r.status] || r.status}</span></td>
-                        <td dir="ltr">{fmtTime12(r.check_in) || "—"}</td>
-                        <td dir="ltr">{fmtTime12(r.check_out) || "—"}</td>
-                        <td>{Number(r.late_minutes || 0) || "—"}</td>
-                        <td>{Number(r.deduction_days || 0) || "—"}</td>
-                        <td className="note-cell">{r.employee_note || r.hr_note || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : <p className="muted">لا يوجد حضور مسجل هذا الشهر.</p>}
-          </section>
+          {/* بصمة الوجه والأجهزة المسجلة في الآخر. */}
+          {!employee.attendance_exempt && (
+            <>
+              <FaceEnrollment employee={employee} onToast={onToast} />
+              <DeviceHistory employee={employee} />
+            </>
+          )}
         </>
       )}
     </div>
