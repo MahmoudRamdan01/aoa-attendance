@@ -3,6 +3,7 @@ import { Camera, CheckCircle2, Clock3, LogOut, MapPin, MessageSquare, QrCode, Sh
 import { distanceMeters, supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { getCompanyLocation } from "../../lib/dates";
+import { haptic } from "../../lib/haptics";
 import { statusLabels } from "../../lib/labels";
 import { fmtTime12 } from "../../lib/format";
 import { checkoutWindowState } from "../../lib/attendanceWindow";
@@ -196,6 +197,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
     try {
       const data = await runV2(draftArgs);
+      haptic([14, 60, 14]);
       onToast(data.label || (kind === "in" ? "تم تسجيل الحضور." : "تم تسجيل الانصراف."));
       setNote("");
       setCapture(null);
@@ -265,6 +267,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       }
       try {
         const data = await runV2(args);
+        haptic([14, 60, 14]);
         onToast(data.label || (kind === "in" ? "تم تسجيل الحضور." : "تم تسجيل الانصراف."));
         setNote("");
         await loadToday();

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, RefreshCcw, ScanFace, Search, UserCheck, Users, UserX, Wrench, X } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
+import { haptic } from "../../lib/haptics";
 import { addDays, datesBetween } from "../../lib/dates";
 import { csvCell, downloadTextFile, fmtSubmittedAt, fmtTime12 } from "../../lib/format";
 import { reqStatusLabel, statusLabels } from "../../lib/labels";
@@ -85,6 +86,7 @@ function AdminDashboard({ context, onToast }) {
     });
     if (error || data?.error) onToast(data?.message || "تعذر تحديث الإذن.");
     else {
+      haptic();
       onToast("تم تحديث طلب الإذن.");
       loadAdmin();
     }
@@ -102,6 +104,7 @@ function AdminDashboard({ context, onToast }) {
     });
     if (error || data?.error) onToast(data?.message || "تعذر تحديث الأجازة.");
     else {
+      haptic();
       onToast("تم تحديث طلب الأجازة.");
       loadAdmin();
     }

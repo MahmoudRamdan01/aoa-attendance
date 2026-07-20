@@ -2621,3 +2621,40 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   margin-top: 10px;
   padding-inline-start: 6px;
 }
+
+/* ---------- Press feedback (Uber feel) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .primary,
+  .secondary,
+  .warning-btn {
+    transition: filter 0.15s ease, background-color 0.15s ease, transform 100ms var(--ease-standard);
+  }
+
+  .primary:active:not(:disabled),
+  .secondary:active:not(:disabled),
+  .warning-btn:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  .tabs button {
+    transition: background-color 0.15s ease, color 0.15s ease, transform 100ms var(--ease-standard);
+  }
+
+  .tabs button:active {
+    transform: scale(0.95);
+  }
+
+  .emp-card:active {
+    transform: scale(0.98);
+  }
+
+  .dept-bar:active {
+    transform: scale(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dept-bar {
+    transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform 100ms var(--ease-standard);
+  }
+}
