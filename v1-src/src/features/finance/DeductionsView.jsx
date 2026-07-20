@@ -296,10 +296,10 @@ function DeductionsAdmin({ context, onToast }) {
       kind === "canteen" ? r.item : (deductionCategoryLabels[r.category] || r.category),
       r.amount,
       r.note || "",
-      r.created_by_name || "",
+      maskActor(r.created_by_name, role) || "",
       statusLabels[r.status] || r.status,
     ].map(csvCell).join(","));
-    downloadTextFile(`${kind}-${month}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+    downloadTextFile(`${kind}-${month}.csv`, "﻿" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
   }
 
   const employeeSelect = (value, onChange) => (
@@ -408,7 +408,7 @@ function DeductionsAdmin({ context, onToast }) {
                       <td data-label="الموظف">{empName.get(row.employee_id) || row.employee_id}</td>
                       <td data-label="الصنف">{row.item}</td>
                       <td data-label="المبلغ">{money(row.amount)} ج</td>
-                      <td data-label="سجّله">{row.created_by_name || "-"}</td>
+                      <td data-label="سجّله">{maskActor(row.created_by_name, role) || "-"}</td>
                       <td data-label="الحالة"><StatusBadge status={row.status} /></td>
                       <td data-label="إجراء">{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => requestVoid("canteen", row.id)}>إلغاء</button> : "-"}</td>
                     </tr>
@@ -451,7 +451,7 @@ function DeductionsAdmin({ context, onToast }) {
                       <td data-label="النوع">{deductionCategoryLabels[row.category] || row.category}</td>
                       <td data-label="المبلغ">{money(row.amount)} ج</td>
                       <td data-label="ملاحظة" className="note-cell">{row.note || "-"}</td>
-                      <td data-label="سجّله">{row.created_by_name || "-"}</td>
+                      <td data-label="سجّله">{maskActor(row.created_by_name, role) || "-"}</td>
                       <td data-label="الحالة"><StatusBadge status={row.status} /></td>
                       <td data-label="إجراء">{row.status === "active" && canVoid(row) ? <button className="danger-link" onClick={() => requestVoid("other", row.id)}>إلغاء</button> : "-"}</td>
                     </tr>

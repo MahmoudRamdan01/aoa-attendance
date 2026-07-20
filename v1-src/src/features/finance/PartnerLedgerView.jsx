@@ -142,7 +142,7 @@ function PartnerLedgerView({ context, onToast }) {
       e.due_date || "",
       maskActor(e.created_by_name, role) || "",
     ].map(csvCell).join(","));
-    downloadTextFile(`partner-ledger-${todayIso()}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+    downloadTextFile(`partner-ledger-${todayIso()}.csv`, "﻿" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
   }
 
   function exportSettlements() {
@@ -156,7 +156,7 @@ function PartnerLedgerView({ context, onToast }) {
       s.note || "",
       maskActor(s.created_by_name, role) || "",
     ].map(csvCell).join(","));
-    downloadTextFile(`partner-settlements-${todayIso()}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+    downloadTextFile(`partner-settlements-${todayIso()}.csv`, "﻿" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
   }
 
   return (
