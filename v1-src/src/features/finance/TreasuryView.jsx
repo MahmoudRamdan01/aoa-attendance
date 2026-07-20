@@ -11,6 +11,7 @@ function TreasuryView({ context, onToast }) {
   const [entries, setEntries] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [receivables, setReceivables] = useState({ loans: [], installments: [], partnerEntries: [], settlements: [] });
+  const [payrollData, setPayrollData] = useState({ salaries: [], attendance: [], canteen: [], other: [] });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [month, setMonth] = useState(() => todayIso().slice(0, 7));
@@ -27,7 +28,7 @@ function TreasuryView({ context, onToast }) {
       supabase.from("employees").select("id,name,active").eq("active", true).order("id"),
       // Company receivables for the financial-position card.
       supabase.from("emp_loans").select("id,amount,status").eq("status", "active"),
-      supabase.from("emp_loan_installments").select("loan_id,amount,due_month"),
+      supabase.from("emp_loan_installments").select("loan_id,employee_id,amount,due_month"),
       supabase.from("partner_ledger_entries").select("id,direction,amount,status").eq("status", "active"),
       supabase.from("partner_settlements").select("entry_id,amount,status").eq("status", "confirmed"),
     ]);
@@ -39,6 +40,22 @@ function TreasuryView({ context, onToast }) {
       partnerEntries: partner.data || [],
       settlements: settle.data || [],
     });
+    // Net payroll liability for the current month — owner eyes only.
+    if (isOwner) {
+      const monthStart = `${todayIso().slice(0, 7)}-01`;
+      const [sal, att, cant, oth] = await Promise.all([
+        supabase.from("salaries").select("employee_id,monthly_salary"),
+        supabase.from("attendance").select("employee_id,status,deduction_days").gte("work_date", monthStart).lte("work_date", todayIso()),
+        supabase.from("canteen_entries").select("employee_id,amount").eq("status", "active").gte("entry_date", monthStart).lte("entry_date", todayIso()),
+        supabase.from("other_deductions").select("employee_id,amount").eq("status", "active").gte("entry_date", monthStart).lte("entry_date", todayIso()),
+      ]);
+      setPayrollData({
+        salaries: sal.data || [],
+        attendance: att.data || [],
+        canteen: cant.data || [],
+        other: oth.data || [],
+      });
+    }
     setLoading(false);
   }
 
@@ -104,6 +121,32 @@ function TreasuryView({ context, onToast }) {
     };
   }, [receivables, stats.balance]);
 
+  // التزام مرتبات الشهر الحالي بعد كل الخصومات (نفس حساب صفحة الرواتب).
+  const netPayroll = useMemo(() => {
+    if (!isOwner || payrollData.salaries.length === 0) return null;
+    const currentMonth = todayIso().slice(0, 7);
+    const activeLoanIds = new Set(receivables.loans.map((loan) => loan.id));
+    const finBy = new Map();
+    receivables.installments.forEach((i) => {
+      if (i.due_month === currentMonth && activeLoanIds.has(i.loan_id)) {
+        finBy.set(i.employee_id, (finBy.get(i.employee_id) || 0) + Number(i.amount));
+      }
+    });
+    [...payrollData.canteen, ...payrollData.other].forEach((row) => {
+      finBy.set(row.employee_id, (finBy.get(row.employee_id) || 0) + Number(row.amount));
+    });
+    const daysBy = new Map();
+    payrollData.attendance.forEach((row) => {
+      const days = Number(row.deduction_days || 0) + (row.status === "absent" ? 1 : 0);
+      if (days > 0) daysBy.set(row.employee_id, (daysBy.get(row.employee_id) || 0) + days);
+    });
+    return payrollData.salaries.reduce((sum, row) => {
+      const salary = Number(row.monthly_salary || 0);
+      const attDeduction = (daysBy.get(row.employee_id) || 0) * (salary / 30);
+      return sum + Math.max(0, salary - attDeduction - (finBy.get(row.employee_id) || 0));
+    }, 0);
+  }, [isOwner, payrollData, receivables]);
+
   function holderArgs(form) {
     if (form.mode === "employee") return { p_holder_employee_id: Number(form.employeeId), p_holder_name: null };
     if (form.mode === "other") return { p_holder_employee_id: null, p_holder_name: form.name.trim() };
@@ -163,11 +206,23 @@ function TreasuryView({ context, onToast }) {
             icon={Scale}
           />
           <Metric label="إجمالي أموال الشركة" value={`${money(position.total)} ج`} tone={position.total >= 0 ? "gold" : "danger"} icon={Coins} />
+          {netPayroll !== null && (
+            <>
+              <Metric label={`مرتبات ${todayIso().slice(0, 7)} بعد الخصومات`} value={`${money(netPayroll)} ج`} tone="warn" icon={Banknote} />
+              <Metric
+                label="الصافي بعد سداد المرتبات"
+                value={`${money(position.total - netPayroll)} ج`}
+                tone={position.total - netPayroll >= 0 ? "ok" : "danger"}
+                icon={Wallet}
+              />
+            </>
+          )}
         </div>
         <p className="muted">
           الإجمالي = السيولة النقدية بالخزنة + السلف القائمة على الموظفين (تُحصَّل من الرواتب)
           + صافي مستحقات Air Ocean (مستحق لنا {money(position.partnerToUs)} ج − مستحق علينا {money(position.partnerByUs)} ج).
           لا يشمل هذا الإجمالي الدفتر الشخصي أو المصروفات الشخصية.
+          {netPayroll !== null && " مرتبات الشهر تُعرض كالتزام مستحق بعد كل الخصومات، والصافي بعد سدادها = الإجمالي − المرتبات."}
         </p>
       </section>
 
