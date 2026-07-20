@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, Coins, HandCoins, Landmark, Pencil, RefreshCcw, Scale, Users, Banknote } from "lucide-react";
+import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, Coins, HandCoins, Landmark, Pencil, RefreshCcw, Scale, Users, Banknote, Receipt } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { money } from "../../lib/format";
 import { Metric, StatusBadge } from "../../ui/legacy";
@@ -17,6 +17,7 @@ function TreasuryView({ context, onToast }) {
   const [month, setMonth] = useState(() => todayIso().slice(0, 7));
   const [hold, setHold] = useState({ mode: "safe", employeeId: "", name: "", amount: "", note: "", date: todayIso() });
   const [spend, setSpend] = useState({ mode: "safe", employeeId: "", name: "", amount: "", note: "", date: todayIso() });
+  const [income, setIncome] = useState({ client: "", amount: "", note: "", date: todayIso() });
   const { requestVoid, voidDialog } = useVoidDialog(onToast, () => loadData());
   const [editRow, setEditRow] = useState(null);
   const [editBusy, setEditBusy] = useState(false);
@@ -82,6 +83,9 @@ function TreasuryView({ context, onToast }) {
     const active = entries.filter((e) => e.status === "active");
     const inTotal = active.filter((e) => e.direction === "in").reduce((s, e) => s + Number(e.amount), 0);
     const outTotal = active.filter((e) => e.direction === "out").reduce((s, e) => s + Number(e.amount), 0);
+    // «قبض من عميل» (إيراد) مقابل «عهدة» (تمويل من المالك) — كلاهما داخل الخزنة.
+    const incomeTotal = active.filter((e) => e.direction === "in" && e.entry_kind === "income").reduce((s, e) => s + Number(e.amount), 0);
+    const custodyTotal = inTotal - incomeTotal;
     const spentMonth = active.filter((e) => e.direction === "out" && e.entry_date.startsWith(month))
       .reduce((s, e) => s + Number(e.amount), 0);
     // Per-holder custody balance (in − out). Owner name masked for HR.
@@ -96,6 +100,8 @@ function TreasuryView({ context, onToast }) {
       balance: inTotal - outTotal,
       inTotal,
       outTotal,
+      incomeTotal,
+      custodyTotal,
       spentMonth,
       holders: [...holders.values()].filter((h) => Math.abs(h.held) > 0.001).sort((a, b) => b.held - a.held),
     };
@@ -190,6 +196,22 @@ function TreasuryView({ context, onToast }) {
     loadData();
   }
 
+  async function submitIncome(event) {
+    event.preventDefault();
+    setBusy("income");
+    const { data, error } = await supabase.rpc("add_treasury_income_v1", {
+      p_amount: Number(income.amount),
+      p_note: income.note || null,
+      p_client_name: income.client || null,
+      p_date: income.date,
+    });
+    setBusy("");
+    if (error || data?.error) return onToast(data?.message || "تعذر تسجيل القبض.");
+    onToast(`تم تسجيل قبض من ${data.client}.`);
+    setIncome((f) => ({ ...f, client: "", amount: "", note: "" }));
+    loadData();
+  }
+
   async function submitSpend(event) {
     event.preventDefault();
     if (spend.mode === "employee" && !spend.employeeId) return onToast("اختار الموظف.");
@@ -210,6 +232,14 @@ function TreasuryView({ context, onToast }) {
   }
 
   const canVoid = (row) => isOwner || (row.created_by_name && row.entry_date === todayIso() && row.status === "active");
+
+  // عهدة (تمويل) / قبض عميل (إيراد) / صرف — لون مميّز لكل نوع.
+  function kindBadge(row) {
+    const kind = row.entry_kind || (row.direction === "out" ? "spend" : "custody");
+    if (kind === "income") return <span className="badge ok">قبض عميل</span>;
+    if (kind === "spend") return <span className="badge warn">صرف</span>;
+    return <span className="badge muted">عهدة</span>;
+  }
 
   return (
     <div className="stack">
@@ -257,11 +287,15 @@ function TreasuryView({ context, onToast }) {
         </div>
         <div className="stats-grid compact-stats">
           <Metric label="رصيد الخزنة الحالي" value={`${money(stats.balance)} ج`} tone={stats.balance >= 0 ? "ok" : "danger"} icon={Vault} />
-          <Metric label="إجمالي العهد" value={`${money(stats.inTotal)} ج`} icon={PiggyBank} />
+          <Metric label="مقبوضات العملاء" value={`${money(stats.incomeTotal)} ج`} tone="ok" icon={Receipt} />
+          <Metric label="عُهد التمويل" value={`${money(stats.custodyTotal)} ج`} icon={PiggyBank} />
           <Metric label="المصروف (كلي)" value={`${money(stats.outTotal)} ج`} tone="warn" icon={Wallet} />
           <Metric label={`المصروف ${month}`} value={`${money(stats.spentMonth)} ج`} tone="gold" icon={Banknote} />
         </div>
-        <p className="muted">يُضاف أي صرف من الخزنة تلقائيًا إلى صفحة «المصروفات» والإجمالي.</p>
+        <p className="muted">
+          الرصيد = (مقبوضات العملاء + عُهد التمويل) − المصروف. أي صرف من الخزنة يُضاف تلقائيًا إلى صفحة «المصروفات»،
+          والمصروف يُخصم من الرصيد بعد تأكيد المالك فقط.
+        </p>
       </section>
 
       {stats.holders.length > 0 && (
@@ -277,6 +311,18 @@ function TreasuryView({ context, onToast }) {
           </div>
         </section>
       )}
+
+      <form className="panel form" onSubmit={submitIncome}>
+        <div className="panel-title"><Receipt size={20} /><h2>قبض من عميل (إيراد الشحنات)</h2></div>
+        <p className="muted">أي فلوس بتدخل الخزنة من عميل (مصاريف شحنة، دفعة، تحصيل) سجّلها هنا — بتزوّد رصيد الخزنة فورًا.</p>
+        <div className="form-grid">
+          <label>العميل / الجهة<input value={income.client} onChange={(e) => setIncome((f) => ({ ...f, client: e.target.value }))} placeholder="اسم العميل (اختياري)" /></label>
+          <label>المبلغ<input type="number" min="0.5" step="0.01" value={income.amount} onChange={(e) => setIncome((f) => ({ ...f, amount: e.target.value }))} required /></label>
+          <label>التاريخ<input type="date" value={income.date} onChange={(e) => setIncome((f) => ({ ...f, date: e.target.value }))} required /></label>
+        </div>
+        <label>البيان / رقم الشحنة<input value={income.note} onChange={(e) => setIncome((f) => ({ ...f, note: e.target.value }))} placeholder="مثال: مصاريف شحنة رقم 1234" /></label>
+        <button className="primary" disabled={busy === "income"}>{busy === "income" ? "جارٍ الحفظ..." : "تسجيل القبض"}</button>
+      </form>
 
       <div className="grid two">
         <form className="panel form" onSubmit={submitHold}>
@@ -314,9 +360,7 @@ function TreasuryView({ context, onToast }) {
               {!loading && monthEntries.map((row) => (
                 <tr key={row.id}>
                   <td data-label="التاريخ" dir="ltr">{row.entry_date}</td>
-                  <td data-label="النوع">{row.direction === "in"
-                    ? <span className="badge ok">عهدة</span>
-                    : <span className="badge warn">صرف</span>}</td>
+                  <td data-label="النوع">{kindBadge(row)}</td>
                   <td data-label="مع/من">{maskActor(row.holder_name, role) || "الخزنة"}</td>
                   <td data-label="المبلغ">{money(row.amount)} ج</td>
                   <td data-label="البيان" className="note-cell">{row.note || (row.direction === "out" ? "صرف" : "-")}</td>
