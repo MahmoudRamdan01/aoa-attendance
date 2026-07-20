@@ -252,24 +252,28 @@
    Scoped by data-company (set in main.jsx); the aol build never matches
    these selectors, so the original gold identity is untouched.
    ===================================================================== */
+/* Real brand palette pulled from airoceanline.com: deep navy #000e54 +
+   magenta #a41662 (their two dominant theme colors). */
 :root[data-company="airocean"],
 :root[data-company="airocean"].dark {
-  --gold: #1e8ffa;
-  --gold-hover: #55acff;
-  --gold-text: #4dabff;
-  --gold-on: #04182b;
-  --gold-soft: rgba(30, 143, 250, 0.14);
-  --gold-line: rgba(30, 143, 250, 0.38);
+  --gold: #bf1a71;
+  --gold-hover: #d93a8c;
+  --gold-text: #f27ab3;
+  --gold-on: #ffffff;
+  --gold-soft: rgba(191, 26, 113, 0.16);
+  --gold-line: rgba(217, 58, 140, 0.4);
   --accent-private: #7dd3fc;
   --accent-private-soft: rgba(125, 211, 252, 0.13);
   --accent-private-line: rgba(125, 211, 252, 0.34);
 }
 
 :root[data-company="airocean"]:not(.dark) {
-  --gold-hover: #0d6fd1;
-  --gold-text: #0a5cae;
-  --gold-soft: rgba(10, 92, 174, 0.1);
-  --gold-line: rgba(10, 92, 174, 0.3);
+  --gold: #a41662;
+  --gold-hover: #8a1253;
+  --gold-text: #8a1253;
+  --gold-on: #ffffff;
+  --gold-soft: rgba(164, 22, 98, 0.1);
+  --gold-line: rgba(164, 22, 98, 0.32);
   --accent-private: #07668e;
   --accent-private-soft: rgba(7, 102, 142, 0.1);
   --accent-private-line: rgba(7, 102, 142, 0.3);

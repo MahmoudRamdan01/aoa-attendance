@@ -2439,3 +2439,121 @@ table.heatmap th.hm-name, table.heatmap td.hm-name { position: sticky; inset-inl
     display: flex;
   }
 }
+
+/* =====================================================================
+   Air Ocean Line login/splash — animated night sea (airocean build only;
+   the aol build never matches html[data-company="airocean"]).
+   Pure CSS: gradient sea, three drifting wave layers, rising light
+   bubbles, a bobbing brand mark and a staggered panel entrance.
+   ===================================================================== */
+@keyframes aol-sea-drift {
+  from { background-position-x: 0, 0; }
+  to { background-position-x: -1600px, -1200px; }
+}
+@keyframes aol-bubbles-rise {
+  from { background-position: 0 120%, 45px 130%; }
+  to { background-position: 0 -20%, 45px -30%; }
+}
+@keyframes aol-bob {
+  0%, 100% { transform: translateY(0) rotate(-1.4deg); }
+  50% { transform: translateY(-7px) rotate(1.4deg); }
+}
+@keyframes aol-rise-in {
+  from { opacity: 0; transform: translateY(26px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+html[data-company="airocean"] .login-screen,
+html[data-company="airocean"] .splash {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(900px 420px at 50% -12%, rgba(191, 26, 113, 0.22), transparent 62%),
+    linear-gradient(180deg, #01041f 0%, #000e54 55%, #142a7e 100%);
+}
+
+/* Back + mid wave layers (slow parallax) with faint rising bubbles. */
+html[data-company="airocean"] .login-screen::before,
+html[data-company="airocean"] .splash::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 46%;
+  pointer-events: none;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 220' preserveAspectRatio='none'%3E%3Cpath d='M0 120 C 260 40 520 190 800 120 C 1080 50 1340 185 1600 120 L1600 220 L0 220 Z' fill='%231a2f8a' fill-opacity='0.55'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 220' preserveAspectRatio='none'%3E%3Cpath d='M0 140 C 200 70 400 200 600 140 C 800 80 1000 205 1200 140 L1200 220 L0 220 Z' fill='%233246a8' fill-opacity='0.45'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 1600px 100%, 1200px 100%;
+  animation: aol-sea-drift 44s linear infinite;
+}
+
+/* Front crest + bubbles (faster, brighter). */
+html[data-company="airocean"] .login-screen::after,
+html[data-company="airocean"] .splash::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 60%;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(217, 58, 140, 0.3) 1.6px, transparent 2.4px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.16) 1.2px, transparent 2px);
+  background-size: 96px 150px, 64px 190px;
+  animation: aol-bubbles-rise 17s linear infinite;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 45%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 45%);
+}
+
+html[data-company="airocean"] .login-panel {
+  position: relative;
+  z-index: 1;
+  /* The sea behind is dark in BOTH themes, so pin readable glass-panel
+     tokens locally instead of inheriting light-theme ink. */
+  --text: #eef6ff;
+  --ink: #eef6ff;
+  --text-secondary: #b9d2e6;
+  --muted: #9fb9cf;
+  color: #eef6ff;
+  background: rgba(2, 10, 48, 0.72);
+  border-color: rgba(217, 58, 140, 0.26);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: aol-rise-in 0.6s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+html[data-company="airocean"] .login-brand .brand-mark {
+  animation: aol-bob 6s ease-in-out infinite;
+  filter: drop-shadow(0 10px 22px rgba(4, 20, 36, 0.55));
+}
+
+/* Staggered entrance for the form pieces. */
+html[data-company="airocean"] .login-panel .login-brand { animation: aol-rise-in 0.55s 0.08s cubic-bezier(0.2, 0.8, 0.25, 1) both; }
+html[data-company="airocean"] .login-panel form label:nth-of-type(1) { animation: aol-rise-in 0.5s 0.18s cubic-bezier(0.2, 0.8, 0.25, 1) both; }
+html[data-company="airocean"] .login-panel form label:nth-of-type(2) { animation: aol-rise-in 0.5s 0.26s cubic-bezier(0.2, 0.8, 0.25, 1) both; }
+html[data-company="airocean"] .login-panel form button { animation: aol-rise-in 0.5s 0.34s cubic-bezier(0.2, 0.8, 0.25, 1) both; }
+
+/* The splash logo floats over the same sea. */
+html[data-company="airocean"] .splash .brand-mark {
+  position: relative;
+  z-index: 1;
+  animation: aol-bob 6s ease-in-out infinite;
+}
+html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-company="airocean"] .login-screen::before,
+  html[data-company="airocean"] .login-screen::after,
+  html[data-company="airocean"] .splash::before,
+  html[data-company="airocean"] .splash::after,
+  html[data-company="airocean"] .login-panel,
+  html[data-company="airocean"] .login-panel .login-brand,
+  html[data-company="airocean"] .login-panel form label,
+  html[data-company="airocean"] .login-panel form button,
+  html[data-company="airocean"] .login-brand .brand-mark,
+  html[data-company="airocean"] .splash .brand-mark {
+    animation: none;
+  }
+}
