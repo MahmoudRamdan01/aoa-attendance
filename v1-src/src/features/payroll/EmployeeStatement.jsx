@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Banknote, CalendarDays, Clock3, FileSpreadsheet, FileText, PiggyBank, TrendingDown, UserCheck, UserX, Wallet } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
+import { computePayroll, getPayrollConfig } from "../../lib/payroll";
 import { csvCell, downloadTextFile, fmtTime12, money } from "../../lib/format";
 import { deductionCategoryLabels, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
@@ -26,6 +27,9 @@ function EmployeeStatement({
   const setTo = controlled ? setToProp : setToState;
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
+  // Payroll mode (monthly / daily-allowance) comes from the company database.
+  const [payConfig, setPayConfig] = useState(null);
+  useEffect(() => { getPayrollConfig().then(setPayConfig); }, []);
 
   useEffect(() => {
     if (fixedEmployeeId) { setEmployeeId(String(fixedEmployeeId)); return; }
@@ -43,7 +47,7 @@ function EmployeeStatement({
     let cancelled = false;
     setLoading(true);
     Promise.all([
-      supabase.from("salaries").select("monthly_salary").eq("employee_id", empId).maybeSingle(),
+      supabase.from("salaries").select("*").eq("employee_id", empId).maybeSingle(),
       supabase.from("attendance").select("work_date,status,check_in,check_out,late_minutes,deduction_days,note")
         .eq("employee_id", empId).gte("work_date", from).lte("work_date", to).order("work_date"),
       supabase.from("emp_loan_installments")
@@ -64,6 +68,7 @@ function EmployeeStatement({
       }
       setData({
         salary: Number(sal.data?.monthly_salary || 0),
+        salaryRow: sal.data || {},
         attendance: att.data || [],
         installments: inst.data || [],
         canteen: cant.data || [],
@@ -84,8 +89,6 @@ function EmployeeStatement({
     const absent = data.attendance.filter((r) => r.status === "absent").length;
     const leave = data.attendance.filter((r) => ["leave", "mission", "sick"].includes(r.status)).length;
     const missingCheckout = data.attendance.filter((r) => r.check_in && !r.check_out && ["present", "late"].includes(r.status)).length;
-    const deductionDays = data.attendance.reduce((s, r) => s + Number(r.deduction_days || 0) + (r.status === "absent" ? 1 : 0), 0);
-    const attendanceDeduction = deductionDays * (data.salary / 30);
 
     const financialItems = [
       ...data.installments.map((i) => ({
@@ -102,15 +105,22 @@ function EmployeeStatement({
     ].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const financialTotal = financialItems.reduce((s, i) => s + i.amount, 0);
 
-    const totalDeductions = attendanceDeduction + financialTotal;
+    // All salary math (monthly vs daily-allowance) lives in lib/payroll.js.
+    const pay = computePayroll({
+      config: payConfig,
+      salaryRow: data.salaryRow,
+      attendanceRows: data.attendance,
+      financialTotal,
+    });
     return {
       present, late, lateMinutes, absent, leave, missingCheckout,
-      deductionDays, attendanceDeduction,
+      deductionDays: pay.deductionDays, attendanceDeduction: pay.attendanceDeduction,
       financialItems, financialTotal,
-      totalDeductions,
-      net: Math.max(0, data.salary - totalDeductions),
+      totalDeductions: pay.attendanceDeduction + financialTotal,
+      net: pay.net,
+      pay,
     };
-  }, [data]);
+  }, [data, payConfig]);
 
   function exportCsv() {
     if (!data || !statement) return;
@@ -119,6 +129,11 @@ function EmployeeStatement({
     lines.push(["الفترة", `${from} → ${to}`].map(csvCell).join(","));
     lines.push([]);
     lines.push(["المرتب الشهري الأساسي (قبل الخصم)", data.salary.toFixed(2)].map(csvCell).join(","));
+    if (statement.pay.mode === "daily") {
+      lines.push(["بدل الانتظام المكتسب", `${statement.pay.creditedDays} يوم × ${statement.pay.dayRate}`, statement.pay.allowanceEarned.toFixed(2)].map(csvCell).join(","));
+      lines.push(["بدلات ثابتة ومكافآت", (statement.pay.fixedAllowance + statement.pay.bonus).toFixed(2)].map(csvCell).join(","));
+      lines.push(["الإجمالي قبل الخصم", statement.pay.gross.toFixed(2)].map(csvCell).join(","));
+    }
     lines.push(["خصم أيام الحضور", statement.deductionDays.toFixed(2), statement.attendanceDeduction.toFixed(2)].map(csvCell).join(","));
     statement.financialItems.forEach((item) => {
       lines.push(["استقطاع مالي", item.date, item.label, item.amount.toFixed(2)].map(csvCell).join(","));
@@ -170,7 +185,18 @@ function EmployeeStatement({
             <Metric label="أجازة" value={statement.leave} icon={CalendarDays} />
           </div>
           <div className="stats-grid compact-stats">
-            <Metric label="المرتب الشهري (قبل الخصم)" value={`${money(data.salary)} ج`} icon={Banknote} />
+            {statement.pay.mode === "daily" ? (
+              <>
+                <Metric label="المرتب الأساسي" value={`${money(statement.pay.base)} ج`} icon={Banknote} />
+                <Metric label="بدل الانتظام المكتسب" value={`${money(statement.pay.allowanceEarned)} ج`} sub={`${statement.pay.creditedDays} يوم × ${money(statement.pay.dayRate)} ج`} tone="ok" icon={CalendarDays} />
+                {(statement.pay.fixedAllowance > 0 || statement.pay.bonus > 0) && (
+                  <Metric label="بدلات ومكافآت" value={`${money(statement.pay.fixedAllowance + statement.pay.bonus)} ج`} icon={Wallet} />
+                )}
+                <Metric label="الإجمالي (قبل الخصم)" value={`${money(statement.pay.gross)} ج`} tone="gold" icon={Banknote} />
+              </>
+            ) : (
+              <Metric label="المرتب الشهري (قبل الخصم)" value={`${money(data.salary)} ج`} icon={Banknote} />
+            )}
             <Metric label="خصومات الحضور والغياب" value={`${money(statement.attendanceDeduction)} ج`} sub={`${statement.deductionDays.toFixed(2)} يوم`} tone="warn" icon={CalendarDays} />
             <Metric label="استقطاعات مالية" value={`${money(statement.financialTotal)} ج`} tone="gold" icon={Wallet} />
             <Metric label="إجمالي الخصومات" value={`${money(statement.totalDeductions)} ج`} tone="danger" icon={TrendingDown} />

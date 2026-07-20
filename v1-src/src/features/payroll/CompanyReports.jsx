@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Gauge, Sparkles, CalendarRange, Trophy, Wallet, ShieldCheck, Inbox,
   TrendingUp, TrendingDown, Minus, AlertTriangle, ScanFace,
 } from "lucide-react";
 import { money } from "../../lib/format";
+import { getPayrollConfig, payrollDayValues } from "../../lib/payroll";
 import { datesBetween } from "../../lib/dates";
 import { Bar as ReBar, BarChart as ReBarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 
@@ -60,19 +61,21 @@ export default function CompanyReports({ report, rows, employees, salaries, stat
     };
   }, [report, headcount]);
 
-  // Deduction breakdown by cause (amounts, using each employee's own salary/30).
+  // Deduction breakdown by cause (amounts, using each employee's own day value).
+  const [payConfig, setPayConfig] = useState(null);
+  useEffect(() => { getPayrollConfig().then(setPayConfig); }, []);
   const breakdown = useMemo(() => {
     let attendanceCost = 0;
     let absentCost = 0;
     rows.forEach((r) => {
-      const per = (salaries[r.employee_id] || 0) / 30;
-      attendanceCost += Number(r.deduction_days || 0) * per;
-      if (r.status === "absent") absentCost += per;
+      const day = payrollDayValues(payConfig, salaries[r.employee_id]);
+      attendanceCost += Number(r.deduction_days || 0) * day.cutDay;
+      if (r.status === "absent") absentCost += day.absentDay;
     });
     const financialCost = stats.financialTotal || 0;
     const total = attendanceCost + absentCost + financialCost;
     return { attendanceCost, absentCost, financialCost, total };
-  }, [rows, salaries, stats.financialTotal]);
+  }, [rows, salaries, stats.financialTotal, payConfig]);
 
   // Generated Arabic "story" — plain templates, no AI.
   const story = useMemo(() => {

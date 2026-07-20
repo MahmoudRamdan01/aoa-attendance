@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { COMPANY } from "../lib/company";
 import CommandPalette from "../ui/CommandPalette";
 import PushToggle from "../ui/PushToggle";
 import { EmptyState, PageHeader, Skeleton } from "../ui/primitives";
@@ -465,8 +466,8 @@ export default function AppShell({
           >
             <span className="ops-brand-mark"><img src="./logo.png" alt="" /></span>
             <span className="ops-brand-copy">
-              <strong lang="en" dir="ltr">AOI Ops Hub</strong>
-              <span lang="en" dir="ltr">Air Ocean Line</span>
+              <strong lang="en" dir="ltr">{COMPANY.opsTitle}</strong>
+              <span lang="en" dir="ltr">{COMPANY.name}</span>
             </span>
           </button>
 

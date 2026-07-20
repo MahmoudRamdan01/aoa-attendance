@@ -246,3 +246,31 @@
     --row-h: 54px;
   }
 }
+
+/* =====================================================================
+   Air Ocean Line (VITE_COMPANY=airocean) — ocean-blue brand accent.
+   Scoped by data-company (set in main.jsx); the aol build never matches
+   these selectors, so the original gold identity is untouched.
+   ===================================================================== */
+:root[data-company="airocean"],
+:root[data-company="airocean"].dark {
+  --gold: #1e8ffa;
+  --gold-hover: #55acff;
+  --gold-text: #4dabff;
+  --gold-on: #04182b;
+  --gold-soft: rgba(30, 143, 250, 0.14);
+  --gold-line: rgba(30, 143, 250, 0.38);
+  --accent-private: #7dd3fc;
+  --accent-private-soft: rgba(125, 211, 252, 0.13);
+  --accent-private-line: rgba(125, 211, 252, 0.34);
+}
+
+:root[data-company="airocean"]:not(.dark) {
+  --gold-hover: #0d6fd1;
+  --gold-text: #0a5cae;
+  --gold-soft: rgba(10, 92, 174, 0.1);
+  --gold-line: rgba(10, 92, 174, 0.3);
+  --accent-private: #07668e;
+  --accent-private-soft: rgba(7, 102, 142, 0.1);
+  --accent-private-line: rgba(7, 102, 142, 0.3);
+}
