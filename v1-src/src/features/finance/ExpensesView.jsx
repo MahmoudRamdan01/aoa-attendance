@@ -96,7 +96,7 @@ function ExpensesView({ context, onToast }) {
       r.confirmed_at ? "نعم" : "لا",
       statusLabels[r.status] || r.status,
     ].map(csvCell).join(","));
-    downloadTextFile(`expenses-${month}.csv`, "Feff" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
+    downloadTextFile(`expenses-${month}.csv`, "﻿" + `${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
   }
 
   const canVoid = (row) =>

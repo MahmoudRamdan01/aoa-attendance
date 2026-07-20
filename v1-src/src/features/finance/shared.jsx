@@ -59,9 +59,12 @@ function useVoidDialog(onToast, reload) {
 
 // The owner's name is hidden from HR wherever it appears as an actor/holder in
 // finance entries — HR sees the amount, not that it's the owner's.
-const OWNER_MASK_NAME = "محمود";
+// The owner records finance entries under a few name spellings (Arabic
+// «محمود», Latin «Mahmoud», and the linked-account label «الإدارة»). Any of
+// them must read as «الإدارة» for non-owners so HR never sees it's the owner.
+const OWNER_MASK_NAMES = new Set(["محمود", "mahmoud", "الإدارة"]);
 function maskActor(name, role) {
-  if (role !== "owner" && name && name.trim() === OWNER_MASK_NAME) return "الإدارة";
+  if (role !== "owner" && name && OWNER_MASK_NAMES.has(name.trim().toLowerCase())) return "الإدارة";
   return name;
 }
 
