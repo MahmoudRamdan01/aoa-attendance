@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { COMPANY } from "./company";
 
 export const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL || "https://gdgrdwjlxcavogztvxon.supabase.co";
@@ -15,12 +16,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
-export const COMPANY_LOCATION = {
-  label: "Air Ocean Line - Alexandria",
-  lat: 31.1985266,
-  lng: 29.9039409,
-  radiusMeters: 1000,
-};
+// Client-side fallback; the live value comes from company_locations via
+// get_my_context_v1 (see getCompanyLocation in lib/dates.js).
+export const COMPANY_LOCATION = COMPANY.location;
 
 export function distanceMeters(a, b) {
   const earth = 6371000;

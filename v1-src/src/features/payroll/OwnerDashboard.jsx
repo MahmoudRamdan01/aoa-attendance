@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, Banknote, BarChart3, CalendarDays, Clock3, Coins, Download, FileSpreadsheet, PiggyBank, Wallet, TrendingUp, UserPlus, Users } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
+import { computePayroll, getPayrollConfig } from "../../lib/payroll";
 import { dateRangeForPeriod, datesBetween } from "../../lib/dates";
 import { csvCell, downloadTextFile, money } from "../../lib/format";
 import { roleNames, roleOptions, statusLabels } from "../../lib/labels";
@@ -17,6 +18,9 @@ function OwnerDashboard({ onToast }) {
   const [holidays, setHolidays] = useState([]);
   const [finRows, setFinRows] = useState([]);
   const [report, setReport] = useState(null);
+  // Payroll mode (monthly / daily-allowance) from the company database.
+  const [payConfig, setPayConfig] = useState(null);
+  useEffect(() => { getPayrollConfig().then(setPayConfig); }, []);
   const [period, setPeriod] = useState("month");
   const [reportDate, setReportDate] = useState(todayIso());
   const [customRange, setCustomRange] = useState({ from: `${todayIso().slice(0, 7)}-01`, to: todayIso() });
@@ -55,7 +59,7 @@ function OwnerDashboard({ onToast }) {
     setError("");
     Promise.all([
       supabase.from("attendance").select("*").gte("work_date", range.from).lte("work_date", range.to),
-      supabase.from("salaries").select("employee_id,monthly_salary"),
+      supabase.from("salaries").select("*"),
       supabase.from("employees").select("id,name,active,attendance_exempt").eq("active", true).order("id"),
       supabase.from("official_holidays").select("holiday_date,label").gte("holiday_date", range.from).lte("holiday_date", range.to),
       // Financial deductions in range. !inner is required so voided loans are excluded.
@@ -71,7 +75,7 @@ function OwnerDashboard({ onToast }) {
       const failed = [att, sal, emp, hol, inst, cant, other].find((item) => item.error);
       if (failed) throw failed.error;
       setRows(att.data || []);
-      setSalaries(Object.fromEntries((sal.data || []).map((s) => [s.employee_id, Number(s.monthly_salary || 0)])));
+      setSalaries(Object.fromEntries((sal.data || []).map((s) => [s.employee_id, s])));
       setEmployees(emp.data || []);
       setHolidays(hol.data || []);
       setFinRows([...(inst.data || []), ...(cant.data || []), ...(other.data || [])]);
@@ -99,10 +103,6 @@ function OwnerDashboard({ onToast }) {
     const leave = rows.filter((r) => ["leave", "mission", "sick"].includes(r.status)).length;
     const missingCheckout = rows.filter((r) => r.check_in && !r.check_out && ["present", "late"].includes(r.status)).length;
     const deductionDays = rows.reduce((sum, r) => sum + Number(r.deduction_days || 0) + (r.status === "absent" ? 1 : 0), 0);
-    const deductions = rows.reduce((sum, r) => {
-      const days = Number(r.deduction_days || 0) + (r.status === "absent" ? 1 : 0);
-      return sum + days * ((salaries[r.employee_id] || 0) / 30);
-    }, 0);
     const lateByEmployee = rows.reduce((acc, row) => {
       if (row.status !== "late") return acc;
       const current = acc.get(row.employee_id) || { employee_id: row.employee_id, name: employeeMap.get(row.employee_id) || `#${row.employee_id}`, count: 0, minutes: 0 };
@@ -125,29 +125,35 @@ function OwnerDashboard({ onToast }) {
     const financialTotal = [...finByEmployee.values()].reduce((sum, value) => sum + value, 0);
     const payrollRows = employees.map((emp) => {
       const employeeRows = rowsByEmployee.get(emp.id) || [];
-      const salary = salaries[emp.id] || 0;
-      const empDeductionDays = employeeRows.reduce((sum, row) => (
-        sum + Number(row.deduction_days || 0) + (row.status === "absent" ? 1 : 0)
-      ), 0);
-      const empDeductionAmount = empDeductionDays * (salary / 30);
+      const salaryRow = salaries[emp.id] || {};
       const financialDeduction = finByEmployee.get(emp.id) || 0;
+      // Salary math (monthly vs daily-allowance) lives in lib/payroll.js.
+      const pay = computePayroll({
+        config: payConfig,
+        salaryRow,
+        attendanceRows: employeeRows,
+        financialTotal: financialDeduction,
+      });
       return {
         employee_id: emp.id,
         name: emp.name,
         exempt: !!emp.attendance_exempt,
-        salary,
-        deductionDays: empDeductionDays,
-        deductionAmount: empDeductionAmount,
+        salary: Number(salaryRow.monthly_salary || 0),
+        gross: pay.gross,
+        deductionDays: pay.deductionDays,
+        deductionAmount: pay.attendanceDeduction,
         financialDeduction,
-        netSalary: Math.max(0, salary - empDeductionAmount - financialDeduction),
+        netSalary: pay.net,
         present: employeeRows.filter((row) => row.check_in).length,
         late: employeeRows.filter((row) => row.status === "late").length,
         absent: employeeRows.filter((row) => row.status === "absent").length,
         missingCheckout: employeeRows.filter((row) => row.check_in && !row.check_out && ["present", "late"].includes(row.status)).length,
       };
     }).sort((a, b) => (b.deductionAmount + b.financialDeduction) - (a.deductionAmount + a.financialDeduction) || a.name.localeCompare(b.name, "ar"));
-    // إجمالي المرتبات قبل أي خصم (المرتب الأساسي لكل الموظفين) وبعد كل الخصومات (الصافي التقديري).
-    const grossTotal = payrollRows.reduce((sum, row) => sum + row.salary, 0);
+    const deductions = payrollRows.reduce((sum, row) => sum + row.deductionAmount, 0);
+    // إجمالي المرتبات قبل أي خصم (شامل بدل الانتظام في نظام الأساسي+الانتظام)
+    // وبعد كل الخصومات (الصافي التقديري).
+    const grossTotal = payrollRows.reduce((sum, row) => sum + row.gross, 0);
     const netTotal = payrollRows.reduce((sum, row) => sum + row.netSalary, 0);
     return {
       total,
@@ -166,7 +172,7 @@ function OwnerDashboard({ onToast }) {
       lateByEmployee: [...lateByEmployee.values()].sort((a, b) => b.count - a.count || b.minutes - a.minutes).slice(0, 5),
       payrollRows,
     };
-  }, [rows, salaries, employees, holidays, finRows, range.from, range.to]);
+  }, [rows, salaries, employees, holidays, finRows, range.from, range.to, payConfig]);
 
   // Daily series for the trend chart (skips Fridays; empty workdays render as zeros).
   const dailyData = useMemo(() => {

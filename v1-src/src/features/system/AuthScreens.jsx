@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { COMPANY } from "../../lib/company";
 import BrandLogo from "../../ui/BrandLogo";
 
 function Splash() {
   return (
     <div className="splash">
       <BrandLogo large />
-      <p>تحميل نظام Air Ocean Line...</p>
+      <p>تحميل نظام {COMPANY.name}...</p>
     </div>
   );
 }
@@ -43,7 +44,7 @@ function LoginScreen() {
         <div className="brand login-brand">
           <BrandLogo />
           <div>
-            <p>Air Ocean Line</p>
+            <p>{COMPANY.name}</p>
             <strong>نظام الحضور والموارد البشرية</strong>
           </div>
         </div>

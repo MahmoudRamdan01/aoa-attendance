@@ -15,6 +15,7 @@ import {
   Vault,
   Wallet,
 } from "lucide-react";
+import { COMPANY } from "../lib/company";
 
 export const SECTION_META = {
   personal: { ar: "مساحتي", order: 10 },
@@ -101,6 +102,7 @@ const DEFINITIONS = [
     en: "AI Assistant",
     icon: Sparkles,
     legacyKind: "all",
+    module: "assistant",
     // Assistant is OFF for everyone by default except the owner. The owner
     // enables it per person (employees.assistant_enabled) from the People page.
     capability: ({ context }) =>
@@ -129,6 +131,7 @@ const DEFINITIONS = [
     legacyKind: "admin",
     capability: capabilities.admin,
     mobileSlot: null,
+    module: "companyFinance",
   },
   {
     id: "treasury",
@@ -140,6 +143,7 @@ const DEFINITIONS = [
     legacyKind: "admin",
     capability: capabilities.admin,
     mobileSlot: null,
+    module: "companyFinance",
   },
   {
     id: "partner",
@@ -151,6 +155,7 @@ const DEFINITIONS = [
     legacyKind: "admin",
     capability: capabilities.admin,
     mobileSlot: null,
+    module: "companyFinance",
   },
   {
     id: "team",
@@ -209,14 +214,19 @@ const DEFINITIONS = [
     capability: capabilities.owner,
     mobileSlot: null,
     private: true,
+    module: "companyFinance",
   },
 ];
 
 export function createViewRegistry(components = {}) {
-  return DEFINITIONS.map((definition) => ({
-    ...definition,
-    component: components[definition.id] || null,
-  }));
+  return DEFINITIONS
+    // Views tagged with a module only exist in companies that enable it
+    // (e.g. Air Ocean runs attendance/leaves/payroll without the finance pages).
+    .filter((definition) => !definition.module || COMPANY.modules?.[definition.module])
+    .map((definition) => ({
+      ...definition,
+      component: components[definition.id] || null,
+    }));
 }
 
 export function canAccessView(view, context) {

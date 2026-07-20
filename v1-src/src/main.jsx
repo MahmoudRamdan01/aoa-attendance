@@ -13,7 +13,11 @@ import "@fontsource/ibm-plex-sans-arabic/latin-700.css";
 import "@fontsource/jetbrains-mono/latin-500.css";
 import "@fontsource/jetbrains-mono/latin-600.css";
 import App from "./App.jsx";
+import { COMPANY } from "./lib/company";
 import "./styles.css";
+
+// Company theme hook: tokens.css scopes per-company palettes on this attribute.
+document.documentElement.dataset.company = COMPANY.key;
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
