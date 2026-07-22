@@ -4240,3 +4240,359 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   background: var(--c);
   flex: none;
 }
+
+/* =====================================================================
+   Redesign v2 — Phase 7: login screen (05-login-spec.md, ref 09).
+   All golds via var(--gold*) → the airocean magenta build restyles itself.
+   ===================================================================== */
+.lg-screen {
+  position: relative;
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(170deg, var(--canvas) 55%, #0d1e2e);
+}
+
+:root:not(.dark) .lg-screen {
+  background: linear-gradient(170deg, var(--canvas) 55%, #dfe9f0);
+}
+
+.lg-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(180, 196, 210, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(180, 196, 210, 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.lg-glow {
+  position: absolute;
+  inset-block-start: -120px;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  inline-size: 380px;
+  block-size: 380px;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--gold-soft), transparent 66%);
+}
+
+.lg-col {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  inline-size: 100%;
+  max-inline-size: 400px;
+  margin-inline: auto;
+  padding: clamp(28px, 8vh, 64px) 20px 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Entrance stagger */
+.lg-logo, .lg-wordmark, .lg-greet, .lg-sub { animation: lgRise 0.5s ease-out both; }
+.lg-card { animation: lgRise 0.5s ease-out 0.12s both; }
+.lg-foot { animation: lgRise 0.5s ease-out 0.24s both; }
+
+@keyframes lgRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Floating logo */
+.lg-logo {
+  position: relative;
+  inline-size: 110px;
+  block-size: 110px;
+  display: grid;
+  place-items: center;
+  animation: lgRise 0.5s ease-out both, lgBob 5.4s ease-in-out infinite;
+}
+
+@keyframes lgBob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -7px; }
+}
+
+.lg-logo-halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--gold-line);
+  animation: lgHalo 3.2s ease-out infinite;
+}
+
+@keyframes lgHalo {
+  0% { transform: scale(1); opacity: 0.5; }
+  70%, 100% { transform: scale(1.18); opacity: 0; }
+}
+
+.lg-logo-ring {
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+}
+
+.lg-logo-mark {
+  inline-size: 66px;
+  block-size: 66px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 18px 44px var(--gold-soft);
+}
+
+.lg-logo-mark img,
+.lg-logo-mark > * { inline-size: 100%; block-size: 100%; object-fit: cover; }
+
+.lg-wordmark {
+  margin: 14px 0 0;
+  color: var(--text-secondary);
+  font: 700 11.5px var(--font-mono);
+  letter-spacing: 0.22em;
+}
+
+.lg-greet {
+  margin: 10px 0 0;
+  font: 700 23px/1.4 var(--font-display);
+  text-align: center;
+}
+
+.lg-sub {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font: 400 12px/1.6 var(--font-body);
+}
+
+/* Glass card */
+.lg-card {
+  inline-size: 100%;
+  margin-block-start: 22px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(20, 33, 47, 0.72);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+:root:not(.dark) .lg-card { background: rgba(255, 255, 255, 0.8); }
+
+.lg-card.has-error { animation: lgShake 0.4s ease-in-out; }
+
+@keyframes lgShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(5px); }
+  50% { transform: translateX(-4px); }
+  75% { transform: translateX(2px); }
+}
+
+.lg-field { display: grid; gap: 6px; }
+.lg-field > span { color: var(--text-muted); font: 600 11px/1.5 var(--font-body); }
+
+.lg-input-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  block-size: 48px;
+  padding-inline: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-nested);
+  transition: border-color var(--duration-fast);
+}
+
+.lg-input-row:focus-within { border-color: var(--gold-line); }
+.lg-input-row > svg { color: var(--text-disabled); flex: none; }
+
+.lg-input-row input {
+  flex: 1;
+  min-inline-size: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text);
+  font: 500 13px/1.4 var(--font-mono);
+}
+
+.lg-eye {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 30px;
+  block-size: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-disabled);
+  cursor: pointer;
+}
+
+.lg-eye:hover { color: var(--text-secondary); }
+
+.lg-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lg-remember {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font: 500 11.5px/1.5 var(--font-body);
+  cursor: pointer;
+}
+
+.lg-remember input {
+  inline-size: 17px;
+  block-size: 17px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.lg-forgot {
+  border: none;
+  background: transparent;
+  color: var(--gold-text);
+  font: 600 11.5px/1.5 var(--font-body);
+  cursor: pointer;
+}
+
+.lg-submit {
+  block-size: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(100deg, var(--gold) 30%, var(--gold-hover) 50%, var(--gold) 70%);
+  background-size: 220% 100%;
+  animation: lgSheen 4.5s ease-in-out infinite;
+  color: var(--gold-on);
+  font: 700 15px/1 var(--font-body);
+  box-shadow: 0 14px 36px var(--gold-soft);
+  cursor: pointer;
+  transition: transform var(--duration-fast);
+}
+
+.lg-submit:active { transform: scale(0.98); }
+.lg-submit:disabled { cursor: progress; }
+
+@keyframes lgSheen {
+  0% { background-position: 180% 0; }
+  100% { background-position: -80% 0; }
+}
+
+.lg-dots i {
+  display: inline-block;
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: var(--gold-on);
+  margin-inline: 2px;
+  animation: ringBlink 1s ease-in-out infinite;
+}
+
+.lg-dots i:nth-child(2) { animation-delay: 0.2s; }
+.lg-dots i:nth-child(3) { animation-delay: 0.4s; }
+
+.lg-card .error { margin: 0; }
+
+/* Footer */
+.lg-foot {
+  margin-block-start: auto;
+  padding-block-start: 26px;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+}
+
+.lg-status {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font: 500 10.5px/1.5 var(--font-body);
+}
+
+.lg-status i {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulseBlink 1.6s ease-in-out infinite;
+}
+
+.lg-tag {
+  margin: 0;
+  color: var(--text-disabled);
+  font: 500 9px var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+/* Ocean waves */
+.lg-waves {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 96px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lg-wave {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-start: 0;
+  inline-size: 786px;
+  block-size: 80px;
+  display: block;
+}
+
+.lg-wave-back {
+  inset-block-end: -6px;
+  animation: lgDrift 22s linear infinite;
+}
+
+.lg-wave-back path { fill: var(--gold); opacity: 0.1; }
+
+.lg-wave-front {
+  inset-block-end: -18px;
+  animation: lgDrift 13s linear infinite;
+}
+
+.lg-wave-front path { fill: #7dd3fc; opacity: 0.14; }
+
+:root:not(.dark) .lg-wave-back path { opacity: 0.05; }
+:root:not(.dark) .lg-wave-front path { opacity: 0.07; }
+
+@keyframes lgDrift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-393px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-wave-back,
+  .lg-wave-front,
+  .lg-logo,
+  .lg-logo-halo,
+  .lg-submit,
+  .lg-status i {
+    animation: none;
+  }
+  .lg-logo { animation: lgRise 0.5s ease-out both; }
+}
