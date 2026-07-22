@@ -3611,3 +3611,57 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
 
 .approval-decided-chip.is-ok { background: var(--success-soft); color: var(--success); }
 .approval-decided-chip.is-no { background: var(--danger-soft); color: var(--danger); }
+
+/* =====================================================================
+   Redesign follow-up: notifications page (bell now opens this full screen,
+   the old popover was removed) as cards.
+   ===================================================================== */
+.notif-list { display: grid; gap: 8px; }
+
+.notif-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface-nested);
+}
+
+.notif-card.is-unread {
+  border-color: var(--gold-line);
+  background: color-mix(in srgb, var(--gold-soft) 60%, var(--surface-nested));
+}
+
+.notif-cat {
+  inline-size: fit-content;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font: 600 9.5px/1.6 var(--font-body);
+}
+
+.notif-title { font: 700 13px/1.5 var(--font-body); }
+.notif-body { margin: 0; color: var(--text-secondary); font: 400 12px/1.6 var(--font-body); }
+
+.notif-foot {
+  margin-block-start: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.notif-time { color: var(--text-muted); font: 400 10.5px/1.6 var(--font-body); }
+.notif-actions { display: flex; align-items: center; gap: 12px; }
+
+.notif-read {
+  border: none;
+  background: transparent;
+  color: var(--gold-text);
+  font: 600 11px/1.6 var(--font-body);
+  cursor: pointer;
+}
+
+.notif-push { margin-block-start: 14px; padding-block-start: 12px; border-block-start: 1px solid var(--line-subtle); }

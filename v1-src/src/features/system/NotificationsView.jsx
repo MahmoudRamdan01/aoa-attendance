@@ -6,6 +6,7 @@ import { cls } from "../../lib/cls";
 import { fmtDateTime } from "../../lib/format";
 import { notificationCategoryLabels } from "../../lib/labels";
 import { ConfirmDialog } from "../../ui/primitives";
+import PushToggle from "../../ui/PushToggle";
 
 function NotificationsView({ context, onToast, routeParam }) {
   const [rows, setRows] = useState([]);
@@ -122,37 +123,37 @@ function NotificationsView({ context, onToast, routeParam }) {
       )}
 
       <section className="panel">
-          <div className="panel-title between">
+        <div className="panel-title between">
           <div><Bell size={20} /><h2>الإشعارات</h2></div>
           <div className="toolbar">
-            <span className="badge">{unread} غير مقروء</span>
             <div className="tabs compact-tabs no-margin">
               <button className={cls(filter === "all" && "active")} onClick={() => setFilter("all")}>الكل</button>
-              <button className={cls(filter === "unread" && "active")} onClick={() => setFilter("unread")}>غير مقروء</button>
+              <button className={cls(filter === "unread" && "active")} onClick={() => setFilter("unread")}>غير مقروء{unread > 0 ? ` (${unread})` : ""}</button>
             </div>
             <button className="secondary" onClick={markAllRead} disabled={busy === "read-all" || unread === 0}>
               <CheckCheck size={16} /> تعليم الكل
             </button>
-            <button className="secondary" onClick={loadNotifications}>تحديث</button>
           </div>
         </div>
-        <div className="list">
+        <div className="notif-list">
           {loading && <p className="muted">جارٍ تحميل الإشعارات...</p>}
-          {!loading && visibleRows.length === 0 && <p className="muted">لا توجد إشعارات بعد.</p>}
+          {!loading && visibleRows.length === 0 && <p className="muted">{filter === "unread" ? "لا توجد إشعارات غير مقروءة." : "لا توجد إشعارات بعد."}</p>}
           {!loading && visibleRows.map((item) => (
-            <div className={cls("list-row notification-row", !item.read_at && "unread")} id={`notif-${item.id}`} key={item.id}>
-              <div>
-                <strong>{item.title}</strong>
-                <span>{fmtDateTime(item.created_at)} · {notificationCategoryLabels[item.category] || item.category || "النظام"}</span>
-              </div>
-              <p>{item.body}</p>
-              <div className="notification-actions">
-                {!item.read_at && <button className="secondary" onClick={() => markRead(item.id)}>تمت القراءة</button>}
-                {role === "owner" && <button className="danger-link" onClick={() => setDeleteId(item.id)}><Trash2 size={15} /> حذف من الكل</button>}
+            <div className={cls("notif-card", !item.read_at && "is-unread")} id={`notif-${item.id}`} key={item.id}>
+              <span className="notif-cat">{notificationCategoryLabels[item.category] || item.category || "النظام"}</span>
+              <strong className="notif-title">{item.title}</strong>
+              <p className="notif-body">{item.body}</p>
+              <div className="notif-foot">
+                <time className="notif-time" dateTime={item.created_at}>{fmtDateTime(item.created_at)}</time>
+                <div className="notif-actions">
+                  {!item.read_at && <button className="notif-read" onClick={() => markRead(item.id)}>تمت القراءة</button>}
+                  {role === "owner" && <button className="danger-link" onClick={() => setDeleteId(item.id)}><Trash2 size={14} /> حذف من الكل</button>}
+                </div>
               </div>
             </div>
           ))}
         </div>
+        <div className="notif-push"><PushToggle onToast={onToast} /></div>
       </section>
       <ConfirmDialog
         open={deleteId !== null}

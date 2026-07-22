@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, RefreshCcw, ScanFace, Search, UserCheck, Users, UserX, Wrench, X } from "lucide-react";
+import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, ScanFace, Search, UserCheck, Users, UserX, Wrench, X } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { haptic } from "../../lib/haptics";
@@ -242,7 +242,6 @@ function AdminDashboard({ context, onToast }) {
               <FileSpreadsheet size={16} /> Excel
             </button>
             <button className="secondary" onClick={markMissingCheckouts}>مراجعة الانصراف</button>
-            <button className="secondary" onClick={loadAdmin}>تحديث</button>
           </div>
         </div>
         <div className="stats-grid compact-stats">
@@ -453,7 +452,6 @@ function RequestsHistory() {
     <section className="panel">
       <div className="panel-title between">
         <div><History size={20} /><h2>سجل الأجازات والأذونات</h2></div>
-        <button className="secondary" onClick={load}><RefreshCcw size={16} /> تحديث</button>
       </div>
       <div className="seg-row">
         <div className="seg">

@@ -3,7 +3,6 @@ import { cls } from "../lib/cls";
 import { haptic } from "../lib/haptics";
 import {
   Bell,
-  CheckCheck,
   ChevronLeft,
   LockKeyhole,
   LogOut,
@@ -19,8 +18,7 @@ import { supabase } from "../lib/supabase";
 import { COMPANY } from "../lib/company";
 import CommandPalette from "../ui/CommandPalette";
 import OfflineBanner from "../ui/OfflineBanner";
-import PushToggle from "../ui/PushToggle";
-import { EmptyState, PageHeader, Skeleton } from "../ui/primitives";
+import { PageHeader } from "../ui/primitives";
 import {
   allowedViews,
   createQuickActions,
@@ -47,12 +45,6 @@ const MOBILE_TAB_LABELS = {
   admin: "الحضور", team: "الفريق", owner: "الرواتب",
   deductions: "الخصومات", expenses: "المصروفات", partner: "المديونية",
   ownerbook: "الخاص", notifications: "الإشعارات", training: "التدريب", assistant: "المساعد",
-};
-const notificationCategoryLabels = {
-  admin_message: "رسالة إدارية",
-  approval: "موافقة مطلوبة",
-  qr: "QR يومي",
-  system: "النظام",
 };
 
 function initials(name) {
@@ -92,182 +84,6 @@ function ThemeButton({ theme, onToggle, mobile = false }) {
   );
 }
 
-function InboxPopover({
-  id,
-  open,
-  closing,
-  panelRef,
-  onClose,
-  unread,
-  setUnread,
-  onNavigate,
-  onToast,
-}) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState(false);
-  const [busy, setBusy] = useState("");
-
-  useEffect(() => {
-    if (!open) return undefined;
-    let cancelled = false;
-    setLoading(true);
-    setLoadError(false);
-    supabase
-      .from("notifications")
-      .select("id,title,body,category,priority,read_at,created_at,created_by,group_id")
-      .order("created_at", { ascending: false })
-      .limit(50)
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) onToast?.("تعذر تحميل الإشعارات.");
-        setRows(data || []);
-        setLoadError(Boolean(error));
-        setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setRows([]);
-        setLoadError(true);
-        setLoading(false);
-        onToast?.("تعذر تحميل الإشعارات.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, unread, onToast]);
-
-  if (!open) return null;
-
-  const markRead = async (id) => {
-    const row = rows.find((item) => item.id === id);
-    if (!row || row.read_at) return;
-    setBusy(String(id));
-    const { error } = await supabase.rpc("mark_notification_read_v1", { p_id: id });
-    setBusy("");
-    if (error) {
-      onToast?.("تعذر تحديث الإشعار.");
-      return;
-    }
-    setRows((items) => items.map((item) => (item.id === id ? { ...item, read_at: new Date().toISOString() } : item)));
-    setUnread?.((count) => Math.max(0, count - 1));
-  };
-
-  const markAllRead = async () => {
-    setBusy("all");
-    const { data, error } = await supabase.rpc("mark_all_notifications_read_v1");
-    setBusy("");
-    if (error || data?.error) {
-      onToast?.(data?.message || "تعذر تحديث الإشعارات.");
-      return;
-    }
-    setRows((items) => items.map((item) => ({ ...item, read_at: item.read_at || new Date().toISOString() })));
-    setUnread?.(0);
-    onToast?.(`تم تعليم ${data?.count || 0} إشعار كمقروء.`);
-  };
-
-  return (
-    <section
-      ref={panelRef}
-      className={cls("ops-inbox", closing && "ops-closing")}
-      id={id}
-      role="dialog"
-      aria-labelledby={`${id}-title`}
-      aria-busy={loading || undefined}
-    >
-      {/* The list scrolls, so only the header acts as the drag handle. */}
-      <header className="ops-inbox-head" data-sheet-handle>
-        <div>
-          <h2 id={`${id}-title`}>صندوق الإشعارات</h2>
-          <span className="ui-page-eyebrow">
-            <bdi dir="ltr">{unread}</bdi>
-            <span>غير مقروء</span>
-          </span>
-        </div>
-        <button
-          className="ops-icon-btn"
-          type="button"
-          onClick={markAllRead}
-          disabled={!unread || busy === "all"}
-          aria-label="تعليم كل الإشعارات كمقروء"
-          title="تعليم الكل كمقروء"
-        >
-          <CheckCheck size={17} aria-hidden="true" />
-        </button>
-      </header>
-
-      <div className="ops-inbox-list">
-        {loading ? (
-          <div className="ops-inbox-loading" role="status" aria-label="جارٍ تحميل الإشعارات">
-            {[0, 1, 2].map((item) => (
-              <div className="ops-inbox-loading-row" key={item}>
-                <Skeleton width={8} height={8} radius="50%" />
-                <span>
-                  <Skeleton width="48%" height={12} />
-                  <Skeleton width="86%" height={9} />
-                  <Skeleton width="32%" height={8} />
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : loadError ? (
-          <EmptyState
-            title="تعذر تحميل الإشعارات"
-            description="اقفل الصندوق وافتحه تاني بعد ما تتأكد من الاتصال."
-            compact
-          />
-        ) : rows.length ? (
-          rows.slice(0, 8).map((item) => (
-            <button
-              className={`ops-inbox-item${item.read_at ? "" : " is-unread"}`}
-              type="button"
-              key={item.id}
-              disabled={busy === String(item.id)}
-              onClick={() => {
-                markRead(item.id);
-                // Take the user TO the notification itself: the full
-                // notifications page, scrolled to and highlighting this one.
-                onNavigate?.("notifications", [String(item.id)]);
-                onClose?.();
-              }}
-            >
-              <span className="ops-inbox-item-dot" aria-hidden="true" />
-              <span className="ops-inbox-item-copy">
-                <strong>{item.title}</strong>
-                <span>{item.body}</span>
-                <time dateTime={item.created_at}>
-                  <bdi dir="ltr">{formatDate(new Date(item.created_at), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</bdi>
-                  {" · "}{notificationCategoryLabels[item.category] || item.category || "النظام"}
-                </time>
-              </span>
-            </button>
-          ))
-        ) : (
-          <EmptyState title="لا توجد إشعارات بعد" description="سيظهر أي تحديث جديد هنا فورًا." compact />
-        )}
-      </div>
-
-      <div className="ops-inbox-push">
-        <PushToggle onToast={onToast} />
-      </div>
-
-      <footer className="ops-inbox-foot">
-        <button
-          className="ui-action"
-          type="button"
-          onClick={() => {
-            onNavigate?.("notifications");
-            onClose?.();
-          }}
-        >
-          فتح كل الإشعارات
-        </button>
-        <button className="ui-action" type="button" onClick={onClose}>إغلاق</button>
-      </footer>
-    </section>
-  );
-}
-
 export default function AppShell({
   session,
   context,
@@ -285,11 +101,9 @@ export default function AppShell({
   children,
 }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [inboxOpen, setInboxOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const paletteTriggerRef = useRef(null);
   const inboxTriggerRef = useRef(null);
-  const inboxWrapRef = useRef(null);
   const mainRef = useRef(null);
   const previousRouteRef = useRef(`${activeView}/${routeParams.join("/")}`);
   const mobileMoreRef = useRef(null);
@@ -299,7 +113,6 @@ export default function AppShell({
   // Animated dismissal: mark the surface as closing, unmount after the exit
   // animation. Drag-to-dismiss finishes its own slide then unmounts directly.
   const [moreClosing, setMoreClosing] = useState(false);
-  const [inboxClosing, setInboxClosing] = useState(false);
   const closeMore = useCallback(() => {
     setMoreClosing((already) => {
       if (already) return already;
@@ -310,26 +123,9 @@ export default function AppShell({
       return true;
     });
   }, []);
-  const closeInbox = useCallback(() => {
-    setInboxClosing((already) => {
-      if (already) return already;
-      window.setTimeout(() => {
-        setInboxOpen(() => false);
-        setInboxClosing(() => false);
-      }, 175);
-      return true;
-    });
-  }, []);
-  const inboxPanelRef = useRef(null);
   useSheetDrag(mobileMoreRef, () => setMobileMoreOpen(() => false), mobileMoreOpen);
-  useSheetDrag(
-    inboxPanelRef,
-    () => setInboxOpen(() => false),
-    inboxOpen && (typeof window === "undefined" || window.matchMedia("(max-width: 820px)").matches)
-  );
   // Hardware Back closes open surfaces instead of leaving the app.
   useBackClose(mobileMoreOpen, () => closeMore());
-  useBackClose(inboxOpen, () => closeInbox());
   const accessibleViews = useMemo(() => allowedViews(views, context), [views, context]);
   const activeItem = accessibleViews.find((view) => view.id === activeView) || accessibleViews[0];
   const navGroups = useMemo(() => groupViewsBySection(accessibleViews), [accessibleViews]);
@@ -361,25 +157,18 @@ export default function AppShell({
         if (event.repeat) return;
         setPaletteOpen((current) => {
           const next = !current;
-          if (next) {
-            closeInbox();
-            closeMore();
-          }
+          if (next) closeMore();
           return next;
         });
       }
       if (event.key === "Escape") {
-        if (inboxOpen) {
-          window.requestAnimationFrame(() => inboxTriggerRef.current?.focus());
-        }
         setPaletteOpen(false);
-        closeInbox();
         closeMore();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [inboxOpen]);
+  }, []);
 
   useEffect(() => {
     const routeKey = `${activeView}/${routeParams.join("/")}`;
@@ -391,21 +180,6 @@ export default function AppShell({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeView, routeParams]);
-
-  useEffect(() => {
-    if (!inboxOpen) return undefined;
-    const onPointerDown = (event) => {
-      if (!inboxWrapRef.current?.contains(event.target)) closeInbox();
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    // Lock the page behind the inbox so swiping the list doesn't scroll the app.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [inboxOpen]);
 
   useEffect(() => {
     if (!mobileMoreOpen) return undefined;
@@ -459,25 +233,16 @@ export default function AppShell({
   const navigate = (view, params = []) => {
     onNavigate?.(view, params);
     setPaletteOpen(false);
-    closeInbox();
     closeMore();
   };
 
   const openPalette = () => {
-    closeInbox();
     closeMore();
     setPaletteOpen(true);
   };
 
-  const openInbox = () => {
-    setPaletteOpen(false);
-    closeMore();
-    setInboxOpen((current) => !current);
-  };
-
   const openMore = () => {
     setPaletteOpen(false);
-    closeInbox();
     setMobileMoreOpen(true);
   };
 
@@ -621,32 +386,18 @@ export default function AppShell({
               <RefreshCcw size={17} aria-hidden="true" />
             </button>
             <ThemeButton theme={theme} onToggle={toggleTheme} />
-            <div className="ops-inbox-wrap" ref={inboxWrapRef}>
-              <button
-                ref={inboxTriggerRef}
-                className="ops-icon-btn"
-                type="button"
-                onClick={openInbox}
-                aria-label={unread > 0 ? `فتح صندوق الإشعارات، ${unread} غير مقروء` : "فتح صندوق الإشعارات"}
-                aria-haspopup="dialog"
-                aria-expanded={inboxOpen}
-                aria-controls="ops-inbox"
-              >
-                <Bell size={18} aria-hidden="true" />
-                {unread > 0 ? <bdi className="ops-unread-badge" dir="ltr">{unread > 99 ? "99+" : unread}</bdi> : null}
-              </button>
-              <InboxPopover
-                id="ops-inbox"
-                open={inboxOpen}
-                closing={inboxClosing}
-                panelRef={inboxPanelRef}
-                onClose={() => closeInbox()}
-                unread={unread}
-                setUnread={setUnread}
-                onNavigate={navigate}
-                onToast={onToast}
-              />
-            </div>
+            {/* Bell opens the full الإشعارات screen (redesign) instead of the
+                old popover. */}
+            <button
+              ref={inboxTriggerRef}
+              className="ops-icon-btn"
+              type="button"
+              onClick={() => navigate("notifications")}
+              aria-label={unread > 0 ? `فتح الإشعارات، ${unread} غير مقروء` : "فتح الإشعارات"}
+            >
+              <Bell size={18} aria-hidden="true" />
+              {unread > 0 ? <bdi className="ops-unread-badge" dir="ltr">{unread > 99 ? "99+" : unread}</bdi> : null}
+            </button>
             <div className="ops-user-chip" title={displayName}>
               <span className="ops-avatar">{initials(displayName)}</span>
               <span className="ops-user-copy">

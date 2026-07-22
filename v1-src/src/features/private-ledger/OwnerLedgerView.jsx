@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, ChevronLeft, Pencil, Plus, RefreshCcw, Search, Trash2, TrendingUp, Users, Wallet, X } from "lucide-react";
+import { Banknote, ChevronLeft, Pencil, Plus, Search, Trash2, TrendingUp, Users, Wallet, X } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { money, normalizeArabicName } from "../../lib/format";
@@ -379,7 +379,6 @@ function OwnerLedgerView({ onToast, onNavigate, routeParam }) {
       <section className="panel">
         <div className="panel-title between">
           <div><Wallet size={20} /><h2>الدفتر الشخصي</h2></div>
-          <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
         </div>
         <div className="stats-grid compact-stats">
           <Metric label="مستحق لك" value={`${money(totals.lent)} ج`} tone="ok" icon={TrendingUp} />

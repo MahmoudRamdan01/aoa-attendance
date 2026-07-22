@@ -232,20 +232,8 @@ function OwnerDashboard({ onToast }) {
   );
   const visibleBars = showAllBars ? employeeBars : employeeBars.slice(0, TOP_BARS_LIMIT);
 
-  function exportCsv() {
-    const employeeMap = new Map(employees.map((emp) => [emp.id, emp.name]));
-    const header = ["التاريخ", "الموظف", "الحالة", "حضور", "انصراف", "تأخير", "خصم أيام"];
-    const lines = rows.map((row) => [
-      row.work_date,
-      employeeMap.get(row.employee_id) || row.employee_id,
-      statusLabels[row.status] || row.status,
-      row.check_in || "",
-      row.check_out || "",
-      row.late_minutes || 0,
-      row.deduction_days || 0,
-    ].map(csvCell).join(","));
-    downloadTextFile(`aoa-attendance-${range.from}-${range.to}.csv`, `\ufeff${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
-  }
+  // Owner feedback (review round 1): the day-records Excel/PDF exports were
+  // removed from «تقارير وتحليلات»; «Excel مرتبات» below stays.
 
   function exportPayrollCsv() {
     const daily = stats.payMode === "daily";
@@ -318,10 +306,6 @@ function OwnerDashboard({ onToast }) {
             ) : (
               <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} />
             )}
-            <button className="secondary" onClick={exportCsv} disabled={loading || rows.length === 0}>
-              <FileSpreadsheet size={16} /> Excel
-            </button>
-            <button className="secondary" onClick={() => window.print()}>PDF</button>
           </div>
         </div>
         <p className="muted">الفترة: {range.from} إلى {range.to}</p>

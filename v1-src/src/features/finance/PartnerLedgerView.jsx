@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Bell, FileSpreadsheet, RefreshCcw, Scale, Search, TrendingUp } from "lucide-react";
+import { Banknote, Bell, FileSpreadsheet, Scale, Search, TrendingUp } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 
@@ -168,7 +168,6 @@ function PartnerLedgerView({ context, onToast }) {
           <div className="toolbar">
             <button className="secondary" onClick={exportEntries} disabled={entries.length === 0}><FileSpreadsheet size={16} /> القيود</button>
             <button className="secondary" onClick={exportSettlements} disabled={settlements.length === 0}><FileSpreadsheet size={16} /> السدادات</button>
-            <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
           </div>
         </div>
         <div className="stats-grid compact-stats">

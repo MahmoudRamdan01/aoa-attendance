@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, Coins, HandCoins, Landmark, Pencil, RefreshCcw, Scale, Users, Banknote, Receipt } from "lucide-react";
+import { Vault, Wallet, PiggyBank, ArrowDownCircle, ArrowUpCircle, Coins, HandCoins, Landmark, Pencil, Scale, Users, Banknote, Receipt } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { money } from "../../lib/format";
 import { Metric, StatusBadge } from "../../ui/legacy";
@@ -283,7 +283,6 @@ function TreasuryView({ context, onToast }) {
           <div><Vault size={20} /><h2>الخزنة</h2></div>
           <div className="toolbar">
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-            <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
           </div>
         </div>
         <div className="stats-grid compact-stats">
