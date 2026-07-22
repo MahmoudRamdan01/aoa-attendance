@@ -4511,6 +4511,42 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
 
 .lg-card .error { margin: 0; }
 
+/* "أو" divider + face-login shortcut (Phase-7 login spec item 4) */
+.lg-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-disabled);
+  font: 600 11.5px/1 var(--font-body);
+}
+
+.lg-divider::before,
+.lg-divider::after {
+  content: "";
+  flex: 1;
+  block-size: 1px;
+  background: var(--line);
+}
+
+.lg-face {
+  block-size: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  border-radius: 13px;
+  background: rgba(125, 211, 252, 0.08);
+  color: #7dd3fc;
+  font: 700 13.5px/1 var(--font-body);
+  cursor: pointer;
+  transition: transform var(--duration-fast), background var(--duration-fast);
+}
+
+.lg-face:hover { background: rgba(125, 211, 252, 0.14); }
+.lg-face:active { transform: scale(0.98); }
+.lg-face:disabled { opacity: 0.6; cursor: progress; }
+
 /* Footer */
 .lg-foot {
   margin-block-start: auto;

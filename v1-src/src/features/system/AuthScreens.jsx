@@ -1,9 +1,17 @@
-import { useState } from "react";
-import { ArrowLeft, Eye, EyeOff, Lock, Mail, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Eye, EyeOff, Lock, Mail, ScanFace, Sparkles } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { COMPANY } from "../../lib/company";
 import BrandLogo from "../../ui/BrandLogo";
+import CaptureSheet, { requestCaptureSession } from "../attendance/CaptureSheet";
+import {
+  enrollFace,
+  hasFaceEnrollment,
+  isFaceLoginSupported,
+  matchFace,
+  removeEnrollment,
+} from "../../lib/faceLogin";
 
 function Splash() {
   return (
@@ -19,6 +27,16 @@ function Splash() {
 const WAVE_PATH =
   "M0,34 Q32.75,14 65.5,34 T131,34 T196.5,34 T262,34 T327.5,34 T393,34 T458.5,34 T524,34 T589.5,34 T655,34 T720.5,34 T786,34 L786,80 L0,80 Z";
 
+// Shared auth-error → Arabic copy for the FACE flows only. The password
+// login() below keeps its own inline mapping byte-for-byte.
+function authErrorMessage(error) {
+  const isNetwork = !error.status || error.status === 0 || /fetch|network|timeout|failed/i.test(error.message || "");
+  if (isNetwork) return "فشل الاتصال بالخادم — تأكّد من اتصال الإنترنت وأعد المحاولة.";
+  if (error.status === 429) return "محاولات كثيرة متتالية — انتظر دقيقة ثم أعد المحاولة.";
+  if (error.status === 400) return "البريد الإلكتروني أو كلمة المرور غير صحيحة.";
+  return "حدث خطأ مؤقت — أعد المحاولة.";
+}
+
 function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,6 +44,21 @@ function LoginScreen() {
   const [message, setMessage] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(true);
+  // Face-login shortcut (device-bound convenience — see lib/faceLogin.js).
+  const faceSupported = isFaceLoginSupported();
+  const [faceEnrolled, setFaceEnrolled] = useState(false);
+  const [faceBusy, setFaceBusy] = useState(false);
+  // { step: "verify" | "enroll", session } while the camera sheet is open.
+  const [faceCapture, setFaceCapture] = useState(null);
+
+  useEffect(() => {
+    if (!faceSupported) return undefined;
+    let alive = true;
+    hasFaceEnrollment().then((exists) => {
+      if (alive) setFaceEnrolled(exists);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [faceSupported]);
 
   async function login(event) {
     event.preventDefault();
@@ -46,9 +79,87 @@ function LoginScreen() {
     setBusy(false);
   }
 
+  // Opens the camera sheet. getUserMedia must start synchronously from the tap
+  // (iOS Safari), so requestCaptureSession is reached with no awaits before it.
+  async function startFaceLogin() {
+    if (faceBusy || busy) return;
+    setMessage("");
+    // Enrollment needs the real password once — guide the first-timer.
+    if (!faceEnrolled && (!email.trim() || !password)) {
+      setMessage("سجّل الدخول بكلمة المرور أول مرة، ثم فعّل الدخول بالوجه بالتقاط وجهك.");
+      return;
+    }
+    setFaceBusy(true);
+    try {
+      const session = await requestCaptureSession({ faceMode: "verify", requireGps: false });
+      setFaceCapture({ step: faceEnrolled ? "verify" : "enroll", session });
+    } catch (error) {
+      setMessage(error.message || "تعذّر تشغيل الكاميرا.");
+    } finally {
+      setFaceBusy(false);
+    }
+  }
+
+  function closeFaceCapture() {
+    // CaptureSheet stops the camera tracks in its own unmount effect.
+    setFaceCapture(null);
+  }
+
+  async function handleFaceCapture(data) {
+    const step = faceCapture?.step;
+    const embedding = data.faceEmbedding;
+    if (!Array.isArray(embedding) || embedding.length !== 1024) {
+      closeFaceCapture();
+      setMessage("تعذّر التحقق من الوجه على هذا الجهاز — سجّل الدخول بكلمة المرور.");
+      return;
+    }
+
+    if (step === "enroll") {
+      const credentials = { email: email.trim(), password };
+      const { error } = await supabase.auth.signInWithPassword(credentials);
+      if (error) {
+        closeFaceCapture();
+        setMessage(authErrorMessage(error));
+        return;
+      }
+      // Signed in — persist the face template + encrypted credentials so next
+      // time is face-only. Enrollment is best-effort; the user is already in.
+      try {
+        await enrollFace({ ...credentials, embedding, scores: data.faceScores });
+      } catch {
+        // ignore — a failed enrollment just means they log in normally again
+      }
+      closeFaceCapture();
+      return;
+    }
+
+    // Verify path: match against enrolled faces, then sign in for them.
+    const match = await matchFace(embedding);
+    if (!match) {
+      closeFaceCapture();
+      setMessage("لم يتم التعرّف على وجهك — سجّل الدخول بكلمة المرور.");
+      return;
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email: match.email, password: match.password });
+    if (error) {
+      closeFaceCapture();
+      if (error.status === 400) {
+        // Password was changed/reset on the server — drop the stale template.
+        await removeEnrollment(match.email);
+        setFaceEnrolled(false);
+        setMessage("تغيّرت كلمة المرور — سجّل الدخول بكلمة المرور مرة واحدة لإعادة تفعيل الوجه.");
+      } else {
+        setMessage(authErrorMessage(error));
+      }
+      return;
+    }
+    closeFaceCapture();
+  }
+
   const morning = new Date().getHours() < 12;
 
   return (
+    <>
     <main className="lg-screen">
       <span className="lg-grid" aria-hidden="true" />
       <span className="lg-glow" aria-hidden="true" />
@@ -111,6 +222,16 @@ function LoginScreen() {
             )}
           </button>
           {message && <p className="error">{message}</p>}
+
+          {faceSupported ? (
+            <>
+              <div className="lg-divider" aria-hidden="true">أو</div>
+              <button type="button" className="lg-face" onClick={startFaceLogin} disabled={busy || faceBusy}>
+                <ScanFace size={17} aria-hidden="true" />
+                {faceBusy ? "جارٍ فتح الكاميرا…" : "الدخول ببصمة الوجه"}
+              </button>
+            </>
+          ) : null}
         </form>
 
         <footer className="lg-foot">
@@ -129,6 +250,18 @@ function LoginScreen() {
         </svg>
       </div>
     </main>
+
+    {faceCapture ? (
+      <CaptureSheet
+        kind="face"
+        session={faceCapture.session}
+        faceMode="verify"
+        requireGps={false}
+        onCapture={handleFaceCapture}
+        onCancel={closeFaceCapture}
+      />
+    ) : null}
+    </>
   );
 }
 
