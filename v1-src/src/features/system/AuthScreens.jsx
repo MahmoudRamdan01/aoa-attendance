@@ -22,11 +22,6 @@ function Splash() {
   );
 }
 
-// Ocean-wave sine layer (Phase-7 login spec): period 131px, amplitude 20,
-// width 786 (2× viewport for a seamless -393px drift loop).
-const WAVE_PATH =
-  "M0,34 Q32.75,14 65.5,34 T131,34 T196.5,34 T262,34 T327.5,34 T393,34 T458.5,34 T524,34 T589.5,34 T655,34 T720.5,34 T786,34 L786,80 L0,80 Z";
-
 // Shared auth-error → Arabic copy for the FACE flows only. The password
 // login() below keeps its own inline mapping byte-for-byte.
 function authErrorMessage(error) {
@@ -238,16 +233,6 @@ function LoginScreen() {
           <p className="lg-status"><i aria-hidden="true" /> النظام يعمل · آخر مزامنة الآن</p>
           <p className="lg-tag" dir="ltr">QUICK · RELIABLE · DELIVERED</p>
         </footer>
-      </div>
-
-      {/* Ocean waves */}
-      <div className="lg-waves" aria-hidden="true">
-        <svg className="lg-wave lg-wave-back" viewBox="0 0 786 80" preserveAspectRatio="none">
-          <path d={WAVE_PATH} />
-        </svg>
-        <svg className="lg-wave lg-wave-front" viewBox="0 0 786 80" preserveAspectRatio="none">
-          <path d={WAVE_PATH} />
-        </svg>
       </div>
     </main>
 

@@ -129,16 +129,18 @@ export default function CaptureSheet({
         </button>
       </header>
 
-      <div className="capture-preview">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          autoPlay
-          onLoadedMetadata={() => setCameraReady(true)}
-        />
-        <div className="capture-guide" aria-hidden="true" />
-        <p>{faceMode === "off" ? "يُرجى توجيه الوجه داخل الإطار والنظر إلى الكاميرا" : face.instruction}</p>
+      <div className="capture-stage">
+        <div className="capture-preview">
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            autoPlay
+            onLoadedMetadata={() => setCameraReady(true)}
+          />
+          <div className="capture-guide" aria-hidden="true" />
+          <p>{faceMode === "off" ? "يُرجى توجيه الوجه داخل الإطار والنظر إلى الكاميرا" : face.instruction}</p>
+        </div>
       </div>
 
       <div className="capture-checks" aria-live="polite">

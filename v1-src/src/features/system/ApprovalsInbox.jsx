@@ -158,7 +158,7 @@ function ApprovalsInbox({ context, onToast }) {
                 {item.note ? <p className="approval-note">{item.note}</p> : null}
                 {item.submittedAt ? <p className="muted approval-submitted">قُدّم {fmtSubmittedAt(item.submittedAt)}</p> : null}
                 {item.status === "pending" ? (
-                  <div className="approval-actions">
+                  <div className="approval-decide">
                     <button type="button" className="approval-accept" disabled={busyId === item.key} onClick={() => decide(item, true)}>قبول</button>
                     <button type="button" className="approval-reject" disabled={busyId === item.key} onClick={() => decide(item, false)}>رفض</button>
                   </div>

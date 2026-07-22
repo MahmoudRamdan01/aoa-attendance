@@ -2016,9 +2016,22 @@ a.secondary {
   color: #fff;
 }
 
+/* The camera row: center a portrait 3:4 preview inside the flexible grid row.
+   A phone's front camera delivers a portrait feed — matching its aspect means
+   object-fit:cover barely crops, so the face you see is the face the engine
+   sees and it lands inside the oval (was: full-bleed tall box → huge crop,
+   face never fit the guide). */
+.capture-stage {
+  min-block-size: 0;
+  display: grid;
+  place-items: center;
+}
+
 .capture-preview {
   position: relative;
-  min-height: 260px;
+  inline-size: 100%;
+  aspect-ratio: 3 / 4;
+  max-block-size: 100%;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.18);
   border-radius: 24px;
@@ -3570,7 +3583,7 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
 
 .approval-submitted { font-size: 10.5px; }
 
-.approval-actions {
+.approval-decide {
   display: flex;
   gap: 8px;
   margin-block-start: 3px;
@@ -4246,10 +4259,14 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
    All golds via var(--gold*) → the airocean magenta build restyles itself.
    ===================================================================== */
 .lg-screen {
-  position: relative;
-  min-block-size: 100vh;
-  min-block-size: 100dvh;
+  /* Owner request: the login screen must not move under a finger in ANY
+     direction. position:fixed takes it out of the document flow so the page
+     has nothing to scroll or rubber-band; the column itself scrolls only if
+     the keyboard leaves too little room. */
+  position: fixed;
+  inset: 0;
   overflow: hidden;
+  overscroll-behavior: none;
   display: flex;
   flex-direction: column;
   background: linear-gradient(170deg, var(--canvas) 55%, #0d1e2e);
@@ -4284,13 +4301,18 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   position: relative;
   z-index: 1;
   flex: 1;
+  min-block-size: 0;
   inline-size: 100%;
   max-inline-size: 400px;
   margin-inline: auto;
-  padding: clamp(28px, 8vh, 64px) 20px 130px;
+  padding: clamp(28px, 8vh, 64px) 20px calc(24px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* Scrolls ONLY when the on-screen keyboard leaves too little room; with the
+     keyboard closed everything fits and the screen stays pinned. */
+  overflow-y: auto;
+  overscroll-behavior: none;
 }
 
 /* Entrance stagger */
@@ -4580,50 +4602,7 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   letter-spacing: 0.12em;
 }
 
-/* Ocean waves */
-.lg-waves {
-  position: absolute;
-  inset-inline: 0;
-  inset-block-end: 0;
-  block-size: 96px;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.lg-wave {
-  position: absolute;
-  inset-block-end: 0;
-  inset-inline-start: 0;
-  inline-size: 786px;
-  block-size: 80px;
-  display: block;
-}
-
-.lg-wave-back {
-  inset-block-end: -6px;
-  animation: lgDrift 22s linear infinite;
-}
-
-.lg-wave-back path { fill: var(--gold); opacity: 0.1; }
-
-.lg-wave-front {
-  inset-block-end: -18px;
-  animation: lgDrift 13s linear infinite;
-}
-
-.lg-wave-front path { fill: #7dd3fc; opacity: 0.14; }
-
-:root:not(.dark) .lg-wave-back path { opacity: 0.05; }
-:root:not(.dark) .lg-wave-front path { opacity: 0.07; }
-
-@keyframes lgDrift {
-  from { transform: translateX(0); }
-  to { transform: translateX(-393px); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .lg-wave-back,
-  .lg-wave-front,
   .lg-logo,
   .lg-logo-halo,
   .lg-submit,
