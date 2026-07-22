@@ -2752,3 +2752,294 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   flex: 0 0 auto;
   font-size: 12.5px;
 }
+
+/* =====================================================================
+   Redesign v2 — Phase 3: اليوم (check-in ring + clock + chips).
+   Presentation only; the security flow behind it is untouched.
+   ===================================================================== */
+.today-clockline {
+  text-align: center;
+  margin-block-end: 4px;
+}
+
+.today-date {
+  margin: 0;
+  color: var(--text-muted);
+  font: 400 12px/1.6 var(--font-body);
+}
+
+.today-clock {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 7px;
+}
+
+.today-clock span {
+  font: 600 46px/1.15 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+}
+
+.today-clock i {
+  color: var(--text-muted);
+  font: 600 15px/1 var(--font-body);
+  font-style: normal;
+}
+
+.attendance-capture-panel .today-status {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface-nested);
+  overflow: hidden;
+}
+
+.attendance-capture-panel .today-status .status-dot {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.attendance-capture-panel .today-status .status-dot:first-child {
+  border-inline-end: 1px solid var(--line-subtle);
+}
+
+.attendance-capture-panel .today-status .status-dot > span {
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: 50%;
+  background: #3c4e5f;
+  box-shadow: none;
+}
+
+.attendance-capture-panel .today-status .status-dot.done > span {
+  background: var(--success);
+}
+
+.attendance-capture-panel .today-status .status-dot small {
+  color: var(--text-muted);
+  font: 400 11px/1.6 var(--font-body);
+}
+
+.attendance-capture-panel .today-status .status-dot strong {
+  font: 600 14px/1.5 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- the ring ---- */
+.ring-wrap {
+  position: relative;
+  inline-size: var(--ring-size);
+  block-size: var(--ring-size);
+  margin: 26px auto 8px;
+}
+
+.ring-halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--gold-line);
+  animation: ringPulse 2.8s ease-out infinite;
+}
+
+@keyframes ringPulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  70%, 100% { transform: scale(1.18); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-halo { animation: none; opacity: 0.35; }
+}
+
+.ring-btn {
+  position: absolute;
+  inset: 17px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 12px;
+  text-align: center;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.ring-primary {
+  background: radial-gradient(circle at 34% 26%, #ffda5c, var(--gold) 62%);
+  color: var(--gold-on);
+  box-shadow: 0 20px 50px var(--gold-soft);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+:root[data-company="airocean"] .ring-primary {
+  background: radial-gradient(circle at 34% 26%, var(--gold-hover), var(--gold) 62%);
+}
+
+.ring-primary:active { transform: scale(0.965); }
+.ring-primary:disabled { opacity: 0.6; cursor: default; }
+.ring-primary strong { font: 700 16px/1.4 var(--font-body); }
+.ring-btn small { font: 500 10px/1.6 var(--font-body); opacity: 0.8; max-inline-size: 128px; }
+
+.ring-verify {
+  background: var(--surface);
+  border: 1.5px solid var(--gold-line);
+  cursor: default;
+}
+
+.ring-verify strong { font: 700 12.5px/1.5 var(--font-body); }
+
+.ring-dots i {
+  display: inline-block;
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  margin: 0 2.5px;
+  animation: ringBlink 1s ease-in-out infinite;
+}
+
+.ring-dots i:nth-child(2) { animation-delay: 0.2s; }
+.ring-dots i:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes ringBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.ring-fail {
+  background: var(--danger-soft);
+  color: var(--danger);
+  cursor: default;
+}
+
+.ring-fail strong { font: 700 12.5px/1.5 var(--font-body); }
+.ring-fail small { color: var(--text-secondary); opacity: 1; font-weight: 400; max-block-size: 48px; overflow: hidden; }
+
+.ring-retry {
+  margin-block-start: 3px;
+  block-size: 32px;
+  padding: 0 18px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--gold);
+  color: var(--gold-on);
+  font: 700 11.5px/1 var(--font-body);
+  cursor: pointer;
+}
+
+.ring-out {
+  background: var(--surface);
+  border: 1.5px solid var(--line-strong);
+  color: var(--text);
+}
+
+.ring-out:disabled { cursor: default; }
+.ring-out:disabled .ring-out-cta { color: var(--text-muted); }
+.ring-out small { color: var(--text-muted); font: 500 10.5px/1.6 var(--font-body); opacity: 1; }
+
+.ring-elapsed {
+  font: 600 24px/1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+}
+
+.ring-out-cta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--gold-text);
+  font: 700 13.5px/1.4 var(--font-body);
+}
+
+.ring-done {
+  background: var(--success-soft);
+  color: var(--success);
+  cursor: default;
+}
+
+.ring-done strong { font: 700 15px/1.4 var(--font-body); }
+.ring-done small { font: 600 13px/1.4 var(--font-mono); opacity: 0.9; }
+
+.ring-locked {
+  background: var(--surface-nested);
+  border: 1.5px solid var(--line);
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.ring-locked strong { font: 700 13px/1.5 var(--font-body); }
+
+/* ---- chips + fields under the ring ---- */
+.today-location-chip {
+  margin: 10px auto 0;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  padding: 5px 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-nested);
+  color: var(--text-muted);
+  font: 600 11.5px/1.6 var(--font-body);
+}
+
+.today-location-chip.is-inside {
+  border-color: rgba(67, 217, 160, 0.28);
+  background: rgba(67, 217, 160, 0.1);
+  color: var(--success);
+}
+
+.today-note-line { text-align: center; }
+
+.today-note-field {
+  display: flex !important; /* .field defaults to grid — this is a row card */
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  min-block-size: 46px;
+  padding-inline: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface-nested);
+  color: var(--text-muted);
+}
+
+.today-note-field input {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  padding-inline: 0 !important;
+  min-block-size: 0 !important;
+}
+
+.today-qr-link {
+  inline-size: fit-content;
+  margin-inline: auto;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 11.5px/1.6 var(--font-body);
+  cursor: pointer;
+}
+
+.today-qr-link:hover { color: var(--text-secondary); }
+
+.today-security-icon { color: var(--info) !important; }
+
+.today-security-card .rules li {
+  color: var(--text-secondary);
+  font: 400 11.5px/1.6 var(--font-body);
+}

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Camera, CheckCircle2, Clock3, LogOut, MapPin, MessageSquare, QrCode, ShieldCheck, WifiOff } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, CheckCircle2, MapPin, MessageSquare, QrCode, ShieldCheck } from "lucide-react";
 import { distanceMeters, supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { getCompanyLocation } from "../../lib/dates";
@@ -19,6 +19,7 @@ import {
 import { ConfirmDialog } from "../../ui/primitives";
 import { SYNC_REQUEST_EVENT, announceQueue } from "../../ui/OfflineBanner";
 import CaptureSheet, { requestCaptureSession } from "./CaptureSheet";
+import CheckInRing from "./CheckInRing";
 import { prepareFaceEngine } from "./useFaceEngine";
 import { startGpsSampler } from "./useGpsSampler";
 
@@ -35,6 +36,59 @@ const ERROR_MESSAGES = {
 };
 
 const LOCKED_DAY_STATUSES = new Set(["leave", "mission", "sick"]);
+
+// Short ring titles per error code — the full ERROR_MESSAGES text becomes the
+// detail line inside the ring (redesign spec B-3: errors move into the ring).
+const ERROR_TITLES = {
+  gps_suspect: "تعذّر توثيق الموقع",
+  face_mismatch: "تعذّر التحقق من الوجه",
+  low_accuracy: "دقة GPS غير كافية",
+  outside: "أنت خارج نطاق الشركة",
+  window_closed: "نافذة التسجيل مغلقة",
+  already: "العملية مسجّلة بالفعل",
+  no_checkin: "سجّل حضورك أولًا",
+  update_required: "حدّث التطبيق",
+  day_locked: "اليوم مسجّل إجازة",
+};
+
+const VERIFY_STEP_LABELS = {
+  gps: "تثبيت الموقع (GPS)…",
+  face: "التحقق من بصمة الوجه…",
+  send: "جارٍ التسجيل…",
+};
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function fmtClock12(date) {
+  const hours = date.getHours();
+  return { time: `${hours % 12 || 12}:${pad2(date.getMinutes())}`, meridiem: hours < 12 ? "ص" : "م" };
+}
+
+function fmtDuration(ms, { seconds = true } = {}) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  return seconds ? `${h}:${pad2(m)}:${pad2(total % 60)}` : `${h}:${pad2(m)}`;
+}
+
+const todayDateFormat = new Intl.DateTimeFormat("ar-EG-u-nu-latn", { weekday: "long", day: "numeric", month: "long" });
+function formatTodayDate(date) {
+  try {
+    return todayDateFormat.format(date);
+  } catch {
+    return "";
+  }
+}
+
+// attendance.check_in / check_out are bare Postgres `time` values (HH:MM:SS).
+// Pin them onto the record's work_date to get a real Date for the timers.
+function parseDayTime(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return null;
+  const parsed = new Date(`${dateStr}T${String(timeStr).slice(0, 8)}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 function normalizeQr(value) {
   return value.trim().toUpperCase();
@@ -56,6 +110,12 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
   const [consentKind, setConsentKind] = useState("");
   const [shortcutRequested, setShortcutRequested] = useState(false);
   const [clock, setClock] = useState(() => new Date());
+  // Ring presentation state (redesign B-3). Security flow untouched — these
+  // only mirror where the existing promise chain currently is.
+  const [verifyStep, setVerifyStep] = useState("send");
+  const [ringError, setRingError] = useState(null);
+  const [qrOpen, setQrOpen] = useState(false);
+  const lastKindRef = useRef("in");
   const [securityConfig, setSecurityConfig] = useState({
     face_mode: "off",
     antispoof_min: 0.6,
@@ -110,11 +170,13 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     if (securityConfig.face_mode !== "off") prepareFaceEngine().catch(() => {});
   }, [securityConfig.face_mode]);
 
+  // The screen now shows a live clock (and the elapsed timer while checked
+  // in), so tick every second for the whole visit — cheap, and it keeps the
+  // checkout-window state fresh too.
   useEffect(() => {
-    if (!todayRecord?.check_in || todayRecord?.check_out) return undefined;
     const timer = window.setInterval(() => setClock(new Date()), 1_000);
     return () => window.clearInterval(timer);
-  }, [todayRecord?.check_in, todayRecord?.check_out]);
+  }, []);
 
   useEffect(() => {
     if (routeParam === "capture-in" && !todayRecord?.check_in && !dayLocked) setShortcutRequested(true);
@@ -227,13 +289,14 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
   async function beginCapture(kind) {
     setBusy(kind);
+    setVerifyStep("face");
     try {
       // This call must remain directly inside the click handler for iOS.
       const captureSession = await requestCaptureSession({ faceMode: securityConfig.face_mode });
       setCapture({ kind, session: captureSession });
       setShortcutRequested(false);
     } catch (error) {
-      onToast(error.message || "تعذر تشغيل الكاميرا.");
+      setRingError({ title: "تعذر تشغيل الكاميرا", detail: error.message || "اسمح للتطبيق باستخدام الكاميرا وحاول مرة أخرى." });
     } finally {
       setBusy("");
     }
@@ -246,6 +309,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
   async function submitDirect(kind) {
     setBusy(kind);
+    setVerifyStep("send");
     try {
       // location_exempt (e.g. حبيبة): no GPS at all — the server skips the
       // geofence for her too, so we go straight to the RPC.
@@ -253,6 +317,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       let location = null;
       let samples = [];
       if (!locationExempt) {
+        setVerifyStep("gps"); // ring mirrors the real GPS sampling stage
         const sampler = startGpsSampler();
         sampler.first.catch(() => {});
         samples = await sampler.done;
@@ -277,6 +342,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
         return;
       }
       try {
+        setVerifyStep("send");
         const data = await runV2(args);
         haptic([14, 60, 14]);
         onToast(data.label || (kind === "in" ? "تم تسجيل الحضور." : "تم تسجيل الانصراف."));
@@ -291,13 +357,20 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
         throw error;
       }
     } catch (error) {
-      onToast(error.message || "تعذر التسجيل.");
+      // Check-in/checkout errors render INSIDE the ring (redesign B-3);
+      // toasts remain for everything else.
+      setRingError({
+        title: ERROR_TITLES[error.code] || "تعذر التسجيل",
+        detail: error.message || ERROR_MESSAGES[error.code] || "حدث خطأ غير متوقع — أعد المحاولة.",
+      });
     } finally {
       setBusy("");
     }
   }
 
   function attendance(kind) {
+    lastKindRef.current = kind;
+    setRingError(null);
     if (kind === "in" && dayLocked) {
       onToast(ERROR_MESSAGES.day_locked);
       return;
@@ -413,18 +486,77 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       ].filter(Boolean).join(" · ")
     : "";
 
+  // ---- Ring phase derivation (presentation only — spec B-3) ----
+  const verifying = busy === "in" || busy === "out";
+  const ringPhase = ringError
+    ? "fail"
+    : verifying
+      ? "verifying"
+      : dayLocked
+        ? "locked"
+        : !todayRecord?.check_in
+          ? "idle"
+          : !todayRecord?.check_out
+            ? "in"
+            : "done";
+  const checkInAt = parseDayTime(todayRecord?.work_date, todayRecord?.check_in);
+  const checkOutAt = parseDayTime(todayRecord?.work_date, todayRecord?.check_out);
+  const elapsed = checkInAt ? fmtDuration(clock - checkInAt) : "";
+  const worked = checkInAt && checkOutAt ? fmtDuration(checkOutAt - checkInAt, { seconds: false }) : "";
+  const checkoutState = !checkoutWindow.configured
+    ? { open: false, label: "موعد الانصراف غير مضبوط" }
+    : checkoutWindow.beforeOpen
+      ? { open: false, label: `يفتح ${fmtTime12(checkoutFrom)}` }
+      : checkoutWindow.afterClose
+        ? { open: false, label: "انتهى وقت الانصراف" }
+        : { open: true, label: "تسجيل انصراف" };
+  const bigClock = fmtClock12(clock);
+  const insideRange = locationState && locationState.distance <= (companyLocation.radiusMeters || 1000);
+
   return (
     <>
       <div className="grid two">
         <section className="panel hero-panel attendance-capture-panel">
-          <div className="panel-title">
-            <Clock3 size={20} />
-            <h2>تسجيل اليوم</h2>
+          {/* 1. Date + live clock */}
+          <div className="today-clockline">
+            <p className="today-date">{formatTodayDate(clock)}</p>
+            <p className="today-clock">
+              <span dir="ltr">{bigClock.time}</span>
+              <i>{bigClock.meridiem}</i>
+            </p>
           </div>
+
+          {/* 2. Status split card */}
           <div className="today-status">
-            <StatusDot done={!!todayRecord?.check_in} label="حضور" value={fmtTime12(todayRecord?.check_in) || "لم يسجل"} />
-            <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={fmtTime12(todayRecord?.check_out) || "لم يسجل"} />
+            <StatusDot done={!!todayRecord?.check_in} label="حضور" value={fmtTime12(todayRecord?.check_in) || "لم يُسجَّل"} />
+            <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={fmtTime12(todayRecord?.check_out) || "لم يُسجَّل"} />
           </div>
+
+          {/* 3. The ring — same attendance() entrypoints as the old buttons */}
+          <CheckInRing
+            phase={ringPhase}
+            step={VERIFY_STEP_LABELS[verifyStep] || VERIFY_STEP_LABELS.send}
+            error={ringError}
+            elapsed={elapsed}
+            worked={worked}
+            lockedLabel={statusLabels[todayRecord?.status] || "اليوم مسجّل إجازة"}
+            checkoutState={checkoutState}
+            onCheckIn={() => attendance("in")}
+            onCheckOut={() => attendance("out")}
+            onRetry={() => attendance(lastKindRef.current)}
+            disabled={Boolean(busy)}
+          />
+
+          {/* 4. Location chip (after a live fix exists) */}
+          {locationState ? (
+            <p className={cls("today-location-chip", insideRange && "is-inside")}>
+              {insideRange ? <CheckCircle2 size={14} /> : <MapPin size={14} />}
+              {insideRange
+                ? `داخل نطاق الشركة · دقة ±${Math.round(locationState.accuracy)} م`
+                : `خارج النطاق — المسافة ${Math.round(locationState.distance)} م · دقة ±${Math.round(locationState.accuracy)} م`}
+            </p>
+          ) : null}
+          {todayNote ? <p className="muted today-note-line">{todayNote}</p> : null}
 
           {shortcutRequested ? (
             <div className="capture-shortcut">
@@ -434,76 +566,49 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
             </div>
           ) : null}
 
-          <label className="field">
-            كود QR اليومي (اختياري)
-            <input
-              dir="ltr"
-              value={qr}
-              onChange={(event) => setQr(event.target.value.toUpperCase())}
-              placeholder="اختياري — الموقع كافي"
-              autoCapitalize="characters"
-              autoComplete="one-time-code"
-            />
-          </label>
-          <label className="field">
-            ملاحظة (اختياري)
+          {/* 5. Note field + collapsed QR */}
+          <label className="field today-note-field">
+            <MessageSquare size={15} aria-hidden="true" />
             <input
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="مثال: تأخّرت بسبب الزحام"
+              placeholder="ملاحظة اليوم (اختياري)…"
               maxLength={280}
+              aria-label="ملاحظة اليوم (اختياري)"
             />
           </label>
+          {qrOpen || qr ? (
+            <label className="field">
+              كود QR اليومي (اختياري)
+              <input
+                dir="ltr"
+                value={qr}
+                onChange={(event) => setQr(event.target.value.toUpperCase())}
+                placeholder="اختياري — الموقع كافي"
+                autoCapitalize="characters"
+                autoComplete="one-time-code"
+              />
+            </label>
+          ) : (
+            <button type="button" className="today-qr-link" onClick={() => setQrOpen(true)}>
+              <QrCode size={14} aria-hidden="true" /> إدخال كود QR
+            </button>
+          )}
           {todayRecord?.employee_note ? (
             <p className="muted"><MessageSquare size={15} /> ملاحظتك المسجلة: {todayRecord.employee_note}</p>
           ) : null}
-
-          <div className="actions-row attendance-main-actions">
-            <button className="primary capture-action" disabled={busy || !!todayRecord?.check_in || dayLocked} onClick={() => attendance("in")}>
-              <Camera size={19} /> {busy === "in" ? (cameraNeeded ? "جارٍ فتح الكاميرا…" : "جارٍ التسجيل…") : "تسجيل حضور"}
-            </button>
-            <button className="secondary capture-action" disabled={busy || !todayRecord?.check_in || !!todayRecord?.check_out || !checkoutTimeAllowed} onClick={() => attendance("out")}>
-              <LogOut size={19} /> {busy === "out"
-                ? (cameraNeeded ? "جارٍ فتح الكاميرا…" : "جارٍ التسجيل…")
-                : checkoutWindow.beforeOpen
-                  ? `يفتح ${fmtTime12(checkoutFrom)}`
-                  : checkoutWindow.afterClose
-                    ? "انتهى وقت الانصراف"
-                    : checkoutWindow.configured
-                      ? "تسجيل انصراف"
-                      : "موعد الانصراف غير مضبوط"}
-            </button>
-          </div>
-          {locationState ? (
-            locationState.distance <= (companyLocation.radiusMeters || 1000) ? (
-              <p className="location-ok">
-                <CheckCircle2 size={15} /> أنت داخل نطاق الشركة ✓
-              </p>
-            ) : (
-              <p className="muted">
-                <MapPin size={15} /> المسافة عن الشركة: {Math.round(locationState.distance)} متر · دقة GPS {locationState.accuracy} متر
-              </p>
-            )
-          ) : null}
-          {todayNote ? <p className="muted">{todayNote}</p> : null}
-          {queued > 0 ? (
-            <button className="warning-btn" onClick={() => syncQueue()} disabled={busy === "sync"}>
-              <WifiOff size={17} /> مزامنة {queued} عملية محفوظة Offline
-            </button>
-          ) : null}
         </section>
 
-        <section className="panel">
+        {/* 6. Security card — trimmed to 3 bullets (spec B-6) */}
+        <section className="panel today-security-card">
           <div className="panel-title">
-            <ShieldCheck size={20} />
-            <h2>تسجيل آمن</h2>
+            <ShieldCheck size={20} className="today-security-icon" />
+            <h2>تسجيل آمن — بدون صور</h2>
           </div>
           <ul className="rules">
             <li>التحقق من الوجه لحظي مثل بصمة الهاتف — دون حفظ أي صور أو مقاطع فيديو.</li>
             <li>يُخزَّن فقط بصمة رقمية مشفّرة (أرقام لا يمكن تحويلها إلى صورة).</li>
             <li>يجب التواجد داخل نطاق {companyLocation.radiusMeters} متر من موقع الشركة.</li>
-            <li>يفحص النظام تغيّرات الموقع (GPS) والجهاز ويُرسل تنبيهًا للإدارة عند الاشتباه.</li>
-            <li><QrCode size={15} /> رمز QR اختياري إلا إذا فعّلته الإدارة.</li>
           </ul>
         </section>
       </div>
