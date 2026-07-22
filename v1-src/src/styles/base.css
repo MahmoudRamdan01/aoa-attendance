@@ -106,6 +106,28 @@ h4,
   outline: none;
 }
 
+/* Text fields ALWAYS match :focus-visible while being typed in, so the rule
+   above was drawing a second box inside every styled input row (owner report:
+   "أي حاجة بكتبها بيظهر حواليها بوكس"). Fields signal focus through their own
+   border / the row's :focus-within instead; buttons and links keep the
+   keyboard outline. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: var(--gold-line);
+}
+
+/* Keep autofilled fields on the app's colors (no yellow/blue browser fill). */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+  transition: background-color 9999999s ease-in-out 0s;
+}
+
 [dir="ltr"],
 bdi[dir="ltr"],
 .num,

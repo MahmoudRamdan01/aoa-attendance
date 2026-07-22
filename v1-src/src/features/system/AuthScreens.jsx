@@ -57,10 +57,17 @@ function LoginScreen() {
 
   async function login(event) {
     event.preventDefault();
+    // An empty field sent to the server comes back as a generic 400 that we'd
+    // show as "wrong credentials" — say what's actually missing instead.
+    if (!email.trim() || !password.trim()) {
+      setMessage("اكتب البريد الإلكتروني وكلمة المرور الأول.");
+      return;
+    }
     setBusy(true);
     setMessage("");
-    // Mobile keyboards/autofill add stray spaces around the email → auth 400.
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    // Mobile keyboards/autofill/copy-paste add stray spaces around both the
+    // email and the password → auth 400. No real password here has edge spaces.
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
     if (error) {
       // A flaky connection is NOT wrong credentials. Team members on mobile
       // were seeing "البريد الإلكتروني أو كلمة المرور غير صحيح" for network drops, then the
@@ -80,7 +87,7 @@ function LoginScreen() {
     if (faceBusy || busy) return;
     setMessage("");
     // Enrollment needs the real password once — guide the first-timer.
-    if (!faceEnrolled && (!email.trim() || !password)) {
+    if (!faceEnrolled && (!email.trim() || !password.trim())) {
       setMessage("سجّل الدخول بكلمة المرور أول مرة، ثم فعّل الدخول بالوجه بالتقاط وجهك.");
       return;
     }
@@ -110,7 +117,7 @@ function LoginScreen() {
     }
 
     if (step === "enroll") {
-      const credentials = { email: email.trim(), password };
+      const credentials = { email: email.trim(), password: password.trim() };
       const { error } = await supabase.auth.signInWithPassword(credentials);
       if (error) {
         closeFaceCapture();

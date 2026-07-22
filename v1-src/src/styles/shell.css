@@ -400,15 +400,12 @@
   padding: clamp(16px, 2.3vw, 34px);
 }
 
-/* Owner request: صفحة اليوم must sit still — no scroll, no rubber-band, no
-   sideways drag — while it's the active view on phones/tablets. Everything on
-   it fits one screen, so lock the document scroller outright. */
+/* اليوم scrolls normally (the owner tried a fully-pinned version and asked
+   for scrolling back); only sideways rubber-banding is suppressed. */
 @media (max-width: 980px) {
   html:has(.ops-shell[data-view="today"]),
   html:has(.ops-shell[data-view="today"]) body {
-    overflow: hidden;
-    overscroll-behavior: none;
-    block-size: 100%;
+    overscroll-behavior-x: none;
   }
 }
 
