@@ -17,6 +17,7 @@ import {
   updateQueuedAttendance,
 } from "../../lib/offlineQueue";
 import { ConfirmDialog } from "../../ui/primitives";
+import { SYNC_REQUEST_EVENT, announceQueue } from "../../ui/OfflineBanner";
 import CaptureSheet, { requestCaptureSession } from "./CaptureSheet";
 import { prepareFaceEngine } from "./useFaceEngine";
 import { startGpsSampler } from "./useGpsSampler";
@@ -73,9 +74,12 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
   const refreshQueueCount = useCallback(async () => {
     try {
-      setQueued(await queuedAttendanceCount());
+      const count = await queuedAttendanceCount();
+      setQueued(count);
+      announceQueue({ queued: count }); // keep the shell offline banner in sync
     } catch {
       setQueued(0);
+      announceQueue({ queued: 0 });
     }
   }, []);
 
@@ -118,8 +122,15 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
   useEffect(() => {
     const sync = () => syncQueue({ quiet: true });
+    // The shell offline banner requests a sync over the event bus (UI only —
+    // syncQueue itself is unchanged).
+    const requested = () => syncQueue();
     window.addEventListener("online", sync);
-    return () => window.removeEventListener("online", sync);
+    window.addEventListener(SYNC_REQUEST_EVENT, requested);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener(SYNC_REQUEST_EVENT, requested);
+    };
   });
 
   async function loadToday() {
@@ -335,6 +346,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     }
     if (!items.length) return;
     setBusy("sync");
+    announceQueue({ syncing: true });
     let synced = 0;
     let expired = 0;
     try {
@@ -381,6 +393,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       }
     } finally {
       setBusy("");
+      announceQueue({ syncing: false });
     }
     await refreshQueueCount();
     await loadToday();

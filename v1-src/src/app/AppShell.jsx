@@ -18,6 +18,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { COMPANY } from "../lib/company";
 import CommandPalette from "../ui/CommandPalette";
+import OfflineBanner from "../ui/OfflineBanner";
 import PushToggle from "../ui/PushToggle";
 import { EmptyState, PageHeader, Skeleton } from "../ui/primitives";
 import {
@@ -29,14 +30,18 @@ import {
 import { useBackClose, useSheetDrag } from "./router";
 import { useTheme } from "./theme";
 
-const roleNames = { employee: "موظف", hr: "HR", owner: "Owner" };
-// Primary mobile bottom-tab views per role (short labels below). The 4th tab is
-// always "المزيد" which opens the full menu sheet.
+const roleNames = { employee: "موظف", hr: "HR", owner: "مالك" };
+// Primary mobile bottom-tab views per role (short labels below). Up to 4
+// primary tabs; the last slot is always "المزيد" → full menu sheet. The owner
+// with a linked employee record gets the employee portal tabs too (redesign
+// spec A); without one they keep the ops-first set.
 const MOBILE_PRIMARY = {
   employee: ["today", "month", "requests"],
   hr: ["admin", "deductions", "expenses"],
-  owner: ["owner", "admin", "team"],
+  owner: ["today", "owner", "month", "requests"],
+  ownerNoEmployee: ["owner", "admin", "team"],
 };
+const MOBILE_TAB_MAX = 4;
 const MOBILE_TAB_LABELS = {
   today: "اليوم", month: "سجلي", requests: "طلباتي",
   admin: "الحضور", team: "الفريق", owner: "الرواتب",
@@ -334,17 +339,18 @@ export default function AppShell({
   // Every role gets the mobile bottom nav (not just employees). Primary tabs
   // are curated per role; the 4th is always "المزيد" → full menu sheet.
   const mobileTabs = useMemo(() => {
-    const primary = MOBILE_PRIMARY[role] || [];
+    const primaryKey = role === "owner" && !context?.employee ? "ownerNoEmployee" : role;
+    const primary = MOBILE_PRIMARY[primaryKey] || [];
     const tabs = primary
       .map((viewId) => accessibleViews.find((view) => view.id === viewId))
       .filter(Boolean);
     for (const view of accessibleViews) {
-      if (tabs.length >= 3) break;
+      if (tabs.length >= MOBILE_TAB_MAX) break;
       if (view.nav === false || view.mobileSlot === "more") continue;
       if (!tabs.some((tab) => tab.id === view.id)) tabs.push(view);
     }
-    return tabs.slice(0, 3);
-  }, [accessibleViews, role]);
+    return tabs.slice(0, MOBILE_TAB_MAX);
+  }, [accessibleViews, role, context?.employee]);
   const showBottomNav = Boolean(context) && mobileTabs.length > 0;
   const moreViewIsActive = !mobileTabs.some((tab) => tab.id === activeView);
 
@@ -560,6 +566,21 @@ export default function AppShell({
 
       <header className="ops-topbar">
         <div className="ops-topbar-inner">
+          {/* Mobile greeting header (redesign spec G) — desktop keeps the brand. */}
+          <div className="ops-mobile-greeting">
+            <span className="ops-mobile-avatar" aria-hidden="true">{String(displayName).trim().charAt(0) || "A"}</span>
+            <span className="ops-mobile-greet-copy">
+              <span className="ops-mobile-greet-top">
+                <strong>{new Date().getHours() < 12 ? "صباح الخير" : "مساء الخير"}، {String(displayName).trim().split(/\s+/)[0]}</strong>
+                <i className="ops-role-chip">{roleNames[role] || role}</i>
+              </span>
+              <small>
+                <span lang="en" dir="ltr">{COMPANY.name}</span>
+                {" · "}
+                {formatDate(new Date(), { weekday: "long", day: "numeric", month: "long" })}
+              </small>
+            </span>
+          </div>
           <button
             className="ops-brand"
             type="button"
@@ -582,9 +603,6 @@ export default function AppShell({
           </div>
 
           <div className="ops-topbar-actions">
-            <button className="ops-icon-btn ops-mobile-only" type="button" onClick={openPalette} aria-label="فتح البحث السريع">
-              <Search size={18} aria-hidden="true" />
-            </button>
             {!showBottomNav ? (
               <button
                 ref={mobileMoreTriggerRef}
@@ -639,6 +657,8 @@ export default function AppShell({
           </div>
         </div>
       </header>
+
+      <OfflineBanner />
 
       <div className="ops-layout">
         <aside className="ops-sidebar" aria-label="التنقل الرئيسي">
@@ -766,6 +786,15 @@ export default function AppShell({
                 </button>
               );
             })}
+            {/* Utilities parked here on mobile to declutter the topbar (spec G). */}
+            <button type="button" onClick={openPalette}>
+              <Search size={19} aria-hidden="true" />
+              <span>بحث سريع</span>
+            </button>
+            <button type="button" onClick={() => { onRefresh?.(); closeMore(); }}>
+              <RefreshCcw size={19} aria-hidden="true" />
+              <span>تحديث البيانات</span>
+            </button>
             <ThemeButton theme={theme} onToggle={toggleTheme} mobile />
             <button className="is-danger" type="button" onClick={onSignOut}>
               <LogOut size={19} aria-hidden="true" />

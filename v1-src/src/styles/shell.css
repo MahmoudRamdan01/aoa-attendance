@@ -1192,3 +1192,135 @@
 .ops-inbox-list {
   overscroll-behavior: contain;
 }
+
+/* =====================================================================
+   Redesign v2 — Phase 2: app chrome (mobile greeting header, offline
+   banner, refreshed bottom nav). Desktop chrome unchanged.
+   ===================================================================== */
+.ops-mobile-greeting {
+  display: none;
+}
+
+.ops-offline-banner {
+  position: sticky;
+  inset-block-start: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+  z-index: 85;
+  inline-size: 100%;
+  min-block-size: 38px;
+  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-block-end: 1px solid var(--warning-line);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font: 600 11px/1.5 var(--font-body);
+  cursor: pointer;
+}
+
+.ops-offline-banner:disabled {
+  opacity: 0.75;
+  cursor: progress;
+}
+
+.ops-offline-count {
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--warning-line);
+  font: 700 10px/1.4 var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 820px) {
+  /* Greeting header replaces the brand block on mobile (spec G). */
+  .ops-brand,
+  .ops-refresh-top,
+  .ops-theme-top {
+    display: none;
+  }
+
+  .ops-mobile-greeting {
+    min-inline-size: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ops-mobile-avatar {
+    flex: 0 0 auto;
+    inline-size: 38px;
+    block-size: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: var(--surface-raised);
+    color: var(--gold-text);
+    font: 700 16px/1 var(--font-display);
+  }
+
+  .ops-mobile-greet-copy {
+    min-inline-size: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .ops-mobile-greet-top {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-inline-size: 0;
+  }
+
+  .ops-mobile-greet-top strong {
+    font: 600 14px/1.4 var(--font-body);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ops-role-chip {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--gold-soft);
+    color: var(--gold-text);
+    font: 600 9.5px/1.4 var(--font-body);
+    font-style: normal;
+  }
+
+  .ops-mobile-greet-copy small {
+    color: var(--text-muted);
+    font: 400 11px/1.5 var(--font-body);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Bottom nav — frosted bar, gold active, calm idle (spec A). */
+  .ops-bottom-nav {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    border-block-start: 1px solid var(--line-subtle);
+    background: color-mix(in srgb, var(--chrome) 92%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: none;
+  }
+
+  .ops-bottom-tab {
+    color: var(--nav-idle);
+    font: 600 10px/1.4 var(--font-body);
+  }
+
+  .ops-bottom-tab svg {
+    inline-size: 21px;
+    block-size: 21px;
+  }
+
+  .ops-bottom-tab[aria-current="page"],
+  .ops-bottom-tab[aria-expanded="true"] {
+    background: transparent;
+    color: var(--nav-active);
+  }
+}
