@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, Banknote, BarChart3, CalendarDays, Clock3, Coins, Download, FileSpreadsheet, PiggyBank, Wallet, TrendingUp, UserPlus, Users } from "lucide-react";
+import { Activity, AlertTriangle, Banknote, BarChart3, CalendarDays, ChevronLeft, Clock3, Coins, Download, FileSpreadsheet, Inbox, PiggyBank, Wallet, TrendingUp, UserPlus, Users } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { computePayroll, getPayrollConfig } from "../../lib/payroll";
@@ -10,7 +10,8 @@ import { Bar, Metric, StatusBadge } from "../../ui/legacy";
 import { Area, AreaChart, Bar as ReBar, BarChart as ReBarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import CompanyReports from "./CompanyReports";
 import EmployeeStatement from "./EmployeeStatement";
-import { CollapsiblePanel, SkeletonTableRows } from "../../ui/primitives";
+import PulseStrip from "./PulseStrip";
+import { CollapsiblePanel, Skeleton, SkeletonTableRows } from "../../ui/primitives";
 
 function OwnerDashboard({ onToast }) {
   const [rows, setRows] = useState([]);
@@ -29,6 +30,12 @@ function OwnerDashboard({ onToast }) {
   const [error, setError] = useState("");
   // Narrow screens squeeze the employee bar chart — shrink its Arabic Y-axis.
   const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 640px)").matches);
+  // Brand accent for charts, resolved at runtime so the airocean magenta build
+  // stays on-brand (SVG presentation attributes can't consume var()).
+  const brandGold = useMemo(
+    () => getComputedStyle(document.documentElement).getPropertyValue("--gold").trim() || "#FCC107",
+    []
+  );
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 640px)");
     const onChange = (event) => setNarrow(event.matches);
@@ -54,6 +61,19 @@ function OwnerDashboard({ onToast }) {
     });
     return () => { active = false; };
   }, [reportMonth]);
+
+  // Pending approvals count for the «بانتظار قرارك» entry card (spec C-2).
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("permissions").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    ]).then(([l, p]) => {
+      if (active) setPendingCount((l.count || 0) + (p.count || 0));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [reportMonth, loading]);
 
   useEffect(() => {
     setLoading(true);
@@ -247,9 +267,26 @@ function OwnerDashboard({ onToast }) {
     downloadTextFile(`aoa-payroll-${range.from}-${range.to}.csv`, `\ufeff${header.map(csvCell).join(",")}\n${lines.join("\n")}`);
   }
 
+  const activeCount = employees.length;
+  const deductionPct = stats.grossTotal > 0 ? Math.round(((stats.grossTotal - stats.netTotal) / stats.grossTotal) * 100) : 0;
+
   return (
     <div className="stack">
       {error && <div className="setup-banner">{error}</div>}
+
+      {/* Live pulse (spec C-1) */}
+      <PulseStrip expected={employees.filter((emp) => !emp.attendance_exempt).length} />
+
+      {/* بانتظار قرارك (spec C-2) → approvals inbox */}
+      <button type="button" className="approvals-entry" onClick={() => { window.location.hash = "inbox"; }}>
+        <span className="approvals-entry-icon"><Inbox size={17} aria-hidden="true" /></span>
+        <span className="approvals-entry-copy">
+          <strong>بانتظار قرارك</strong>
+          <span>{pendingCount > 0 ? `${pendingCount} طلبات معلقة — اضغط للمراجعة` : "لا توجد طلبات معلقة"}</span>
+        </span>
+        <ChevronLeft size={17} aria-hidden="true" />
+      </button>
+
       <section className="panel">
         <div className="panel-title between">
           <div><Download size={20} /><h2>تقارير وتحليلات</h2></div>
@@ -290,41 +327,48 @@ function OwnerDashboard({ onToast }) {
         <p className="muted">الفترة: {range.from} إلى {range.to}</p>
       </section>
 
-      <CompanyReports
-        report={report}
-        rows={rows}
-        employees={employees}
-        salaries={salaries}
-        stats={stats}
-        range={range}
-        loading={loading}
-      />
+      {/* Hero: net payroll (spec C-4) */}
+      <section className="panel payroll-hero">
+        <p className="payroll-hero-label">صافي المرتبات — {range.label}</p>
+        <p className="payroll-hero-value">
+          <strong><bdi dir="ltr">{money(stats.netTotal)}</bdi></strong>
+          <span>ج.م</span>
+        </p>
+        <p className="payroll-hero-sub">قبل الخصومات {money(stats.grossTotal)} ج · {activeCount} موظفين نشطين</p>
+        {deductionPct > 0 ? <span className="payroll-hero-chip">خصومات −{deductionPct}%</span> : null}
+      </section>
 
-      <div className="stats-grid">
-        <Metric label="معدل التغطية" value={`${stats.attendanceRate}%`} tone="ok" icon={Activity} />
-        <Metric label={`سجلات ${range.label}`} value={`${stats.total}/${stats.expected}`} icon={CalendarDays} />
-        <Metric label="تأخيرات" value={stats.late} tone="warn" icon={Clock3} />
-        <Metric label="بدون انصراف" value={stats.missingCheckout} tone="danger" icon={AlertTriangle} />
-        <Metric label="خصم أيام" value={stats.deductionDays.toFixed(2)} tone="warn" icon={TrendingUp} />
-        <Metric label="خصومات تقديرية" value={`${money(stats.deductions)} ج`} tone="gold" icon={Banknote} />
-        <Metric label="استقطاعات مالية" value={`${money(stats.financialTotal)} ج`} tone="gold" icon={Wallet} />
-        <Metric label="إجمالي قبل الخصومات" value={`${money(stats.grossTotal)} ج`} icon={Coins} />
-        <Metric label="إجمالي بعد الخصومات" value={`${money(stats.netTotal)} ج`} tone="ok" icon={PiggyBank} />
+      {/* KPI 2×2 (spec C-5) — the rest of the old metric wall lives below */}
+      <div className="kpi-grid">
+        <div className="kpi-card"><span className="kpi-dot tone-ok" /> <span className="kpi-label">التغطية</span><strong><bdi dir="ltr">{stats.attendanceRate}%</bdi></strong></div>
+        <div className="kpi-card"><span className="kpi-dot tone-warn" /> <span className="kpi-label">تأخيرات</span><strong>{stats.late}</strong></div>
+        <div className="kpi-card"><span className="kpi-dot tone-danger" /> <span className="kpi-label">بدون انصراف</span><strong>{stats.missingCheckout}</strong></div>
+        <div className="kpi-card"><span className="kpi-dot tone-warn" /> <span className="kpi-label">خصومات الفترة</span><strong><bdi dir="ltr">{money(stats.deductions + stats.financialTotal)}</bdi> ج</strong></div>
       </div>
+
+      <CollapsiblePanel icon={Activity} title="مؤشرات إضافية" subtitle={`${range.label}`}>
+        <div className="stats-grid">
+          <Metric label={`سجلات ${range.label}`} value={`${stats.total}/${stats.expected}`} icon={CalendarDays} />
+          <Metric label="خصم أيام" value={stats.deductionDays.toFixed(2)} tone="warn" icon={TrendingUp} />
+          <Metric label="خصومات تقديرية" value={`${money(stats.deductions)} ج`} tone="gold" icon={Banknote} />
+          <Metric label="استقطاعات مالية" value={`${money(stats.financialTotal)} ج`} tone="gold" icon={Wallet} />
+          <Metric label="إجمالي قبل الخصومات" value={`${money(stats.grossTotal)} ج`} icon={Coins} />
+          <Metric label="إجمالي بعد الخصومات" value={`${money(stats.netTotal)} ج`} tone="ok" icon={PiggyBank} />
+        </div>
+      </CollapsiblePanel>
+
       <div className="grid two">
         <section className="panel">
-          <div className="panel-title"><TrendingUp size={20} /><h2>اتجاه الحضور اليومي</h2></div>
+          <div className="panel-title"><TrendingUp size={20} /><h2>اتجاه الحضور — {range.label}</h2></div>
           {dailyData.length > 0 ? (
             <div className="chart-box">
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={dailyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={dailyData} margin={{ top: 8, right: 8, left: 8, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(180,196,210,0.1)" />
                   <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
                   <ChartTooltip />
-                  <Area type="monotone" dataKey="present" name="حضور" stroke="#FCC107" fill="#FCC107" fillOpacity={0.2} strokeWidth={2.2} />
-                  <Area type="monotone" dataKey="late" name="تأخير" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.12} strokeWidth={2} />
-                  <Area type="monotone" dataKey="absent" name="غياب" stroke="#EF4444" fill="#EF4444" fillOpacity={0.1} strokeWidth={2} />
+                  <Area type="monotone" dataKey="present" name="حضور" stroke={brandGold} fill={brandGold} fillOpacity={0.12} strokeWidth={2} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -378,7 +422,52 @@ function OwnerDashboard({ onToast }) {
             <FileSpreadsheet size={16} /> Excel مرتبات
           </button>
         </div>
-        <div className="table-wrap sticky-table">
+        {/* Mobile: payroll as cards (spec C-7); the full table stays ≥640px */}
+        <div className="payroll-cards">
+          {loading ? (
+            [0, 1, 2].map((i) => (
+              <div className="payroll-card-row" key={i}>
+                <Skeleton width={34} height={34} radius={10} />
+                <span style={{ flex: 1, display: "grid", gap: 6 }}>
+                  <Skeleton width="42%" height={12} />
+                  <Skeleton width="64%" height={9} />
+                </span>
+                <Skeleton width={64} height={14} />
+              </div>
+            ))
+          ) : stats.payrollRows.length === 0 ? (
+            <p className="muted">لا توجد بيانات مرتبات.</p>
+          ) : (
+            <>
+              {stats.payrollRows.map((row) => {
+                const totalCut = row.deductionAmount + row.financialDeduction;
+                return (
+                  <div className="payroll-card-row" key={row.employee_id}>
+                    <span className="payroll-initial" aria-hidden="true">{String(row.name).trim().charAt(0)}</span>
+                    <span className="payroll-copy">
+                      <strong>{row.name}</strong>
+                      <span>
+                        {row.late} تأخير · {row.absent} غياب{row.missingCheckout ? ` · ${row.missingCheckout} بدون انصراف` : ""}{row.exempt ? " · معفى" : ""}
+                      </span>
+                    </span>
+                    <span className="payroll-amounts">
+                      <strong><bdi dir="ltr">{money(row.netSalary)}</bdi> ج</strong>
+                      {totalCut > 0
+                        ? <i className="is-cut">خصم {money(totalCut)} ج</i>
+                        : <i className="is-ok">مكتمل</i>}
+                    </span>
+                  </div>
+                );
+              })}
+              <div className="payroll-cards-foot">
+                <span>الإجمالي بعد الخصومات</span>
+                <strong><bdi dir="ltr">{money(stats.netTotal)}</bdi> ج</strong>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="table-wrap sticky-table payroll-table">
           <table>
             <thead>
               {/* نظام «أساسي + انتظام»: الأساسي والانتظام أعمدة منفصلة والخصم من الإجمالي. */}
@@ -439,13 +528,29 @@ function OwnerDashboard({ onToast }) {
         <div className="panel-title"><Clock3 size={20} /><h2>أعلى التأخيرات</h2></div>
         <div className="list">
           {stats.lateByEmployee.length === 0 && <p className="muted">لا توجد تأخيرات في الفترة.</p>}
-          {stats.lateByEmployee.map((item) => (
-            <div className="list-row compact-row" key={item.employee_id}>
-              <div><strong>{item.name}</strong><span>{item.count} مرة · {item.minutes} دقيقة</span></div>
+          {stats.lateByEmployee.map((item, index) => (
+            <div className="list-row compact-row lates-row" key={item.employee_id}>
+              <span className="lates-rank" aria-hidden="true">{index + 1}</span>
+              <div>
+                <strong>{item.name}</strong>
+                <span className="lates-meta"><bdi dir="ltr">{item.count}</bdi> مرات · <bdi dir="ltr">{item.minutes}</bdi> د</span>
+              </div>
             </div>
           ))}
         </div>
       </section>
+
+      {/* «نبض الشركة» monthly report block (unchanged), after the flagship flow */}
+      <CompanyReports
+        report={report}
+        rows={rows}
+        employees={employees}
+        salaries={salaries}
+        stats={stats}
+        range={range}
+        loading={loading}
+      />
+
       <EmployeeStatement onToast={onToast} />
       <AccountManager onToast={onToast} />
     </div>
