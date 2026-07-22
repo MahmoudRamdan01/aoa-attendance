@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, MapPin, MessageSquare, QrCode, ShieldCheck } from "lucide-react";
+import { Camera, MapPin, MessageSquare, ShieldCheck } from "lucide-react";
 import { distanceMeters, supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { getCompanyLocation } from "../../lib/dates";
@@ -91,7 +91,6 @@ function isNetworkError(error) {
 }
 
 function EmployeeToday({ context, session, onToast, routeParam }) {
-  const [qr, setQr] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState("");
   const [locationState, setLocationState] = useState(null);
@@ -105,7 +104,6 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
   // only mirror where the existing promise chain currently is.
   const [verifyStep, setVerifyStep] = useState("send");
   const [ringError, setRingError] = useState(null);
-  const [qrOpen, setQrOpen] = useState(false);
   const lastKindRef = useRef("in");
   const [securityConfig, setSecurityConfig] = useState({
     face_mode: "off",
@@ -203,7 +201,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       p_lat: captureData.location?.lat ?? null,
       p_lng: captureData.location?.lng ?? null,
       p_accuracy: captureData.location?.accuracy ?? null,
-      p_qr_code: normalizeQr(qr) || null,
+      p_qr_code: null, // QR entry removed from the UI (qr_required is off)
       p_device_id: getDeviceId(),
       p_note: note.trim() || null,
       // No photos, ever: only the face embedding (a mathematical template)
@@ -233,7 +231,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       capturedAt: captureData.capturedAt,
       location: captureData.location,
       samples: captureData.samples,
-      qr,
+      qr: "",
       note,
       deviceId: args.p_device_id,
       fingerprint: args.p_fingerprint,
@@ -557,7 +555,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
           </div>
         ) : null}
 
-        {/* Note field (design: r14 row card) + collapsed QR */}
+        {/* Note field (design: r14 row card) */}
         <label className="today-note-field">
           <MessageSquare size={16} aria-hidden="true" />
           <input
@@ -568,23 +566,6 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
             aria-label="ملاحظة اليوم (اختياري)"
           />
         </label>
-        {qrOpen || qr ? (
-          <label className="field today-qr-field">
-            كود QR اليومي (اختياري)
-            <input
-              dir="ltr"
-              value={qr}
-              onChange={(event) => setQr(event.target.value.toUpperCase())}
-              placeholder="اختياري — الموقع كافي"
-              autoCapitalize="characters"
-              autoComplete="one-time-code"
-            />
-          </label>
-        ) : (
-          <button type="button" className="today-qr-link" onClick={() => setQrOpen(true)}>
-            <QrCode size={14} aria-hidden="true" /> إدخال كود QR
-          </button>
-        )}
         {todayRecord?.employee_note ? (
           <p className="muted"><MessageSquare size={15} /> ملاحظتك المسجلة: {todayRecord.employee_note}</p>
         ) : null}

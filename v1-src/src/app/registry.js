@@ -295,7 +295,7 @@ export function createQuickActions(context) {
     {
       id: "quick-team-requests",
       label: "مراجعة تشغيل الفريق",
-      description: "الحضور والطلبات المعلقة والـ QR",
+      description: "الحضور والطلبات المعلقة",
       icon: UserCog,
       view: "admin",
       capability: capabilities.admin,

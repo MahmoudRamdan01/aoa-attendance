@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, ScanFace, Search, UserCheck, Users, UserX, Wrench, X } from "lucide-react";
+import { AlertTriangle, Bell, CalendarDays, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, ScanFace, Search, UserCheck, Users, UserX, Wrench, X } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { haptic } from "../../lib/haptics";
@@ -9,7 +9,6 @@ import { csvCell, downloadTextFile, fmtSubmittedAt, fmtTime12 } from "../../lib/
 import { reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import { ConfirmDialog, PromptDialog, SkeletonList, SkeletonTableRows } from "../../ui/primitives";
-import QRCodeLib from "qrcode";
 import { Cell, Pie, PieChart as RePieChart, ResponsiveContainer, Tooltip as ChartTooltip } from "recharts";
 
 function AdminDashboard({ context, onToast }) {
@@ -19,7 +18,6 @@ function AdminDashboard({ context, onToast }) {
   const [leaves, setLeaves] = useState([]);
   const [reportDate, setReportDate] = useState(todayIso());
   const [holiday, setHoliday] = useState({ date: todayIso(), to: todayIso(), label: "" });
-  const [qr, setQr] = useState({ today: "", tomorrow: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [employeeQuery, setEmployeeQuery] = useState("");
@@ -34,25 +32,19 @@ function AdminDashboard({ context, onToast }) {
     setLoading(true);
     setError("");
     try {
-      const [emp, att, perm, leave, qrData, tomorrowQr] = await Promise.all([
+      const [emp, att, perm, leave] = await Promise.all([
         supabase.from("employees").select("id,name,leave_balance,active,attendance_exempt").order("id"),
         supabase.from("attendance").select("*").eq("work_date", reportDate),
         pendingPermissionsQuery(),
         pendingLeavesQuery(),
-        supabase.rpc("get_daily_qr_v1"),
-        supabase.rpc("get_qr_for_date_v1", { p_date: addDays(todayIso(), 1) }),
       ]);
-      const failed = [emp, att, perm, leave, qrData, tomorrowQr].find((item) => item.error);
+      const failed = [emp, att, perm, leave].find((item) => item.error);
       if (failed) throw failed.error;
       // Payroll-only employees (attendance_exempt) never appear on the attendance board.
       setEmployees((emp.data || []).filter((e) => !e.attendance_exempt));
       setAttendance(att.data || []);
       setPermissions(perm.data || []);
       setLeaves(leave.data || []);
-      setQr({
-        today: qrData.data?.code || "",
-        tomorrow: tomorrowQr.data?.code || "",
-      });
     } catch (err) {
       setError(err.message || "تعذر تحميل بيانات الإدارة.");
     }
@@ -312,14 +304,6 @@ function AdminDashboard({ context, onToast }) {
       </section>
 
       <div className="grid two">
-        <section className="panel">
-          <div className="panel-title"><QrCode size={20} /><h2>QR اليوم</h2></div>
-          <div className="qr-stack">
-            <QrDisplay label="اليوم" code={qr.today} date={todayIso()} onToast={onToast} />
-            <QrDisplay label="الغد" code={qr.tomorrow} date={addDays(todayIso(), 1)} muted onToast={onToast} />
-          </div>
-          <p className="muted">الكود بيتولد ويتبعت تلقائيًا للفريق مرة واحدة يوميًا. اللوحة هنا للعرض والطباعة فقط.</p>
-        </section>
         <section className="panel">
           <div className="panel-title"><PieChartIcon size={20} /><h2>توزيع حالات اليوم</h2></div>
           {donutData.length > 0 ? (
@@ -618,50 +602,6 @@ function Approvals({ title, rows, type, canApprove, onPermission, onLeave }) {
         onCancel={() => setRejectId(null)}
       />
     </section>
-  );
-}
-
-function QrDisplay({ label, code, date, muted, onToast }) {
-  const [image, setImage] = useState("");
-
-  useEffect(() => {
-    if (!code) {
-      setImage("");
-      return;
-    }
-    QRCodeLib.toDataURL(code, {
-      width: 190,
-      margin: 2,
-      color: {
-        dark: muted ? "#667085" : "#071224",
-        light: "#ffffff",
-      },
-    }).then(setImage).catch(() => setImage(""));
-  }, [code, muted]);
-
-  async function copyCode() {
-    if (!code) return;
-    await navigator.clipboard.writeText(code);
-    onToast?.(`تم نسخ كود ${label}.`);
-  }
-
-  return (
-    <div className={cls("qr-card", muted && "muted")}>
-      <div>
-        <span>{label}</span>
-        {date && <small>{date}</small>}
-      </div>
-      {image ? <img src={image} alt={`QR ${label}`} /> : <div className="qr-placeholder">QR</div>}
-      <div className="qr-code">{code || "-"}</div>
-      <div className="qr-actions">
-        <button className="secondary" type="button" onClick={copyCode} disabled={!code}>
-          <Clipboard size={15} /> نسخ
-        </button>
-        <button className="secondary" type="button" onClick={() => window.print()} disabled={!code}>
-          <Printer size={15} /> طباعة
-        </button>
-      </div>
-    </div>
   );
 }
 
