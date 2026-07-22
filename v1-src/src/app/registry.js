@@ -91,7 +91,10 @@ const DEFINITIONS = [
     en: "Training",
     icon: GraduationCap,
     legacyKind: "all",
-    capability: capabilities.authenticated,
+    // Air Ocean decision: the Training section (onboarding plan + evaluation
+    // form) is owner-only. On AOL it stays available to the whole team.
+    capability: (args) =>
+      COMPANY.key === "airocean" ? capabilities.owner(args) : capabilities.authenticated(args),
     mobileSlot: "more",
   },
   {
