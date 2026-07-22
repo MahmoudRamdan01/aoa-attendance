@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Wallet } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { computePayroll, getPayrollConfig } from "../../lib/payroll";
 import { money } from "../../lib/format";
@@ -55,9 +54,9 @@ function PayslipCard({ employeeId, month, monthLabel, attendanceRows }) {
   });
 
   return (
-    <section className="panel payslip-card">
+    <section className="payslip-card">
       <div className="payslip-head">
-        <strong><Wallet size={16} aria-hidden="true" /> كشف راتبي — {monthLabel}</strong>
+        <strong>كشف راتبي — {monthLabel}</strong>
         <i className="payslip-chip">تقديري</i>
       </div>
       <div className="payslip-rows">
@@ -76,7 +75,7 @@ function PayslipCard({ employeeId, month, monthLabel, attendanceRows }) {
       </div>
       <div className="payslip-net">
         <span>الصافي التقديري</span>
-        <strong><bdi dir="ltr">{money(pay.net)}</bdi> ج</strong>
+        <strong><bdi dir="ltr">{money(pay.net)}</bdi> <i>ج.م</i></strong>
       </div>
     </section>
   );
@@ -87,7 +86,7 @@ function PayslipRow({ label, amount, tone }) {
   return (
     <div className={`payslip-row${tone === "deduction" ? " is-deduction" : ""}`}>
       <span>{label}</span>
-      <bdi dir="ltr">{negative ? "-" : ""}{money(Math.abs(amount))} ج</bdi>
+      <bdi dir="ltr">{negative ? "−" : ""}{money(Math.abs(amount))} ج</bdi>
     </div>
   );
 }

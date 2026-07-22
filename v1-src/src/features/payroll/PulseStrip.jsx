@@ -56,15 +56,15 @@ function PulseStrip({ expected }) {
     <div className="pulse-strip">
       <div className="pulse-mini">
         <span className="pulse-mini-label"><i className="pulse-live-dot" aria-hidden="true" /> بالشركة الآن</span>
-        <strong><bdi dir="ltr">{pulse.present}/{expected || 0}</bdi></strong>
+        <strong><bdi dir="ltr">{pulse.present}<small>/{expected || 0}</small></bdi></strong>
       </div>
       <div className="pulse-mini">
-        <span className="pulse-mini-label">تأخير اليوم</span>
-        <strong className="tone-warn">{pulse.late}</strong>
+        <span className="pulse-mini-label"><i className="pulse-dot tone-warn" aria-hidden="true" /> تأخير اليوم</span>
+        <strong>{pulse.late}</strong>
       </div>
       <div className="pulse-mini">
-        <span className="pulse-mini-label">لم يحضر</span>
-        <strong className="tone-danger">{notIn}</strong>
+        <span className="pulse-mini-label"><i className="pulse-dot tone-danger" aria-hidden="true" /> لم يحضر</span>
+        <strong>{notIn}</strong>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, FileSpreadsheet, History } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, FileSpreadsheet } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 
 import { csvCell, downloadTextFile, fmtTime12 } from "../../lib/format";
@@ -103,18 +103,13 @@ function MyMonthView({ context, onToast }) {
   }
 
   return (
-    <div className="stack">
-      {/* Month selector + summary chips (spec E-1/E-2) */}
-      <section className="panel">
-        <div className="panel-title between">
-          <div><History size={20} /><h2>سجلي الشهري</h2></div>
-          <button className="secondary" onClick={exportMonthCsv} disabled={loading || rows.length === 0}>
-            <FileSpreadsheet size={16} /> Excel
-          </button>
-        </div>
+    <div className="record-screen">
+      {/* Screen title row (design ref 06): «سجلي» + month chevrons inline */}
+      <div className="scr-head">
+        <h2>سجلي</h2>
         <div className="month-selector">
           <button type="button" className="month-chevron" onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="الشهر السابق">
-            <ChevronRight size={17} aria-hidden="true" />
+            <ChevronRight size={14} aria-hidden="true" />
           </button>
           <strong>{monthLabel(month)}</strong>
           <button
@@ -124,46 +119,49 @@ function MyMonthView({ context, onToast }) {
             disabled={month >= currentMonth}
             aria-label="الشهر التالي"
           >
-            <ChevronLeft size={17} aria-hidden="true" />
+            <ChevronLeft size={14} aria-hidden="true" />
           </button>
         </div>
-        <div className="month-chips">
-          <MonthChip tone="ok" value={summary.present} label="حضور" />
-          <MonthChip tone="warn" value={summary.lateCount} label="تأخير" />
-          <MonthChip tone="danger" value={summary.absent} label="غياب" />
-          <MonthChip tone="info" value={summary.leave} label="إجازة" />
-        </div>
-        {employee?.leave_balance != null && (
-          <p className="muted">رصيد أجازاتك المتبقي: {employee.leave_balance} يوم</p>
-        )}
-      </section>
+      </div>
 
-      {/* كشف راتبي (spec E-3) — hides itself when salary isn't readable */}
+      {/* Summary chips ×4 */}
+      <div className="month-chips">
+        <MonthChip tone="ok" value={summary.present} label="حضور" />
+        <MonthChip tone="warn" value={summary.lateCount} label="تأخير" />
+        <MonthChip tone="danger" value={summary.absent} label="غياب" />
+        <MonthChip tone="info" value={summary.leave} label="إجازة" />
+      </div>
+
+      {/* كشف راتبي — hides itself when salary isn't readable */}
       <PayslipCard employeeId={employee?.id} month={month} monthLabel={monthLabel(month)} attendanceRows={rows} />
 
-      {/* Day list (spec E-4): cards on mobile, table on wide screens */}
-      <section className="panel">
-        <div className="panel-title"><CalendarDays size={20} /><h2>تفاصيل الأيام</h2></div>
-
-        <div className="day-list">
-          {loading && <p className="muted">جارٍ تحميل السجل…</p>}
-          {!loading && rows.length === 0 && <p className="muted">لا توجد سجلات في هذا الشهر.</p>}
-          {!loading && rows.map((row) => (
-            <div className="day-row" key={row.id || row.work_date}>
-              <div className="day-row-copy">
-                <strong>{weekdayName(row.work_date)} <bdi dir="ltr">{row.work_date.slice(8)}/{row.work_date.slice(5, 7)}</bdi></strong>
-                <span>{daySubline(row)}</span>
-              </div>
-              {row.check_in ? (
-                <span className="day-row-times">
-                  {fmtTime12(row.check_in)} {row.check_out ? `← ${fmtTime12(row.check_out)}` : ""}
-                </span>
-              ) : null}
-              <StatusBadge status={row.status} />
+      {/* Day list: ONE card with hairline-separated rows (design), table ≥640 */}
+      <div className="day-list">
+        {loading && <p className="muted day-list-note">جارٍ تحميل السجل…</p>}
+        {!loading && rows.length === 0 && <p className="muted day-list-note">لا توجد سجلات في هذا الشهر.</p>}
+        {!loading && rows.map((row) => (
+          <div className="day-row" key={row.id || row.work_date}>
+            <div className="day-row-copy">
+              <strong>{weekdayName(row.work_date)} <bdi dir="ltr">{row.work_date.slice(8)}/{row.work_date.slice(5, 7)}</bdi></strong>
+              <span>{daySubline(row)}</span>
             </div>
-          ))}
-        </div>
+            {row.check_in ? (
+              <span className="day-row-times">
+                {fmtTime12(row.check_in)} {row.check_out ? `← ${fmtTime12(row.check_out)}` : ""}
+              </span>
+            ) : null}
+            <StatusBadge status={row.status} />
+          </div>
+        ))}
+      </div>
 
+      <section className="panel day-table-panel">
+        <div className="panel-title between">
+          <div><CalendarDays size={20} /><h2>تفاصيل الأيام</h2></div>
+          <button className="secondary" onClick={exportMonthCsv} disabled={loading || rows.length === 0}>
+            <FileSpreadsheet size={16} /> Excel
+          </button>
+        </div>
         <div className="table-wrap sticky-table day-table">
           <table>
             <thead>

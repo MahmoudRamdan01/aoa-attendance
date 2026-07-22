@@ -3683,3 +3683,560 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   font: 600 11.5px/1 var(--font-body);
   cursor: pointer;
 }
+
+/* =====================================================================
+   Redesign v2 — FIDELITY PASS: exact values from the design prototype
+   (AOI Attendance Redesign.dc.html). Later rules override the earlier
+   phase styles; the design is the single source of truth here.
+   ===================================================================== */
+
+/* -- Screen title row (h2 600 18px Alexandria, padding 10px 2px 14px) -- */
+.scr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 2px 14px;
+}
+
+.scr-head h2 {
+  margin: 0;
+  font: 600 18px/1.4 var(--font-display);
+}
+
+/* Segmented pill (design): container r999 p3-4, buttons h30/34 */
+.seg-pill {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.seg-pill button {
+  block-size: 30px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 11.5px/1 var(--font-body);
+  cursor: pointer;
+}
+
+.seg-pill button.active {
+  background: var(--gold);
+  color: var(--gold-on);
+}
+
+.seg-pill-block { padding: 4px; }
+.seg-pill-block button { flex: 1; block-size: 34px; font-size: 12px; }
+
+/* Hide the legacy page header on the redesigned mobile screens — the design
+   screens carry their own compact title (or none, for اليوم). */
+@media (max-width: 820px) {
+  .ops-shell:is([data-view="today"], [data-view="month"], [data-view="requests"], [data-view="owner"], [data-view="inbox"]) .ui-page-header {
+    display: none;
+  }
+}
+
+@media (min-width: 821px) {
+  .scr-head { display: none; } /* desktop keeps the standard page header */
+}
+
+/* -------------------- اليوم (ref 01) -------------------- */
+.today-screen {
+  display: flex;
+  flex-direction: column;
+  max-inline-size: 560px;
+  margin-inline: auto;
+  inline-size: 100%;
+}
+
+.today-clockline { text-align: center; padding: 14px 0 4px; margin: 0; }
+
+.today-clock {
+  margin: 0;
+  font: 600 46px/1.15 var(--font-display);
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.today-clock i {
+  color: var(--text-muted);
+  font: 600 15px/1 var(--font-display);
+  font-style: normal;
+}
+
+.attendance-capture-panel .today-status { display: none; } /* legacy guard */
+
+.today-status {
+  display: flex;
+  margin-block-start: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.today-status .status-dot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.today-status-divider {
+  inline-size: 1px;
+  margin: 10px 0;
+  background: var(--line);
+}
+
+.today-status .status-dot > span {
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: 50%;
+  background: #3c4e5f;
+  box-shadow: none;
+  flex: none;
+}
+
+.today-status .status-dot.done > span { background: var(--success); }
+
+.today-status .status-dot small {
+  display: block;
+  color: var(--text-muted);
+  font: 400 11px/1.5 var(--font-body);
+  font-weight: 400;
+}
+
+.today-status .status-dot strong {
+  font: 600 14px/1.5 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.ring-wrap { margin: 26px auto 8px; }
+
+/* Static inner circle at inset 8 — hairline; tone follows the phase */
+.ring-inner {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+
+.ring-wrap[data-phase="fail"] .ring-inner { border-color: rgba(255, 107, 112, 0.34); }
+.ring-wrap[data-phase="done"] .ring-inner { border-color: rgba(67, 217, 160, 0.34); }
+.ring-wrap[data-phase="in"] .ring-inner { border-color: var(--line-strong); }
+.ring-wrap[data-phase="fail"] .ring-halo,
+.ring-wrap[data-phase="done"] .ring-halo { display: none; }
+
+.ring-halo-fast { animation-duration: 1.5s; }
+
+.ring-fail { background: rgba(255, 107, 112, 0.07); }
+.ring-verify strong { font: 700 12.5px/1.5 var(--font-body); }
+.ring-verify small { color: var(--text-disabled); font: 500 9.5px/1.5 var(--font-body); opacity: 1; }
+.ring-out { background: var(--surface); }
+.ring-done small { font: 500 11.5px/1.4 var(--font-mono); }
+
+.today-location-chip {
+  margin: 6px auto 0;
+  padding: 7px 14px;
+  gap: 7px;
+  border-color: rgba(67, 217, 160, 0.28);
+}
+
+.today-note-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-block-start: 18px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.today-note-field input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--text);
+  font: 400 12.5px/1.5 var(--font-body);
+  outline: none;
+}
+
+.today-note-field input::placeholder { color: var(--text-muted); }
+
+.today-qr-field { margin-block-start: 10px; }
+
+.today-security-card {
+  margin-block-start: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.today-security-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block-end: 10px;
+}
+
+.today-security-head svg { color: var(--info); }
+.today-security-head strong { font: 700 12.5px/1.5 var(--font-body); }
+
+.today-security-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--text-secondary);
+  font: 400 11.5px/1.6 var(--font-body);
+}
+
+/* -------------------- سجلي (ref 06) -------------------- */
+.record-screen,
+.payroll-screen,
+.requests-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-inline-size: 720px;
+  margin-inline: auto;
+  inline-size: 100%;
+}
+
+.record-screen .month-selector { margin: 0; gap: 4px; }
+.record-screen .month-selector strong { min-inline-size: 0; padding: 0 8px; font: 600 12.5px/1.5 var(--font-body); }
+
+.month-chevron {
+  inline-size: 34px;
+  block-size: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.month-chips { margin: 0; gap: 8px; }
+
+.month-chip {
+  padding: 10px 6px;
+  border-radius: 12px;
+  background: var(--surface);
+  gap: 2px;
+}
+
+.month-chip span { margin-top: 2px; }
+
+.payslip-card {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface-hero);
+  padding: 16px 18px;
+}
+
+.payslip-chip {
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 2.5px 9px;
+  font: 600 9.5px/1.5 var(--font-body);
+}
+
+.payslip-rows { gap: 8px; }
+
+.payslip-net strong {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.payslip-net strong i { color: var(--text-secondary); font: 600 11px/1 var(--font-display); font-style: normal; }
+
+/* Day list: ONE card, hairline-separated rows */
+.day-list {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.day-row {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 13px 18px;
+  gap: 12px;
+}
+
+.day-row + .day-row { border-block-start: 1px solid var(--line-subtle); }
+
+.day-list-note { padding: 14px 18px; margin: 0; }
+
+.day-table-panel { display: none; }
+
+@media (min-width: 640px) {
+  .day-list { display: none; }
+  .day-table-panel { display: block; }
+  .day-table { display: block; }
+}
+
+/* -------------------- طلباتي (ref 07) -------------------- */
+.requests-list { display: flex; flex-direction: column; gap: 10px; }
+
+.request-card {
+  padding: 15px 17px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  display: block;
+}
+
+.request-card-head strong { font: 700 13px/1.5 var(--font-body); }
+.request-card-range { margin-top: 5px; color: var(--text-muted); font: 400 11.5px/1.6 var(--font-body); }
+
+.request-card-note {
+  margin: 9px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--surface-nested);
+  color: var(--text-secondary);
+  font: 400 12px/1.5 var(--font-body);
+}
+
+/* -------------------- الرواتب (ref 04) -------------------- */
+.pulse-strip { gap: 8px; }
+
+.pulse-mini {
+  display: block;
+  padding: 11px 12px;
+  border-radius: 13px;
+  background: var(--surface);
+  text-align: start;
+}
+
+.pulse-mini-label { justify-content: flex-start; font: 500 10px/1.5 var(--font-body); }
+
+.pulse-mini strong {
+  display: block;
+  margin-block-start: 4px;
+  font: 600 17px/1.2 var(--font-display);
+}
+
+.pulse-mini strong small { color: var(--text-disabled); font: 500 10.5px/1 var(--font-display); }
+
+.pulse-dot { inline-size: 7px; block-size: 7px; border-radius: 50%; display: inline-block; }
+.pulse-dot.tone-warn { background: var(--warning); }
+.pulse-dot.tone-danger { background: var(--danger); }
+
+.approvals-entry { padding: 13px 16px; border-radius: 14px; }
+.approvals-entry-copy span { margin-top: 2px; }
+
+.period-dates {
+  display: flex;
+  gap: 8px;
+  margin-block-start: -4px;
+}
+
+.period-dates input {
+  flex: 1;
+  min-inline-size: 0;
+  block-size: 36px;
+  padding-inline: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: 500 11.5px/1 var(--font-body);
+}
+
+.payroll-hero {
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: var(--surface-hero);
+  padding: 18px 20px;
+}
+
+.payroll-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.payroll-hero-label { margin: 0; color: var(--text-muted); font: 500 11.5px/1.5 var(--font-body); }
+
+.payroll-hero-chip {
+  position: static;
+  padding: 2.5px 9px;
+  font: 600 10px/1.5 var(--font-body);
+}
+
+.payroll-hero-value { margin-block-start: 6px; justify-content: flex-start; }
+.payroll-hero-sub { margin-block-start: 4px; white-space: normal; }
+
+.kpi-grid { gap: 10px; }
+.kpi-card { border-radius: 14px; padding: 13px 15px; background: var(--surface); }
+.kpi-card strong { margin-block-start: 6px; text-align: end; direction: ltr; }
+
+/* Payroll list: ONE card with internal header + hairline rows */
+.payroll-card-list {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.payroll-card-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 18px 4px;
+}
+
+.payroll-card-list-head strong { font: 700 13px/1.5 var(--font-body); }
+.payroll-card-list-head span { color: var(--text-muted); font: 500 10.5px/1.5 var(--font-body); }
+
+.payroll-cards { display: block; }
+
+.payroll-card-row {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 12px 18px;
+  border-block-start: 1px solid var(--line-subtle);
+}
+
+.payroll-cards-foot {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  border-block-start: 1px solid var(--line);
+  background: var(--surface-nested);
+  padding: 13px 18px;
+}
+
+.payroll-table-panel { display: none; }
+
+@media (min-width: 640px) {
+  .payroll-card-list { display: none; }
+  .payroll-table-panel { display: block; }
+  .payroll-table { display: block; }
+}
+
+/* أعلى التأخيرات — one card */
+.lates-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  padding: 15px 18px 6px;
+}
+
+.lates-title { font: 700 13px/1.5 var(--font-body); }
+.lates-empty { padding: 11px 0; margin: 0; }
+
+.lates-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 0;
+  border-block-start: 1px solid var(--line-subtle);
+  margin-block-start: 0;
+}
+
+.lates-card .lates-row:first-of-type { margin-block-start: 11px; }
+.lates-name { flex: 1; font: 600 12.5px/1.5 var(--font-body); }
+.lates-meta { color: var(--text-muted); font: 500 11px/1.5 var(--font-mono); unicode-bidi: isolate; }
+
+/* -------------------- المزيد (ref 08) -------------------- */
+.more-profile {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.more-avatar {
+  inline-size: 48px;
+  block-size: 48px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--surface-raised);
+  color: var(--gold-text);
+  font: 700 19px/1 var(--font-display);
+}
+
+.more-profile-copy { flex: 1; min-inline-size: 0; display: grid; gap: 2px; }
+.more-profile-copy strong { font: 700 14px/1.4 var(--font-body); }
+.more-profile-copy bdi {
+  color: var(--text-muted);
+  font: 500 10.5px/1.4 var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more-role-chip {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-pill);
+  background: var(--gold-soft);
+  color: var(--gold-text);
+  font: 600 10px/1.5 var(--font-body);
+  font-style: normal;
+}
+
+.more-section-label {
+  margin: 0;
+  padding: 14px 4px 0;
+  color: var(--text-disabled);
+  font: 700 10.5px/1.5 var(--font-body);
+  letter-spacing: 0.04em;
+}
+
+.more-group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.ops-mobile-more .more-row {
+  inline-size: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 17px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+
+.ops-mobile-more .more-row + .more-row { border-block-start: 1px solid var(--line-subtle); }
+.ops-mobile-more .more-row:active { background: var(--surface-raised); }
+.ops-mobile-more .more-row > svg { color: var(--text-disabled); flex: none; }
+.more-row-label { flex: 1; font: 500 13px/1.5 var(--font-body); }
+.ops-mobile-more .more-row.is-danger { color: var(--danger); }
+.ops-mobile-more .more-row.is-danger > svg { color: var(--danger); }
+
+.more-dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: var(--c);
+  flex: none;
+}

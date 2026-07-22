@@ -259,8 +259,13 @@ function OwnerDashboard({ onToast }) {
   const deductionPct = stats.grossTotal > 0 ? Math.round(((stats.grossTotal - stats.netTotal) / stats.grossTotal) * 100) : 0;
 
   return (
-    <div className="stack">
+    <div className="payroll-screen">
       {error && <div className="setup-banner">{error}</div>}
+
+      {/* Screen title (design ref 04) */}
+      <div className="scr-head">
+        <h2>الرواتب والتقارير</h2>
+      </div>
 
       {/* Live pulse (spec C-1) */}
       <PulseStrip expected={employees.filter((emp) => !emp.attendance_exempt).length} />
@@ -272,54 +277,51 @@ function OwnerDashboard({ onToast }) {
           <strong>بانتظار قرارك</strong>
           <span>{pendingCount > 0 ? `${pendingCount} طلبات معلقة — اضغط للمراجعة` : "لا توجد طلبات معلقة"}</span>
         </span>
-        <ChevronLeft size={17} aria-hidden="true" />
+        <ChevronLeft size={15} aria-hidden="true" />
       </button>
 
-      <section className="panel">
-        <div className="panel-title between">
-          <div><Download size={20} /><h2>تقارير وتحليلات</h2></div>
-          <div className="toolbar">
-            <div className="tabs compact-tabs no-margin">
-              <button className={cls(period === "day" && "active")} onClick={() => setPeriod("day")}>يومي</button>
-              <button className={cls(period === "week" && "active")} onClick={() => setPeriod("week")}>أسبوعي</button>
-              <button className={cls(period === "month" && "active")} onClick={() => setPeriod("month")}>شهري</button>
-              <button className={cls(period === "range" && "active")} onClick={() => setPeriod("range")}>فترة محددة</button>
-            </div>
-            {period === "range" ? (
-              <>
-                <input
-                  type="date"
-                  value={customRange.from}
-                  aria-label="من تاريخ"
-                  title="من تاريخ"
-                  onChange={(e) => setCustomRange((r) => ({ from: e.target.value, to: r.to < e.target.value ? e.target.value : r.to }))}
-                />
-                <input
-                  type="date"
-                  value={customRange.to}
-                  min={customRange.from}
-                  aria-label="إلى تاريخ"
-                  title="إلى تاريخ"
-                  onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))}
-                />
-              </>
-            ) : (
-              <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} />
-            )}
-          </div>
-        </div>
-        <p className="muted">الفترة: {range.from} إلى {range.to}</p>
-      </section>
+      {/* Period segmented pill (design) + the functional date pickers */}
+      <div className="seg-pill seg-pill-block">
+        <button type="button" className={cls(period === "day" && "active")} onClick={() => setPeriod("day")}>يومي</button>
+        <button type="button" className={cls(period === "week" && "active")} onClick={() => setPeriod("week")}>أسبوعي</button>
+        <button type="button" className={cls(period === "month" && "active")} onClick={() => setPeriod("month")}>شهري</button>
+        <button type="button" className={cls(period === "range" && "active")} onClick={() => setPeriod("range")}>فترة</button>
+      </div>
+      <div className="period-dates">
+        {period === "range" ? (
+          <>
+            <input
+              type="date"
+              value={customRange.from}
+              aria-label="من تاريخ"
+              title="من تاريخ"
+              onChange={(e) => setCustomRange((r) => ({ from: e.target.value, to: r.to < e.target.value ? e.target.value : r.to }))}
+            />
+            <input
+              type="date"
+              value={customRange.to}
+              min={customRange.from}
+              aria-label="إلى تاريخ"
+              title="إلى تاريخ"
+              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))}
+            />
+          </>
+        ) : (
+          <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} />
+        )}
+      </div>
 
-      {/* Hero: net payroll (spec C-4) */}
-      <section className="panel payroll-hero">
-        <p className="payroll-hero-label">صافي المرتبات — {range.label}</p>
+      {/* Hero: net payroll (spec C-4) — chip inline in the label row */}
+      <section className="payroll-hero">
+        <div className="payroll-hero-top">
+          <span className="payroll-hero-label">صافي المرتبات — {range.label}</span>
+          {deductionPct > 0 ? <span className="payroll-hero-chip">خصومات −{deductionPct}%</span> : null}
+        </div>
         <p className="payroll-hero-value">
           <strong><bdi dir="ltr">{money(stats.netTotal)}</bdi></strong>
           <span>ج.م</span>
         </p>
         <p className="payroll-hero-sub">قبل الخصومات {money(stats.grossTotal)} ج · {activeCount} موظفين نشطين</p>
-        {deductionPct > 0 ? <span className="payroll-hero-chip">خصومات −{deductionPct}%</span> : null}
       </section>
 
       {/* KPI 2×2 (spec C-5) — the rest of the old metric wall lives below */}
@@ -399,14 +401,12 @@ function OwnerDashboard({ onToast }) {
           <p className="muted">لا توجد بيانات موظفين في الفترة.</p>
         )}
       </CollapsiblePanel>
-      <section className="panel">
-        <div className="panel-title between">
-          <div><Banknote size={20} /><h2>المرتبات والخصومات</h2></div>
-          <button className="secondary" onClick={exportPayrollCsv} disabled={loading || stats.payrollRows.length === 0}>
-            <FileSpreadsheet size={16} /> Excel مرتبات
-          </button>
+      {/* Mobile: ONE card with hairline rows (design); the full table ≥640px */}
+      <section className="payroll-card-list">
+        <div className="payroll-card-list-head">
+          <strong>المرتبات والخصومات</strong>
+          <span>الصافي التقديري</span>
         </div>
-        {/* Mobile: payroll as cards (spec C-7); the full table stays ≥640px */}
         <div className="payroll-cards">
           {loading ? (
             [0, 1, 2].map((i) => (
@@ -450,7 +450,15 @@ function OwnerDashboard({ onToast }) {
             </>
           )}
         </div>
+      </section>
 
+      <section className="panel payroll-table-panel">
+        <div className="panel-title between">
+          <div><Banknote size={20} /><h2>المرتبات والخصومات</h2></div>
+          <button className="secondary" onClick={exportPayrollCsv} disabled={loading || stats.payrollRows.length === 0}>
+            <FileSpreadsheet size={16} /> Excel مرتبات
+          </button>
+        </div>
         <div className="table-wrap sticky-table payroll-table">
           <table>
             <thead>
@@ -508,20 +516,16 @@ function OwnerDashboard({ onToast }) {
           </table>
         </div>
       </section>
-      <section className="panel">
-        <div className="panel-title"><Clock3 size={20} /><h2>أعلى التأخيرات</h2></div>
-        <div className="list">
-          {stats.lateByEmployee.length === 0 && <p className="muted">لا توجد تأخيرات في الفترة.</p>}
-          {stats.lateByEmployee.map((item, index) => (
-            <div className="list-row compact-row lates-row" key={item.employee_id}>
-              <span className="lates-rank" aria-hidden="true">{index + 1}</span>
-              <div>
-                <strong>{item.name}</strong>
-                <span className="lates-meta"><bdi dir="ltr">{item.count}</bdi> مرات · <bdi dir="ltr">{item.minutes}</bdi> د</span>
-              </div>
-            </div>
-          ))}
-        </div>
+      <section className="lates-card">
+        <strong className="lates-title">أعلى التأخيرات</strong>
+        {stats.lateByEmployee.length === 0 && <p className="muted lates-empty">لا توجد تأخيرات في الفترة.</p>}
+        {stats.lateByEmployee.map((item, index) => (
+          <div className="lates-row" key={item.employee_id}>
+            <span className="lates-rank" aria-hidden="true">{index + 1}</span>
+            <span className="lates-name">{item.name}</span>
+            <span className="lates-meta" dir="ltr">{item.count} مرات · {item.minutes} د</span>
+          </div>
+        ))}
       </section>
 
       {/* «نبض الشركة» monthly report block (unchanged), after the flagship flow */}

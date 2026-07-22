@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CheckCircle2, MapPin, MessageSquare, QrCode, ShieldCheck } from "lucide-react";
+import { Camera, MapPin, MessageSquare, QrCode, ShieldCheck } from "lucide-react";
 import { distanceMeters, supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { getCompanyLocation } from "../../lib/dates";
@@ -71,15 +71,6 @@ function fmtDuration(ms, { seconds = true } = {}) {
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   return seconds ? `${h}:${pad2(m)}:${pad2(total % 60)}` : `${h}:${pad2(m)}`;
-}
-
-const todayDateFormat = new Intl.DateTimeFormat("ar-EG-u-nu-latn", { weekday: "long", day: "numeric", month: "long" });
-function formatTodayDate(date) {
-  try {
-    return todayDateFormat.format(date);
-  } catch {
-    return "";
-  }
 }
 
 // attendance.check_in / check_out are bare Postgres `time` values (HH:MM:SS).
@@ -515,102 +506,101 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
   return (
     <>
-      <div className="grid two">
-        <section className="panel hero-panel attendance-capture-panel">
-          {/* 1. Date + live clock */}
-          <div className="today-clockline">
-            <p className="today-date">{formatTodayDate(clock)}</p>
-            <p className="today-clock">
-              <span dir="ltr">{bigClock.time}</span>
-              <i>{bigClock.meridiem}</i>
-            </p>
-          </div>
+      {/* Design (ref 01): content sits directly on the canvas — no panel. */}
+      <div className="today-screen">
+        {/* Live clock (the design hides the date line — the topbar carries it) */}
+        <div className="today-clockline">
+          <p className="today-clock" dir="ltr">
+            {bigClock.time}
+            <i> {bigClock.meridiem}</i>
+          </p>
+        </div>
 
-          {/* 2. Status split card */}
-          <div className="today-status">
-            <StatusDot done={!!todayRecord?.check_in} label="حضور" value={fmtTime12(todayRecord?.check_in) || "لم يُسجَّل"} />
-            <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={fmtTime12(todayRecord?.check_out) || "لم يُسجَّل"} />
-          </div>
+        {/* Status card: two halves split by a vertical hairline */}
+        <div className="today-status">
+          <StatusDot done={!!todayRecord?.check_in} label="حضور" value={fmtTime12(todayRecord?.check_in) || "لم يُسجَّل"} />
+          <span className="today-status-divider" aria-hidden="true" />
+          <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={fmtTime12(todayRecord?.check_out) || "لم يُسجَّل"} />
+        </div>
 
-          {/* 3. The ring — same attendance() entrypoints as the old buttons */}
-          <CheckInRing
-            phase={ringPhase}
-            step={VERIFY_STEP_LABELS[verifyStep] || VERIFY_STEP_LABELS.send}
-            error={ringError}
-            elapsed={elapsed}
-            worked={worked}
-            lockedLabel={statusLabels[todayRecord?.status] || "اليوم مسجّل إجازة"}
-            checkoutState={checkoutState}
-            onCheckIn={() => attendance("in")}
-            onCheckOut={() => attendance("out")}
-            onRetry={() => attendance(lastKindRef.current)}
-            disabled={Boolean(busy)}
+        {/* The ring — same attendance() entrypoints as the old buttons */}
+        <CheckInRing
+          phase={ringPhase}
+          step={VERIFY_STEP_LABELS[verifyStep] || VERIFY_STEP_LABELS.send}
+          error={ringError}
+          elapsed={elapsed}
+          worked={worked}
+          lockedLabel={statusLabels[todayRecord?.status] || "اليوم مسجّل إجازة"}
+          checkoutState={checkoutState}
+          onCheckIn={() => attendance("in")}
+          onCheckOut={() => attendance("out")}
+          onRetry={() => attendance(lastKindRef.current)}
+          disabled={Boolean(busy)}
+        />
+
+        {/* Location chip (after a live fix exists) */}
+        {locationState ? (
+          <p className={cls("today-location-chip", insideRange && "is-inside")}>
+            {insideRange ? <MapPin size={13} /> : <MapPin size={13} />}
+            {insideRange
+              ? `داخل نطاق الشركة · دقة ±${Math.round(locationState.accuracy)} م`
+              : `خارج النطاق — المسافة ${Math.round(locationState.distance)} م · دقة ±${Math.round(locationState.accuracy)} م`}
+          </p>
+        ) : null}
+        {todayNote ? <p className="muted today-note-line">{todayNote}</p> : null}
+
+        {shortcutRequested ? (
+          <div className="capture-shortcut">
+            <Camera size={22} />
+            <div><strong>جاهز لتسجيل حضورك؟</strong><span>اضغط لفتح الكاميرا وتثبيت الموقع.</span></div>
+            <button type="button" className="primary" onClick={() => attendance("in")}>ابدأ</button>
+          </div>
+        ) : null}
+
+        {/* Note field (design: r14 row card) + collapsed QR */}
+        <label className="today-note-field">
+          <MessageSquare size={16} aria-hidden="true" />
+          <input
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="ملاحظة اليوم (اختياري)…"
+            maxLength={280}
+            aria-label="ملاحظة اليوم (اختياري)"
           />
-
-          {/* 4. Location chip (after a live fix exists) */}
-          {locationState ? (
-            <p className={cls("today-location-chip", insideRange && "is-inside")}>
-              {insideRange ? <CheckCircle2 size={14} /> : <MapPin size={14} />}
-              {insideRange
-                ? `داخل نطاق الشركة · دقة ±${Math.round(locationState.accuracy)} م`
-                : `خارج النطاق — المسافة ${Math.round(locationState.distance)} م · دقة ±${Math.round(locationState.accuracy)} م`}
-            </p>
-          ) : null}
-          {todayNote ? <p className="muted today-note-line">{todayNote}</p> : null}
-
-          {shortcutRequested ? (
-            <div className="capture-shortcut">
-              <Camera size={22} />
-              <div><strong>جاهز لتسجيل حضورك؟</strong><span>اضغط لفتح الكاميرا وتثبيت الموقع.</span></div>
-              <button type="button" className="primary" onClick={() => attendance("in")}>ابدأ</button>
-            </div>
-          ) : null}
-
-          {/* 5. Note field + collapsed QR */}
-          <label className="field today-note-field">
-            <MessageSquare size={15} aria-hidden="true" />
+        </label>
+        {qrOpen || qr ? (
+          <label className="field today-qr-field">
+            كود QR اليومي (اختياري)
             <input
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="ملاحظة اليوم (اختياري)…"
-              maxLength={280}
-              aria-label="ملاحظة اليوم (اختياري)"
+              dir="ltr"
+              value={qr}
+              onChange={(event) => setQr(event.target.value.toUpperCase())}
+              placeholder="اختياري — الموقع كافي"
+              autoCapitalize="characters"
+              autoComplete="one-time-code"
             />
           </label>
-          {qrOpen || qr ? (
-            <label className="field">
-              كود QR اليومي (اختياري)
-              <input
-                dir="ltr"
-                value={qr}
-                onChange={(event) => setQr(event.target.value.toUpperCase())}
-                placeholder="اختياري — الموقع كافي"
-                autoCapitalize="characters"
-                autoComplete="one-time-code"
-              />
-            </label>
-          ) : (
-            <button type="button" className="today-qr-link" onClick={() => setQrOpen(true)}>
-              <QrCode size={14} aria-hidden="true" /> إدخال كود QR
-            </button>
-          )}
-          {todayRecord?.employee_note ? (
-            <p className="muted"><MessageSquare size={15} /> ملاحظتك المسجلة: {todayRecord.employee_note}</p>
-          ) : null}
-        </section>
+        ) : (
+          <button type="button" className="today-qr-link" onClick={() => setQrOpen(true)}>
+            <QrCode size={14} aria-hidden="true" /> إدخال كود QR
+          </button>
+        )}
+        {todayRecord?.employee_note ? (
+          <p className="muted"><MessageSquare size={15} /> ملاحظتك المسجلة: {todayRecord.employee_note}</p>
+        ) : null}
 
-        {/* 6. Security card — trimmed to 3 bullets (spec B-6) */}
-        <section className="panel today-security-card">
-          <div className="panel-title">
-            <ShieldCheck size={20} className="today-security-icon" />
-            <h2>تسجيل آمن — بدون صور</h2>
+        {/* Security card — the design's exact copy */}
+        <div className="today-security-card">
+          <div className="today-security-head">
+            <ShieldCheck size={15} aria-hidden="true" />
+            <strong>تسجيل آمن — بدون صور</strong>
           </div>
-          <ul className="rules">
-            <li>التحقق من الوجه لحظي مثل بصمة الهاتف — دون حفظ أي صور أو مقاطع فيديو.</li>
-            <li>يُخزَّن فقط بصمة رقمية مشفّرة (أرقام لا يمكن تحويلها إلى صورة).</li>
-            <li>يجب التواجد داخل نطاق {companyLocation.radiusMeters} متر من موقع الشركة.</li>
-          </ul>
-        </section>
+          <div className="today-security-rules">
+            <span>· التحقق من الوجه لحظي؛ تُخزَّن بصمة رقمية مشفّرة فقط.</span>
+            <span>· يلزم التواجد داخل نطاق {companyLocation.radiusMeters} متر من موقع الشركة.</span>
+            <span>· تُحفظ العمليات دون اتصال وتُزامَن تلقائيًا.</span>
+          </div>
+        </div>
       </div>
 
       <ConfirmDialog

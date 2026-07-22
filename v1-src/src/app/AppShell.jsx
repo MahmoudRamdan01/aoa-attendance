@@ -311,6 +311,7 @@ export default function AppShell({
   return (
     <div
       className="ops-shell"
+      data-view={activeView}
       data-section={activeItem?.accent || activeItem?.section || "home"}
       data-employee-tabs={showBottomNav ? "true" : undefined}
     >
@@ -521,36 +522,67 @@ export default function AppShell({
           >
             <span className="ops-mobile-more-handle" aria-hidden="true" />
             <header className="ops-mobile-more-head">
-              <h2 id="ops-mobile-more-title">القائمة</h2>
+              <h2 id="ops-mobile-more-title">المزيد</h2>
               <button className="ops-mobile-more-close" type="button" onClick={() => closeMore()} aria-label="إغلاق القائمة">
                 <X size={18} aria-hidden="true" />
               </button>
             </header>
-            {accessibleViews
-              .filter((view) => view.nav !== false && !mobileTabs.some((tab) => tab.id === view.id))
-              .map((view) => {
-              const Icon = view.icon;
-              return (
-                <button type="button" key={view.id} onPointerEnter={() => onViewIntent?.(view.id)} onFocus={() => onViewIntent?.(view.id)} onClick={() => navigate(view.id)}>
-                  <Icon size={19} aria-hidden="true" />
-                  <span>{view.ar}</span>
-                </button>
-              );
-            })}
-            {/* Utilities parked here on mobile to declutter the topbar (spec G). */}
-            <button type="button" onClick={openPalette}>
-              <Search size={19} aria-hidden="true" />
-              <span>بحث سريع</span>
-            </button>
-            <button type="button" onClick={() => { onRefresh?.(); closeMore(); }}>
-              <RefreshCcw size={19} aria-hidden="true" />
-              <span>تحديث البيانات</span>
-            </button>
-            <ThemeButton theme={theme} onToggle={toggleTheme} mobile />
-            <button className="is-danger" type="button" onClick={onSignOut}>
-              <LogOut size={19} aria-hidden="true" />
-              <span>خروج</span>
-            </button>
+
+            {/* Profile card (design ref 08) */}
+            <div className="more-profile">
+              <span className="more-avatar" aria-hidden="true">{String(displayName).trim().charAt(0) || "A"}</span>
+              <span className="more-profile-copy">
+                <strong>{displayName}</strong>
+                <bdi dir="ltr">{session?.user?.email || ""}</bdi>
+              </span>
+              <i className="more-role-chip">{roleNames[role] || role}</i>
+            </div>
+
+            {/* Grouped menu — sections with dot-rows exactly like the design */}
+            {groupViewsBySection(
+              accessibleViews.filter((view) => view.nav !== false && !mobileTabs.some((tab) => tab.id === view.id))
+            ).map((group) => (
+              <div key={group.id} className="more-group-wrap">
+                <p className="more-section-label">{group.ar}</p>
+                <div className="more-group">
+                  {group.items.map((view) => (
+                    <button
+                      type="button"
+                      className="more-row"
+                      key={view.id}
+                      onPointerEnter={() => onViewIntent?.(view.id)}
+                      onFocus={() => onViewIntent?.(view.id)}
+                      onClick={() => navigate(view.id)}
+                    >
+                      <span className="more-dot" data-section={view.accent || view.section} aria-hidden="true" />
+                      <span className="more-row-label">{view.ar}</span>
+                      <ChevronLeft size={14} aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <p className="more-section-label">التطبيق</p>
+            <div className="more-group">
+              <button type="button" className="more-row" onClick={openPalette}>
+                <Search size={16} aria-hidden="true" />
+                <span className="more-row-label">بحث سريع</span>
+                <ChevronLeft size={14} aria-hidden="true" />
+              </button>
+              <button type="button" className="more-row" onClick={() => { onRefresh?.(); closeMore(); }}>
+                <RefreshCcw size={16} aria-hidden="true" />
+                <span className="more-row-label">تحديث البيانات</span>
+              </button>
+              <button type="button" className="more-row" onClick={toggleTheme}>
+                {theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+                <span className="more-row-label">{theme === "dark" ? "الوضع الفاتح" : "الوضع الغامق"}</span>
+              </button>
+              <button type="button" className="more-row is-danger" onClick={onSignOut}>
+                <LogOut size={16} aria-hidden="true" />
+                <span className="more-row-label">تسجيل خروج</span>
+              </button>
+            </div>
           </section>
         </div>
       ) : null}

@@ -6,7 +6,9 @@ import { AlertCircle, Camera, CheckCircle2, Lock, LogOut } from "lucide-react";
 // phase: idle | verifying | fail | in | done | locked
 function CheckInRing({ phase, step, error, elapsed, worked, lockedLabel, checkoutState, onCheckIn, onCheckOut, onRetry, disabled }) {
   return (
-    <div className="ring-wrap">
+    <div className="ring-wrap" data-phase={phase}>
+      {/* Static inner circle at inset 8px — present in every design state */}
+      <span className="ring-inner" aria-hidden="true" />
       {phase === "idle" && (
         <>
           <span className="ring-halo" aria-hidden="true" />
@@ -18,11 +20,14 @@ function CheckInRing({ phase, step, error, elapsed, worked, lockedLabel, checkou
         </>
       )}
       {phase === "verifying" && (
-        <div className="ring-btn ring-verify" role="status" aria-live="polite">
-          <span className="ring-dots" aria-hidden="true"><i /><i /><i /></span>
-          <strong>{step}</strong>
-          <small>لا تُحفظ أي صور</small>
-        </div>
+        <>
+          <span className="ring-halo ring-halo-fast" aria-hidden="true" />
+          <div className="ring-btn ring-verify" role="status" aria-live="polite">
+            <span className="ring-dots" aria-hidden="true"><i /><i /><i /></span>
+            <strong>{step}</strong>
+            <small>لا تُحفظ أي صور</small>
+          </div>
+        </>
       )}
       {phase === "fail" && (
         <div className="ring-btn ring-fail" role="alert">

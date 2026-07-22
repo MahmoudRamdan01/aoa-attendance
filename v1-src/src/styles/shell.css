@@ -1324,3 +1324,9 @@
     color: var(--nav-active);
   }
 }
+
+/* Navigation scrolls #main-content into view — keep it clear of the fixed
+   topbar (the old PageHeader used to absorb this overlap). */
+.ops-main {
+  scroll-margin-block-start: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+}
