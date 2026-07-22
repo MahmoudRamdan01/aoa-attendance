@@ -3495,3 +3495,119 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
 }
 
 .lates-meta { unicode-bidi: isolate; }
+
+/* =====================================================================
+   Redesign v2 — Phase 6: صندوق الموافقات (approvals inbox).
+   ===================================================================== */
+.approvals-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.approvals-head h2 {
+  margin: 0;
+  font: 600 18px/1.4 var(--font-display);
+}
+
+.approvals-back {
+  inline-size: 36px;
+  block-size: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-nested);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.approvals-section-label {
+  margin: 0;
+  color: var(--text-muted);
+  font: 600 11px/1.6 var(--font-body);
+}
+
+.approvals-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.approvals-empty p { margin: 0; font: 500 12.5px/1.6 var(--font-body); }
+
+.approval-card { display: grid; gap: 7px; }
+.approval-card.is-decided { opacity: 0.75; }
+
+.approval-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.approval-card-head strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 700 13px/1.5 var(--font-body);
+}
+
+.approval-requester { color: var(--text-secondary); font: 600 11px/1.6 var(--font-body); }
+
+.approval-range { margin: 0; color: var(--text-muted); font: 400 11.5px/1.6 var(--font-body); }
+
+.approval-note {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--surface-nested);
+  color: var(--text-secondary);
+  font: 400 11.5px/1.6 var(--font-body);
+}
+
+.approval-submitted { font-size: 10.5px; }
+
+.approval-actions {
+  display: flex;
+  gap: 8px;
+  margin-block-start: 3px;
+}
+
+.approval-accept {
+  flex: 1;
+  block-size: 40px;
+  border: none;
+  border-radius: 11px;
+  background: var(--success);
+  color: #0b1621;
+  font: 700 12.5px/1 var(--font-body);
+  cursor: pointer;
+}
+
+.approval-reject {
+  flex: 0 0 auto;
+  block-size: 40px;
+  padding-inline: 18px;
+  border: 1px solid rgba(255, 107, 112, 0.34);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--danger);
+  font: 700 12.5px/1 var(--font-body);
+  cursor: pointer;
+}
+
+.approval-accept:disabled,
+.approval-reject:disabled { opacity: 0.6; cursor: default; }
+
+.approval-decided-chip {
+  inline-size: fit-content;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font: 600 10.5px/1.6 var(--font-body);
+}
+
+.approval-decided-chip.is-ok { background: var(--success-soft); color: var(--success); }
+.approval-decided-chip.is-no { background: var(--danger-soft); color: var(--danger); }

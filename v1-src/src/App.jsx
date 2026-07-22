@@ -26,6 +26,7 @@ const VIEW_LOADERS = {
   assistant: () => import("./features/assistant/AssistantView"),
   team: () => import("./features/people/EmployeesView"),
   admin: () => import("./features/attendance/AdminDashboard"),
+  inbox: () => import("./features/system/ApprovalsInbox"),
   security: () => import("./features/system/SecuritySettings"),
   owner: () => import("./features/payroll/OwnerDashboard"),
   expenses: () => import("./features/finance/ExpensesView"),
@@ -107,6 +108,7 @@ function lazyView(viewId) {
 const AssistantView = lazyView("assistant");
 const EmployeesView = lazyView("team");
 const AdminDashboard = lazyView("admin");
+const ApprovalsInbox = lazyView("inbox");
 const SecuritySettings = lazyView("security");
 const OwnerDashboard = lazyView("owner");
 const ExpensesView = lazyView("expenses");
@@ -207,6 +209,7 @@ function App() {
       partner: PartnerLedgerView,
       team: EmployeesView,
       admin: AdminDashboard,
+      inbox: ApprovalsInbox,
       security: SecuritySettings,
       owner: OwnerDashboard,
       ownerbook: OwnerLedgerView,

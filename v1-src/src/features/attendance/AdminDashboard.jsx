@@ -3,6 +3,7 @@ import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, 
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { haptic } from "../../lib/haptics";
+import { decideLeaveRpc, decidePermissionRpc, pendingLeavesQuery, pendingPermissionsQuery } from "../../lib/approvals";
 import { addDays, datesBetween } from "../../lib/dates";
 import { csvCell, downloadTextFile, fmtSubmittedAt, fmtTime12 } from "../../lib/format";
 import { reqStatusLabel, statusLabels } from "../../lib/labels";
@@ -36,8 +37,8 @@ function AdminDashboard({ context, onToast }) {
       const [emp, att, perm, leave, qrData, tomorrowQr] = await Promise.all([
         supabase.from("employees").select("id,name,leave_balance,active,attendance_exempt").order("id"),
         supabase.from("attendance").select("*").eq("work_date", reportDate),
-        supabase.from("permissions").select("*, employees(name)").eq("status", "pending").order("perm_date"),
-        supabase.from("leave_requests").select("*, employees!leave_requests_employee_id_fkey(name), cover:employees!leave_requests_cover_employee_id_fkey(name)").eq("status", "pending").order("from_date"),
+        pendingPermissionsQuery(),
+        pendingLeavesQuery(),
         supabase.rpc("get_daily_qr_v1"),
         supabase.rpc("get_qr_for_date_v1", { p_date: addDays(todayIso(), 1) }),
       ]);
@@ -78,12 +79,7 @@ function AdminDashboard({ context, onToast }) {
       onToast("الموافقة على الأذونات المالك فقط.");
       return;
     }
-    const { data, error } = await supabase.rpc("decide_permission_v1", {
-      p_id: id,
-      p_approve: approve,
-      p_hours_approved: hoursApproved,
-      p_note: approve ? "تمت الموافقة" : (note || "تم الرفض"),
-    });
+    const { data, error } = await decidePermissionRpc({ id, approve, hoursApproved, note });
     if (error || data?.error) onToast(data?.message || "تعذر تحديث الإذن.");
     else {
       haptic();
@@ -97,11 +93,7 @@ function AdminDashboard({ context, onToast }) {
       onToast("الموافقة على الأجازات المالك فقط.");
       return;
     }
-    const { data, error } = await supabase.rpc("decide_leave_v1", {
-      p_id: id,
-      p_approve: approve,
-      p_note: approve ? "تمت الموافقة" : (note || "تم الرفض"),
-    });
+    const { data, error } = await decideLeaveRpc({ id, approve, note });
     if (error || data?.error) onToast(data?.message || "تعذر تحديث الأجازة.");
     else {
       haptic();
@@ -232,6 +224,15 @@ function AdminDashboard({ context, onToast }) {
   return (
     <div className="stack">
       {error && <div className="setup-banner">{error}</div>}
+      {permissions.length + leaves.length > 0 ? (
+        <button type="button" className="approvals-entry" onClick={() => { window.location.hash = "inbox"; }}>
+          <span className="approvals-entry-icon"><Bell size={17} aria-hidden="true" /></span>
+          <span className="approvals-entry-copy">
+            <strong>بانتظار قرارك ({permissions.length + leaves.length})</strong>
+            <span>اضغط لمراجعة الطلبات المعلقة في شاشة مخصصة</span>
+          </span>
+        </button>
+      ) : null}
       <section className="panel">
         <div className="panel-title between">
           <div><Users size={20} /><h2>جدول الحضور</h2></div>

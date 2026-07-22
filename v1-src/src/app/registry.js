@@ -5,6 +5,7 @@ import {
   Clock3,
   GraduationCap,
   History,
+  Inbox,
   Receipt,
   Scale,
   Settings2,
@@ -183,6 +184,20 @@ const DEFINITIONS = [
     legacyKind: "admin",
     capability: capabilities.admin,
     mobileSlot: null,
+  },
+  {
+    // Approvals inbox (redesign spec D): navigated from the owner dashboard
+    // entry card / admin shortcut — not listed in the nav itself.
+    id: "inbox",
+    section: "operations",
+    accent: "attendance",
+    ar: "بانتظار قرارك",
+    en: "Approvals",
+    icon: Inbox,
+    legacyKind: "admin",
+    capability: capabilities.admin,
+    mobileSlot: null,
+    nav: false,
   },
   {
     id: "security",
