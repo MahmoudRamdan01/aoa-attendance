@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Plus, X } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { addDays } from "../../lib/dates";
@@ -10,22 +10,38 @@ import { StatusBadge } from "../../ui/legacy";
 function RequestsView({ context, onToast }) {
   const [kind, setKind] = useState("permission");
   const [refreshKey, setRefreshKey] = useState(0);
-  const refreshRequests = () => setRefreshKey((key) => key + 1);
+  // The create flow sits behind the FAB (redesign spec F); the forms and
+  // their RPCs are unchanged.
+  const [createOpen, setCreateOpen] = useState(false);
+  const refreshRequests = () => {
+    setRefreshKey((key) => key + 1);
+    setCreateOpen(false);
+  };
 
   return (
-    <div className="grid two">
-      <section className="panel">
-        <div className="tabs compact-tabs">
-          <button className={cls(kind === "permission" && "active")} onClick={() => setKind("permission")}>إذن</button>
-          <button className={cls(kind === "leave" && "active")} onClick={() => setKind("leave")}>أجازة</button>
-        </div>
-        {kind === "permission" ? (
-          <PermissionForm onToast={onToast} onDone={refreshRequests} />
-        ) : (
-          <LeaveForm context={context} onToast={onToast} onDone={refreshRequests} />
-        )}
-      </section>
+    <div className="stack requests-screen">
+      {createOpen ? (
+        <section className="panel">
+          <div className="panel-title between">
+            <div className="tabs compact-tabs">
+              <button className={cls(kind === "permission" && "active")} onClick={() => setKind("permission")}>إذن</button>
+              <button className={cls(kind === "leave" && "active")} onClick={() => setKind("leave")}>أجازة</button>
+            </div>
+            <button type="button" className="ops-icon-btn" onClick={() => setCreateOpen(false)} aria-label="إغلاق نموذج الطلب">
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+          {kind === "permission" ? (
+            <PermissionForm onToast={onToast} onDone={refreshRequests} />
+          ) : (
+            <LeaveForm context={context} onToast={onToast} onDone={refreshRequests} />
+          )}
+        </section>
+      ) : null}
       <MyRequests context={context} refreshKey={refreshKey} />
+      <button type="button" className="requests-fab" onClick={() => setCreateOpen((open) => !open)} aria-label="طلب جديد" aria-expanded={createOpen}>
+        <Plus size={22} aria-hidden="true" />
+      </button>
     </div>
   );
 }
@@ -121,6 +137,7 @@ function LeaveForm({ context, onToast, onDone }) {
 function MyRequests({ context, refreshKey }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all"); // all | pending (spec F)
 
   useEffect(() => {
     if (!context?.employee?.id) return;
@@ -158,20 +175,32 @@ function MyRequests({ context, refreshKey }) {
     });
   }, [context?.employee?.id, refreshKey]);
 
+  const visible = filter === "pending" ? rows.filter((row) => row.status === "pending") : rows;
+
   return (
     <section className="panel">
-      <div className="panel-title"><CalendarDays size={20} /><h2>طلباتي</h2></div>
+      <div className="panel-title between">
+        <div><CalendarDays size={20} /><h2>طلباتي</h2></div>
+        <div className="tabs compact-tabs requests-filter">
+          <button className={cls(filter === "all" && "active")} onClick={() => setFilter("all")}>الكل</button>
+          <button className={cls(filter === "pending" && "active")} onClick={() => setFilter("pending")}>المعلّقة</button>
+        </div>
+      </div>
       <div className="list">
         {loading && <p className="muted">جارٍ تحميل الطلبات...</p>}
-        {!loading && rows.length === 0 && <p className="muted">لا توجد طلبات بعد.</p>}
-        {rows.map((row, index) => (
-          <div className="list-row" key={`${row.type}-${row.date}-${index}`}>
-            <div><strong>{row.type}</strong><span>{row.date}</span></div>
-            <p>{row.meta}</p>
+        {!loading && visible.length === 0 && (
+          <p className="muted">{filter === "pending" ? "لا توجد طلبات معلّقة." : "لا توجد طلبات بعد."}</p>
+        )}
+        {visible.map((row, index) => (
+          <div className="list-row request-card" key={`${row.type}-${row.date}-${index}`}>
+            <div className="request-card-head">
+              <strong>{row.type}</strong>
+              <StatusBadge status={row.status} />
+            </div>
+            <span className="request-card-range">{row.date} · {row.meta}</span>
+            {row.reason && <p className="request-card-note">{row.reason}</p>}
             {row.submittedAt && <p className="muted">قُدّم الطلب: {fmtSubmittedAt(row.submittedAt)}</p>}
-            {row.reason && <p>السبب: {row.reason}</p>}
-            {row.decision && <p>قرار الإدارة: {row.decision}{row.decidedAt ? ` · ${fmtDateTime(row.decidedAt)}` : ""}</p>}
-            <StatusBadge status={row.status} />
+            {row.decision && <p className="muted">قرار الإدارة: {row.decision}{row.decidedAt ? ` · ${fmtDateTime(row.decidedAt)}` : ""}</p>}
           </div>
         ))}
       </div>

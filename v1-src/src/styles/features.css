@@ -3043,3 +3043,220 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   color: var(--text-secondary);
   font: 400 11.5px/1.6 var(--font-body);
 }
+
+/* =====================================================================
+   Redesign v2 — Phase 4: سجلي + كشف راتبي + طلباتي.
+   ===================================================================== */
+.month-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-block-end: 14px;
+}
+
+.month-selector strong {
+  min-inline-size: 110px;
+  text-align: center;
+  font: 600 12.5px/1.6 var(--font-body);
+}
+
+.month-chevron {
+  inline-size: 36px;
+  block-size: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-nested);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.month-chevron:disabled { opacity: 0.4; cursor: default; }
+
+.month-chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-block-end: 10px;
+}
+
+.month-chip {
+  padding: 10px 8px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface-nested);
+}
+
+.month-chip strong {
+  font: 600 18px/1.3 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.month-chip span {
+  color: var(--text-muted);
+  font: 500 10px/1.6 var(--font-body);
+}
+
+.month-chip.tone-ok strong { color: var(--success); }
+.month-chip.tone-warn strong { color: var(--warning); }
+.month-chip.tone-danger strong { color: var(--danger); }
+.month-chip.tone-info strong { color: var(--info); }
+
+/* ---- كشف راتبي ---- */
+.payslip-card {
+  background: var(--surface-hero) !important;
+}
+
+.payslip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: 12px;
+}
+
+.payslip-head strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 700 13px/1.5 var(--font-body);
+}
+
+.payslip-chip {
+  padding: 2px 10px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-pill);
+  background: var(--gold-soft);
+  color: var(--gold-text);
+  font: 600 9.5px/1.6 var(--font-body);
+  font-style: normal;
+}
+
+.payslip-rows { display: grid; gap: 7px; }
+
+.payslip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-secondary);
+  font: 500 12px/1.6 var(--font-body);
+}
+
+.payslip-row bdi {
+  flex: none;
+  white-space: nowrap;
+  font: 500 12px/1.5 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.payslip-row.is-deduction bdi { color: var(--warning); }
+
+.payslip-net {
+  margin-block-start: 12px;
+  padding-block-start: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-block-start: 1px solid var(--line);
+}
+
+.payslip-net span { color: var(--text-secondary); font: 600 12px/1.6 var(--font-body); }
+
+.payslip-net strong {
+  color: var(--gold-text);
+  font: 600 20px/1.3 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- day list (mobile cards / desktop table) ---- */
+.day-table { display: none; }
+
+.day-list { display: grid; gap: 8px; }
+
+.day-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface-nested);
+}
+
+.day-row-copy { flex: 1; min-inline-size: 0; display: grid; gap: 1px; }
+.day-row-copy strong { font: 600 12.5px/1.5 var(--font-body); }
+.day-row-copy span { color: var(--text-muted); font: 400 10.5px/1.6 var(--font-body); }
+
+.day-row-times {
+  flex: none;
+  color: var(--text-secondary);
+  font: 500 11.5px/1.6 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 640px) {
+  .day-list { display: none; }
+  .day-table { display: block; }
+}
+
+/* ---- طلباتي ---- */
+.requests-screen { position: relative; }
+
+.request-card { display: grid; gap: 5px; }
+
+.request-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.request-card-head strong { font: 700 13px/1.5 var(--font-body); }
+
+.request-card-range { color: var(--text-muted); font: 400 11.5px/1.6 var(--font-body); }
+
+.request-card-note {
+  margin: 2px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--surface-nested);
+  color: var(--text-secondary);
+  font: 400 11.5px/1.6 var(--font-body);
+}
+
+/* Sticky (not fixed): the animated view container keeps a transform, which
+   would re-anchor position:fixed to the view instead of the viewport. Sticky
+   pins to the scrollport and stays correct inside transformed ancestors.
+   In RTL margin-inline-start:auto pushes it to the LEFT edge (spec F). */
+.requests-fab {
+  position: sticky;
+  inset-block-end: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 18px);
+  z-index: 40;
+  margin-inline-start: auto;
+  margin-block-start: 4px;
+  inline-size: 52px;
+  block-size: 52px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 18px;
+  background: var(--gold);
+  color: var(--gold-on);
+  box-shadow: 0 14px 34px var(--gold-soft);
+  cursor: pointer;
+}
+
+.requests-fab:active { transform: scale(0.95); }
+
+@media (min-width: 821px) {
+  .requests-fab {
+    inset-block-end: 26px;
+  }
+}
