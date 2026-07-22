@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;600;700&amp;family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ECEFF2;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif}
+a{color:#8A6D00;text-decoration:none}a:hover{color:#5c4900;text-decoration:underline}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulseRing{0%{transform:scale(1);opacity:.5}70%{transform:scale(1.18);opacity:0}100%{transform:scale(1.18);opacity:0}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+[data-noscroll]::-webkit-scrollbar{display:none;width:0;height:0}
+</style>
+</helmet>
+<div style="padding: 36px 40px 64px; min-height: 100vh; box-sizing: border-box; position: absolute; left: 4px; top: 7px">
+  <div style="max-width:1300px;margin:0 auto">
+    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+      <div style="font:700 10px 'JetBrains Mono',monospace;letter-spacing:.14em;background:#141F2B;color:#FCC107;padding:5px 9px;border-radius:5px">AOI REDESIGN</div>
+      <h1 style="margin:0;font:700 22px/1.2 Alexandria,'IBM Plex Sans Arabic',sans-serif;color:#141F2B">Attendance PWA — premium &amp; calm refresh</h1>
+      <span style="font:400 12.5px 'IBM Plex Sans Arabic';color:#66727d">إعادة تصميم تطبيق الحضور والرواتب — Air Ocean Line</span>
+    </div>
+    <p style="margin:10px 0 0;font:400 12.5px/1.65 system-ui,sans-serif;color:#5b6772;max-width:860px">Grounded in the live v1 codebase (tokens, nav registry, owner payroll screen). Keeps the navy + gold DNA and the Arabic-first RTL layout, but refines it toward "premium &amp; calm": one accent instead of eight, hairline surfaces instead of heavy shadows, payroll table re-thought as cards. The phone is fully interactive — tap the tabs, check in, switch report periods.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start;margin-top:28px">
+      <div style="width:330px;flex:none;display:flex;flex-direction:column;gap:14px">
+        <div style="background:#fff;border:1px solid rgba(20,31,43,.09);border-radius:12px;padding:18px 20px">
+          <div style="font:700 11px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#8a949e;margin-bottom:12px">PALETTE — REFINED NAVY</div>
+          <div style="display:flex;gap:8px">
+            <div style="flex:1;display:flex;flex-direction:column;gap:5px;align-items:center"><div style="width:100%;height:34px;border-radius:7px;background:#0B1621"></div><span style="font:500 9.5px 'JetBrains Mono',monospace;color:#66727d">0B1621</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:5px;align-items:center"><div style="width:100%;height:34px;border-radius:7px;background:#14212F"></div><span style="font:500 9.5px 'JetBrains Mono',monospace;color:#66727d">14212F</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:5px;align-items:center"><div style="width:100%;height:34px;border-radius:7px;background:#22374A"></div><span style="font:500 9.5px 'JetBrains Mono',monospace;color:#66727d">22374A</span></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:5px;align-items:center"><div style="width:100%;height:34px;border-radius:7px;background:#FCC107"></div><span style="font:500 9.5px 'JetBrains Mono',monospace;color:#66727d">FCC107</span></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <span style="flex:1;text-align:center;font:600 10px 'IBM Plex Sans Arabic';color:#0a7a58;background:rgba(67,217,160,.16);border-radius:999px;padding:4px 0">حضور</span>
+            <span style="flex:1;text-align:center;font:600 10px 'IBM Plex Sans Arabic';color:#8a5200;background:rgba(255,184,77,.2);border-radius:999px;padding:4px 0">تأخير</span>
+            <span style="flex:1;text-align:center;font:600 10px 'IBM Plex Sans Arabic';color:#a8272c;background:rgba(255,107,112,.16);border-radius:999px;padding:4px 0">غياب</span>
+            <span style="flex:1;text-align:center;font:600 10px 'IBM Plex Sans Arabic';color:#07668e;background:rgba(125,211,252,.2);border-radius:999px;padding:4px 0">إجازة</span>
+          </div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(20,31,43,.08);display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:600 15px Alexandria,sans-serif;color:#141F2B">Alexandria</span><span style="font:400 10.5px system-ui;color:#8a949e">display &amp; key figures</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:500 13px 'IBM Plex Sans Arabic';color:#141F2B">IBM Plex Sans Arabic</span><span style="font:400 10.5px system-ui;color:#8a949e">body, RTL</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:500 12px 'JetBrains Mono',monospace;color:#141F2B">JetBrains Mono</span><span style="font:400 10.5px system-ui;color:#8a949e">times &amp; amounts</span></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid rgba(20,31,43,.09);border-radius:12px;padding:18px 20px">
+          <div style="font:700 11px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#8a949e;margin-bottom:10px">KEY DECISIONS</div>
+          <div style="display:flex;flex-direction:column;gap:9px;font:400 12px/1.55 system-ui,sans-serif;color:#414c56">
+            <div style="display:flex;gap:8px"><span style="color:#b8860b;font-weight:700">1</span><span>Gold is reserved for the primary action, active nav and key figures — the old UI spread 8 accent hues across sections.</span></div>
+            <div style="display:flex;gap:8px"><span style="color:#b8860b;font-weight:700">2</span><span>Check-in became a single thumb-reach ring; GPS + face verification run implicitly, security copy moved below the fold.</span></div>
+            <div style="display:flex;gap:8px"><span style="color:#b8860b;font-weight:700">3</span><span>Owner payroll: 9 metric tiles + wide table → net-payroll hero, 4 period KPIs, and per-employee cards (net first).</span></div>
+            <div style="display:flex;gap:8px"><span style="color:#b8860b;font-weight:700">4</span><span>Hairline borders + soft depth replace heavy shadows; one status color language everywhere; ≥44px targets.</span></div>
+            <div style="display:flex;gap:8px"><span style="color:#b8860b;font-weight:700">5</span><span>Owner opens to a live pulse (in / late / absent) + one actionable approvals queue; employees get payslip transparency.</span></div>
+            <div style="display:flex;gap:8px"><span style="color:#b8860b;font-weight:700">6</span><span>Trust states live on the check-in ring itself (verifying → success / GPS failure with recovery), offline is a persistent banner.</span></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid rgba(20,31,43,.09);border-radius:12px;padding:16px 20px">
+          <div style="font:700 11px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#8a949e;margin-bottom:8px">TRY / TWEAKS</div>
+          <p style="margin:0;font:400 12px/1.6 system-ui;color:#5b6772">Tap tabs, press تسجيل حضور (verification steps run on the ring), open the bell or "بانتظار قرارك" for the approvals inbox and approve/reject. Tweaks: accent, owner ↔ employee role, texture, offline banner, and a GPS-failure outcome to preview the error state.</p>
+        </div>
+      </div>
+      <div style="flex:none">
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="430px,900px">
+          <div dir="rtl" style="--acc:{{ acc }};--acc-on:{{ accOn }};--acc-soft:{{ accSoft }};--acc-line:{{ accLine }};position:relative;height:100%;display:flex;flex-direction:column;background:#0B1621;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;color:#F7FAFC;overflow:hidden">
+            <sc-if value="{{ texture }}" hint-placeholder-val="{{ true }}">
+              <div style="position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(90deg,rgba(180,196,210,.045) 1px,transparent 1px),linear-gradient(0deg,rgba(180,196,210,.035) 1px,transparent 1px);background-size:64px 64px"></div>
+              <div style="position:absolute;top:-140px;right:-90px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,var(--acc-soft,rgba(252,193,7,.14)),transparent 68%);pointer-events:none"></div>
+            </sc-if>
+            <div style="position:relative;display:flex;align-items:center;gap:11px;padding:62px 18px 12px">
+              <div style="width:38px;height:38px;border-radius:12px;background:#1B2B3B;border:1px solid rgba(180,196,210,.16);display:flex;align-items:center;justify-content:center;font:700 15px Alexandria,sans-serif;color:var(--acc,#FCC107)">م</div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:7px">
+                  <span style="font:600 14px 'IBM Plex Sans Arabic'">{{ greeting }}، محمود</span>
+                  <span style="font:600 9.5px 'IBM Plex Sans Arabic';color:var(--acc,#FCC107);background:var(--acc-soft,rgba(252,193,7,.14));border:1px solid var(--acc-line,rgba(252,193,7,.3));padding:2px 8px;border-radius:999px">{{ roleLabel }}</span>
+                </div>
+                <div style="font:400 11px 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:1px">Air Ocean Line · {{ dateLine }}</div>
+              </div>
+              <button onClick="{{ goInbox }}" style="position:relative;width:42px;height:42px;border-radius:12px;border:1px solid rgba(180,196,210,.14);background:#14212F;color:{{ bellC }};display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#1B2B3B">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7"></path><path d="M10.5 20a1.7 1.7 0 0 0 3 0"></path></svg>
+                <sc-if value="{{ hasPending }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;top:4px;left:5px;min-width:17px;height:17px;border-radius:999px;background:#FF6B70;color:#fff;font:700 10px 'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #14212F;box-sizing:border-box">{{ bellBadge }}</span></sc-if>
+              </button>
+            </div>
+            <sc-if value="{{ offline }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:9px;margin:2px 16px 8px;background:rgba(255,184,77,.09);border:1px solid rgba(255,184,77,.3);border-radius:12px;padding:9px 13px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB84D" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3l19 19"></path><path d="M5 10a10.5 10.5 0 0 1 4.2-2.5"></path><path d="M13.5 7.2A10.5 10.5 0 0 1 19 10"></path><path d="M8.5 13.5a6 6 0 0 1 7-1"></path><circle cx="12" cy="17.5" r="1.2" fill="#FFB84D" stroke="none"></circle></svg>
+                <span style="flex:1;font:600 11px/1.5 'IBM Plex Sans Arabic';color:#FFB84D">بدون اتصال — تُحفظ العمليات وتُزامَن تلقائيًا</span>
+                <span style="font:600 9.5px 'IBM Plex Sans Arabic';color:#FFB84D;background:rgba(255,184,77,.14);padding:3px 9px;border-radius:999px">2 بالانتظار</span>
+              </div>
+            </sc-if>
+            <div data-noscroll="true" style="position:relative;flex:1;overflow-y:auto;scrollbar-width:none;padding:4px 16px 110px">
+
+              <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+                <div data-screen-label="Today" style="animation:fadeUp .24s ease-out">
+                  <div style="text-align:center;padding:14px 0 4px">
+                    <div style="font: 400 12px 'IBM Plex Sans Arabic'; color: #8B9AA8; display: none">{{ dateFull }}</div>
+                    <div style="font:600 46px/1.15 Alexandria,sans-serif;letter-spacing:.01em;direction:ltr">{{ clockTime }}<span style="font:600 15px Alexandria,sans-serif;color:#8B9AA8"> {{ clockAp }}</span></div>
+                  </div>
+                  <div style="display:flex;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;margin-top:10px">
+                    <div style="flex:1;display:flex;align-items:center;gap:10px;padding:14px 16px">
+                      <span style="width:9px;height:9px;border-radius:50%;background:{{ inDot }}"></span>
+                      <div><div style="font:400 11px 'IBM Plex Sans Arabic';color:#8B9AA8">حضور</div><div style="font: 600 14px 'JetBrains Mono',monospace">{{ inLabel }}</div></div>
+                    </div>
+                    <div style="width:1px;background:rgba(180,196,210,.13);margin:10px 0"></div>
+                    <div style="flex:1;display:flex;align-items:center;gap:10px;padding:14px 16px">
+                      <span style="width:9px;height:9px;border-radius:50%;background:{{ outDot }}"></span>
+                      <div><div style="font:400 11px 'IBM Plex Sans Arabic';color:#8B9AA8">انصراف</div><div style="font:600 14px 'JetBrains Mono',monospace">{{ outLabel }}</div></div>
+                    </div>
+                  </div>
+                  <div style="display:flex;justify-content:center;padding:26px 0 8px">
+                    <sc-if value="{{ ringPrimary }}" hint-placeholder-val="{{ true }}">
+                      <div style="position:relative;width:186px;height:186px">
+                        <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--acc-line,rgba(252,193,7,.3));animation:pulseRing 2.8s ease-out infinite"></div>
+                        <div style="position:absolute;inset:8px;border-radius:50%;border:1px solid rgba(180,196,210,.14)"></div>
+                        <button onClick="{{ doCheckIn }}" style="position:absolute;inset:17px;border-radius:50%;border:none;cursor:pointer;background:radial-gradient(circle at 34% 26%,#FFDA5C,var(--acc,#FCC107) 62%);color:var(--acc-on,#251F05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;box-shadow:0 20px 50px var(--acc-soft,rgba(252,193,7,.25))" style-active="transform:scale(.965)">
+                          <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2.5"></rect><path d="M9 7l1.2-2.4h3.6L15 7"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+                          <span style="font:700 16px 'IBM Plex Sans Arabic'">تسجيل حضور</span>
+                          <span style="font:500 10px 'IBM Plex Sans Arabic';opacity:.75">الموقع والوجه يتحقّقان تلقائيًا</span>
+                        </button>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ ringVerify }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:relative;width:186px;height:186px">
+                        <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--acc-line,rgba(252,193,7,.3));animation:pulseRing 1.5s ease-out infinite"></div>
+                        <div style="position:absolute;inset:8px;border-radius:50%;border:1px solid rgba(180,196,210,.14)"></div>
+                        <div style="position:absolute;inset:17px;border-radius:50%;background:#14212F;border:1.5px solid var(--acc-line,rgba(252,193,7,.3));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px">
+                          <div style="display:flex;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:var(--acc,#FCC107);animation:blink 1s ease-in-out infinite"></span><span style="width:7px;height:7px;border-radius:50%;background:var(--acc,#FCC107);animation:blink 1s ease-in-out .2s infinite"></span><span style="width:7px;height:7px;border-radius:50%;background:var(--acc,#FCC107);animation:blink 1s ease-in-out .4s infinite"></span></div>
+                          <span style="font:700 12.5px 'IBM Plex Sans Arabic'">{{ verifyStep }}</span>
+                          <span style="font:500 9.5px 'IBM Plex Sans Arabic';color:#66727d">لا تُحفظ أي صور</span>
+                        </div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ ringFail }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:relative;width:186px;height:186px">
+                        <div style="position:absolute;inset:8px;border-radius:50%;border:1px solid rgba(255,107,112,.34)"></div>
+                        <div style="position:absolute;inset:17px;border-radius:50%;background:rgba(255,107,112,.07);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px;box-sizing:border-box">
+                          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#FF6B70" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16.5h.01"></path></svg>
+                          <span style="font:700 12.5px 'IBM Plex Sans Arabic';color:#FF6B70">دقة GPS غير كافية</span>
+                          <span style="font:400 10px/1.5 'IBM Plex Sans Arabic';color:#B4C0CC;text-align:center">±340 م — اقترب من مكان مكشوف وأعد المحاولة</span>
+                          <button onClick="{{ doRetry }}" style="margin-top:3px;height:32px;padding:0 18px;border:none;border-radius:999px;background:var(--acc,#FCC107);color:var(--acc-on,#251F05);font:700 11.5px 'IBM Plex Sans Arabic';cursor:pointer" style-active="transform:scale(.96)">إعادة المحاولة</button>
+                        </div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ ringOut }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:relative;width:186px;height:186px">
+                        <div style="position:absolute;inset:8px;border-radius:50%;border:1px solid rgba(180,196,210,.2)"></div>
+                        <button onClick="{{ doCheckOut }}" style="position:absolute;inset:17px;border-radius:50%;border:1.5px solid rgba(180,196,210,.26);cursor:pointer;background:#14212F;color:#F7FAFC;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px" style-active="transform:scale(.965)">
+                          <span style="font:500 10.5px 'IBM Plex Sans Arabic';color:#8B9AA8">مدة العمل حتى الآن</span>
+                          <span style="font:600 24px 'JetBrains Mono',monospace;direction:ltr">{{ elapsed }}</span>
+                          <span style="display:flex;align-items:center;gap:6px;font:700 13.5px 'IBM Plex Sans Arabic';color:var(--acc,#FCC107)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4"></path><path d="M10 8l-4 4 4 4"></path><path d="M6 12h10"></path></svg>تسجيل انصراف</span>
+                        </button>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ ringDone }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:relative;width:186px;height:186px">
+                        <div style="position:absolute;inset:8px;border-radius:50%;border:1px solid rgba(67,217,160,.34)"></div>
+                        <div style="position:absolute;inset:17px;border-radius:50%;background:rgba(67,217,160,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#43D9A0">
+                          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg>
+                          <span style="font:700 15px 'IBM Plex Sans Arabic'">اكتمل اليوم</span>
+                          <span style="font:500 11.5px 'JetBrains Mono',monospace;direction:ltr">{{ workedTotal }}</span>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                  <div style="display:flex;justify-content:center;margin-top:6px">
+                    <span style="display:inline-flex;align-items:center;gap:7px;font:600 11.5px 'IBM Plex Sans Arabic';color:#43D9A0;background:rgba(67,217,160,.1);border:1px solid rgba(67,217,160,.28);padding:7px 14px;border-radius:999px">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
+                      داخل نطاق الشركة · دقة ±14 م
+                    </span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:14px;padding:13px 16px;margin-top:18px;color:#8B9AA8">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8.5 8.5 0 0 1-8.5 8.5H4l2-3A8.5 8.5 0 1 1 21 12z"></path></svg>
+                    <span style="font:400 12.5px 'IBM Plex Sans Arabic'">ملاحظة اليوم (اختياري)…</span>
+                  </div>
+                  <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:16px 18px;margin-top:14px">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7DD3FC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                      <span style="font:700 12.5px 'IBM Plex Sans Arabic'">تسجيل آمن — بدون صور</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:7px;font:400 11.5px/1.6 'IBM Plex Sans Arabic';color:#B4C0CC">
+                      <span>· التحقق من الوجه لحظي؛ تُخزَّن بصمة رقمية مشفّرة فقط.</span>
+                      <span data-om-label="100">· يلزم التواجد داخل نطاق 100 متر من موقع الشركة.</span>
+                      <span>· تُحفظ العمليات دون اتصال وتُزامَن تلقائيًا.</span>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isPay }}" hint-placeholder-val="{{ false }}">
+                <div data-screen-label="Payroll and reports" style="animation:fadeUp .24s ease-out">
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 2px 14px">
+                    <h2 style="margin:0;font:600 18px Alexandria,'IBM Plex Sans Arabic',sans-serif">الرواتب والتقارير</h2>
+                    <button style="display:flex;align-items:center;gap:6px;height:36px;padding:0 13px;border-radius:10px;border:1px solid rgba(180,196,210,.18);background:#14212F;color:#B4C0CC;font:600 11.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#1B2B3B">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"></path><path d="m8.5 9.5 3.5 3.5 3.5-3.5"></path><path d="M4 17v3h16v-3"></path></svg>
+                      تصدير
+                    </button>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-bottom:10px">
+                    <div style="flex:1;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:13px;padding:11px 12px"><div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:#43D9A0;animation:blink 1.6s ease-in-out infinite"></span><span style="font:500 10px 'IBM Plex Sans Arabic';color:#8B9AA8">بالشركة الآن</span></div><div style="font:600 17px Alexandria,sans-serif;margin-top:4px">6<span style="font:500 10.5px Alexandria,sans-serif;color:#66727d">/8</span></div></div>
+                    <div style="flex:1;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:13px;padding:11px 12px"><div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:#FFB84D"></span><span style="font:500 10px 'IBM Plex Sans Arabic';color:#8B9AA8">تأخير اليوم</span></div><div style="font:600 17px Alexandria,sans-serif;margin-top:4px">1</div></div>
+                    <div style="flex:1;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:13px;padding:11px 12px"><div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:#FF6B70"></span><span style="font:500 10px 'IBM Plex Sans Arabic';color:#8B9AA8">لم يحضر</span></div><div style="font:600 17px Alexandria,sans-serif;margin-top:4px">1</div></div>
+                  </div>
+                  <button onClick="{{ goInbox }}" style="width:100%;display:flex;align-items:center;gap:11px;background:linear-gradient(150deg,#1B2B3B,#14212F);border:1px solid var(--acc-line,rgba(252,193,7,.3));border-radius:14px;padding:13px 16px;margin-bottom:12px;cursor:pointer;color:#F7FAFC;text-align:right;font-family:'IBM Plex Sans Arabic'" style-active="transform:scale(.985)">
+                    <span style="width:34px;height:34px;border-radius:10px;background:var(--acc-soft,rgba(252,193,7,.14));display:flex;align-items:center;justify-content:center;color:var(--acc,#FCC107);flex:none"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12v6a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18v-6"></path><path d="M3 12l3-7h12l3 7"></path><path d="M3 12h5l2 3h4l2-3h5"></path></svg></span>
+                    <span style="flex:1;min-width:0"><span style="display:block;font:700 13px 'IBM Plex Sans Arabic'">بانتظار قرارك</span><span style="display:block;font:400 11px/1.5 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:2px">{{ inboxSub }}</span></span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg>
+                  </button>
+                  <div style="display:flex;gap:4px;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:999px;padding:4px">
+                    <sc-for list="{{ periods }}" as="p" hint-placeholder-count="4">
+                      <button onClick="{{ p.go }}" style="flex:1;height:34px;border:none;border-radius:999px;background:{{ p.bg }};color:{{ p.fg }};font:600 12px 'IBM Plex Sans Arabic';cursor:pointer">{{ p.label }}</button>
+                    </sc-for>
+                  </div>
+                  <div style="background:linear-gradient(150deg,#1B2B3B,#14212F 70%);border:1px solid rgba(180,196,210,.16);border-radius:18px;padding:18px 20px;margin-top:14px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <span style="font:500 11.5px 'IBM Plex Sans Arabic';color:#8B9AA8">صافي المرتبات — يوليو 2026</span>
+                      <span style="font:600 10px 'IBM Plex Sans Arabic';color:#FFB84D;background:rgba(255,184,77,.12);border:1px solid rgba(255,184,77,.3);padding:2.5px 9px;border-radius:999px">خصومات −3.5%</span>
+                    </div>
+                    <div style="font:600 32px/1.25 Alexandria,sans-serif;color:var(--acc,#FCC107);margin-top:6px;direction:ltr;text-align:right">50,550 <span style="font:600 15px Alexandria,sans-serif;color:#B4C0CC">ج.م</span></div>
+                    <div style="font:400 11.5px 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:4px">قبل الخصومات 52,400 ج · 6 موظفين نشطين</div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+                    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+                      <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:14px;padding:13px 15px">
+                        <div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:{{ k.dot }}"></span><span style="font:500 10.5px 'IBM Plex Sans Arabic';color:#8B9AA8">{{ k.label }}</span></div>
+                        <div style="font:600 21px Alexandria,sans-serif;margin-top:6px;direction:ltr;text-align:right">{{ k.value }}<span style="font:500 11px Alexandria,sans-serif;color:#8B9AA8"> {{ k.unit }}</span></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:16px 16px 10px;margin-top:12px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                      <span style="font:700 12.5px 'IBM Plex Sans Arabic'">اتجاه الحضور — آخر 30 يوم</span>
+                      <span style="display:flex;align-items:center;gap:5px;font:500 10.5px 'IBM Plex Sans Arabic';color:#8B9AA8"><span style="width:8px;height:3px;border-radius:2px;background:var(--acc,#FCC107)"></span>حضور يومي</span>
+                    </div>
+                    <svg viewBox="0 0 320 112" style="width:100%;height:auto;display:block" preserveAspectRatio="none">
+                      <line x1="0" y1="18" x2="320" y2="18" stroke="rgba(180,196,210,.09)" stroke-width="1"></line>
+                      <line x1="0" y1="60" x2="320" y2="60" stroke="rgba(180,196,210,.09)" stroke-width="1"></line>
+                      <line x1="0" y1="102" x2="320" y2="102" stroke="rgba(180,196,210,.14)" stroke-width="1"></line>
+                      <path d="{{ trendArea }}" style="fill:var(--acc,#FCC107);opacity:.12"></path>
+                      <path d="{{ trendLine }}" style="stroke:var(--acc,#FCC107)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                      <circle cx="{{ trendLastX }}" cy="{{ trendLastY }}" r="3.5" style="fill:var(--acc,#FCC107)"></circle>
+                    </svg>
+                    <div style="display:flex;justify-content:space-between;font:500 9.5px 'JetBrains Mono',monospace;color:#66727d;padding:6px 2px 4px;direction:ltr"><span>22/06</span><span>07/07</span><span>22/07</span></div>
+                  </div>
+                  <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;margin-top:12px;overflow:hidden">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:15px 18px 4px">
+                      <span style="font:700 13px 'IBM Plex Sans Arabic'">المرتبات والخصومات</span>
+                      <span style="font:500 10.5px 'IBM Plex Sans Arabic';color:#8B9AA8">الصافي التقديري</span>
+                    </div>
+                    <sc-if value="{{ payLoading }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-top:1px solid rgba(180,196,210,.08)"><div style="width:34px;height:34px;border-radius:10px;background:#1B2B3B;animation:blink 1.2s ease-in-out infinite"></div><div style="flex:1"><div style="width:42%;height:10px;border-radius:5px;background:#1B2B3B;animation:blink 1.2s ease-in-out infinite"></div><div style="width:26%;height:8px;border-radius:4px;background:#1B2B3B;margin-top:6px;animation:blink 1.2s ease-in-out .15s infinite"></div></div><div style="width:54px;height:12px;border-radius:6px;background:#1B2B3B;animation:blink 1.2s ease-in-out .3s infinite"></div></div>
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-top:1px solid rgba(180,196,210,.08)"><div style="width:34px;height:34px;border-radius:10px;background:#1B2B3B;animation:blink 1.2s ease-in-out .1s infinite"></div><div style="flex:1"><div style="width:36%;height:10px;border-radius:5px;background:#1B2B3B;animation:blink 1.2s ease-in-out .1s infinite"></div><div style="width:22%;height:8px;border-radius:4px;background:#1B2B3B;margin-top:6px;animation:blink 1.2s ease-in-out .25s infinite"></div></div><div style="width:54px;height:12px;border-radius:6px;background:#1B2B3B;animation:blink 1.2s ease-in-out .4s infinite"></div></div>
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-top:1px solid rgba(180,196,210,.08)"><div style="width:34px;height:34px;border-radius:10px;background:#1B2B3B;animation:blink 1.2s ease-in-out .2s infinite"></div><div style="flex:1"><div style="width:46%;height:10px;border-radius:5px;background:#1B2B3B;animation:blink 1.2s ease-in-out .2s infinite"></div><div style="width:24%;height:8px;border-radius:4px;background:#1B2B3B;margin-top:6px;animation:blink 1.2s ease-in-out .35s infinite"></div></div><div style="width:54px;height:12px;border-radius:6px;background:#1B2B3B;animation:blink 1.2s ease-in-out .5s infinite"></div></div>
+                    </sc-if>
+                    <sc-if value="{{ payReady }}" hint-placeholder-val="{{ true }}">
+                    <sc-for list="{{ payroll }}" as="e" hint-placeholder-count="6">
+                      <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid rgba(180,196,210,.08)">
+                        <div style="width:34px;height:34px;border-radius:10px;background:#1B2B3B;display:flex;align-items:center;justify-content:center;font:600 13px Alexandria,sans-serif;color:#B4C0CC;flex:none">{{ e.init }}</div>
+                        <div style="flex:1;min-width:0">
+                          <div style="font:600 13px 'IBM Plex Sans Arabic'">{{ e.name }}</div>
+                          <div style="font:400 10.5px/1.6 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:1px">{{ e.flags }}</div>
+                        </div>
+                        <div style="text-align:left">
+                          <div style="font:600 14px 'JetBrains Mono',monospace;direction:ltr">{{ e.net }} ج</div>
+                          <div style="font:600 10px 'IBM Plex Sans Arabic';color:{{ e.dedColor }};margin-top:1px">{{ e.ded }}</div>
+                        </div>
+                      </div>
+                    </sc-for>
+                    </sc-if>
+                    <div style="display:flex;justify-content:space-between;padding:13px 18px;background:#101B28;border-top:1px solid rgba(180,196,210,.12)">
+                      <span style="font:600 12px 'IBM Plex Sans Arabic';color:#8B9AA8">الإجمالي بعد الخصومات</span>
+                      <span style="font:600 14px 'JetBrains Mono',monospace;color:var(--acc,#FCC107);direction:ltr">50,550 ج</span>
+                    </div>
+                  </div>
+                  <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;margin-top:12px;padding:15px 18px 6px">
+                    <span style="font:700 13px 'IBM Plex Sans Arabic'">أعلى التأخيرات</span>
+                    <sc-for list="{{ lates }}" as="l" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-top:1px solid rgba(180,196,210,.08)">
+                        <span style="width:22px;height:22px;border-radius:7px;background:rgba(255,184,77,.13);color:#FFB84D;display:flex;align-items:center;justify-content:center;font:600 11px 'JetBrains Mono',monospace;flex:none">{{ l.rank }}</span>
+                        <span style="flex:1;font:600 12.5px 'IBM Plex Sans Arabic'">{{ l.name }}</span>
+                        <span style="font:500 11px 'JetBrains Mono',monospace;color:#8B9AA8;direction:ltr">{{ l.stat }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isRecord }}" hint-placeholder-val="{{ false }}">
+                <div data-screen-label="My record" style="animation:fadeUp .24s ease-out">
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 2px 14px">
+                    <h2 style="margin:0;font:600 18px Alexandria,'IBM Plex Sans Arabic',sans-serif">سجلي</h2>
+                    <div style="display:flex;align-items:center;gap:4px">
+                      <button style="width:34px;height:34px;border-radius:10px;border:1px solid rgba(180,196,210,.16);background:#14212F;color:#B4C0CC;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 6 6 6-6 6"></path></svg></button>
+                      <span style="font:600 12.5px 'IBM Plex Sans Arabic';padding:0 8px">يوليو 2026</span>
+                      <button style="width:34px;height:34px;border-radius:10px;border:1px solid rgba(180,196,210,.16);background:#14212F;color:#66727d;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg></button>
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+                    <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:12px;padding:10px 6px;text-align:center"><div style="font:600 18px Alexandria,sans-serif;color:#43D9A0">18</div><div style="font:500 10px 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:2px">حضور</div></div>
+                    <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:12px;padding:10px 6px;text-align:center"><div style="font:600 18px Alexandria,sans-serif;color:#FFB84D">2</div><div style="font:500 10px 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:2px">تأخير</div></div>
+                    <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:12px;padding:10px 6px;text-align:center"><div style="font:600 18px Alexandria,sans-serif;color:#FF6B70">1</div><div style="font:500 10px 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:2px">غياب</div></div>
+                    <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:12px;padding:10px 6px;text-align:center"><div style="font:600 18px Alexandria,sans-serif;color:#7DD3FC">1</div><div style="font:500 10px 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:2px">إجازة</div></div>
+                  </div>
+                  <div style="background:linear-gradient(150deg,#1B2B3B,#14212F 70%);border:1px solid rgba(180,196,210,.16);border-radius:16px;padding:16px 18px;margin-top:12px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font:700 13px 'IBM Plex Sans Arabic'">كشف راتبي — يوليو</span><span style="font:600 9.5px 'IBM Plex Sans Arabic';color:#8B9AA8;border:1px solid rgba(180,196,210,.2);padding:2.5px 9px;border-radius:999px">تقديري</span></div>
+                    <div style="display:flex;flex-direction:column;gap:8px;font:400 12px 'IBM Plex Sans Arabic';color:#B4C0CC">
+                      <div style="display:flex;justify-content:space-between;gap:10px"><span style="min-width:0">الراتب الأساسي</span><span style="font:500 12px 'JetBrains Mono',monospace;white-space:nowrap;flex:none">9,500 ج</span></div>
+                      <div style="display:flex;justify-content:space-between;gap:10px"><span style="min-width:0">خصم تأخير (0.5 يوم)</span><span style="font:500 12px 'JetBrains Mono',monospace;color:#FFB84D;white-space:nowrap;flex:none">−190 ج</span></div>
+                      <div style="display:flex;justify-content:space-between;gap:10px"><span style="min-width:0">استقطاعات مالية</span><span style="font:500 12px 'JetBrains Mono',monospace;white-space:nowrap;flex:none">0 ج</span></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(180,196,210,.12);margin-top:12px;padding-top:12px">
+                      <span style="font:600 12.5px 'IBM Plex Sans Arabic';color:#8B9AA8">الصافي التقديري</span>
+                      <span style="font:600 20px Alexandria,sans-serif;color:var(--acc,#FCC107)">9,310 <span style="font:600 11px Alexandria,sans-serif;color:#B4C0CC">ج.م</span></span>
+                    </div>
+                  </div>
+                  <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;margin-top:12px;overflow:hidden">
+                    <sc-for list="{{ days }}" as="d" hint-placeholder-count="8">
+                      <div style="display:flex;align-items:center;gap:12px;padding:13px 18px;border-top:1px solid rgba(180,196,210,.07)">
+                        <div style="flex:1;min-width:0">
+                          <div style="font:600 12.5px 'IBM Plex Sans Arabic'">{{ d.label }}</div>
+                          <div style="font:400 10.5px/1.6 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:1px">{{ d.sub }}</div>
+                        </div>
+                        <span style="font:500 11.5px 'JetBrains Mono',monospace;color:#B4C0CC">{{ d.times }}</span>
+                        <span style="font:600 10px 'IBM Plex Sans Arabic';color:{{ d.chipFg }};background:{{ d.chipBg }};padding:3px 10px;border-radius:999px;flex:none">{{ d.status }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isReq }}" hint-placeholder-val="{{ false }}">
+                <div data-screen-label="Requests" style="animation:fadeUp .24s ease-out">
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 2px 14px">
+                    <h2 style="margin:0;font:600 18px Alexandria,'IBM Plex Sans Arabic',sans-serif">طلباتي</h2>
+                    <div style="display:flex;gap:4px;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:999px;padding:3px">
+                      <button onClick="{{ reqAll }}" style="height:30px;padding:0 14px;border:none;border-radius:999px;background:{{ reqAllBg }};color:{{ reqAllFg }};font:600 11.5px 'IBM Plex Sans Arabic';cursor:pointer">الكل</button>
+                      <button onClick="{{ reqPending }}" style="height:30px;padding:0 14px;border:none;border-radius:999px;background:{{ reqPendBg }};color:{{ reqPendFg }};font:600 11.5px 'IBM Plex Sans Arabic';cursor:pointer">المعلّقة</button>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:10px">
+                    <sc-for list="{{ requests }}" as="r" hint-placeholder-count="3">
+                      <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:15px 17px">
+                        <div style="display:flex;align-items:center;justify-content:space-between">
+                          <span style="font:700 13px 'IBM Plex Sans Arabic'">{{ r.type }}</span>
+                          <span style="display:inline-flex;align-items:center;gap:5px;font:600 10px 'IBM Plex Sans Arabic';color:{{ r.fg }};background:{{ r.bg }};padding:3px 10px;border-radius:999px"><span style="width:5px;height:5px;border-radius:50%;background:{{ r.fg }}"></span>{{ r.status }}</span>
+                        </div>
+                        <div style="font:400 11.5px/1.6 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:5px">{{ r.range }}</div>
+                        <sc-if value="{{ r.note }}" hint-placeholder-val="{{ false }}">
+                          <div style="font:400 12px/1.5 'IBM Plex Sans Arabic';color:#B4C0CC;background:#101B28;border-radius:10px;padding:9px 12px;margin-top:9px">{{ r.note }}</div>
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isInbox }}" hint-placeholder-val="{{ false }}">
+                <div data-screen-label="Inbox and approvals" style="animation:fadeUp .24s ease-out">
+                  <div style="display:flex;align-items:center;gap:10px;padding:10px 2px 14px">
+                    <button onClick="{{ goBack }}" style="width:36px;height:36px;border-radius:11px;border:1px solid rgba(180,196,210,.16);background:#14212F;color:#B4C0CC;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 6 6 6-6 6"></path></svg></button>
+                    <h2 style="margin:0;font:600 18px Alexandria,'IBM Plex Sans Arabic',sans-serif;flex:1">الإشعارات والطلبات</h2>
+                  </div>
+                  <sc-if value="{{ isOwner }}" hint-placeholder-val="{{ true }}">
+                    <div style="font:700 10.5px 'IBM Plex Sans Arabic';color:#66727d;padding:0 4px 8px">بانتظار قرارك</div>
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                      <sc-for list="{{ inboxItems }}" as="a" hint-placeholder-count="3">
+                        <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:15px 17px">
+                          <div style="display:flex;align-items:center;justify-content:space-between">
+                            <span style="font:700 13px 'IBM Plex Sans Arabic'">{{ a.type }}</span>
+                            <span style="font:600 11px 'IBM Plex Sans Arabic';color:#B4C0CC">{{ a.name }}</span>
+                          </div>
+                          <div style="font:400 11.5px/1.6 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:4px">{{ a.range }}</div>
+                          <sc-if value="{{ a.note }}" hint-placeholder-val="{{ false }}">
+                            <div style="font:400 12px/1.6 'IBM Plex Sans Arabic';color:#B4C0CC;background:#101B28;border-radius:10px;padding:9px 12px;margin-top:9px">{{ a.note }}</div>
+                          </sc-if>
+                          <sc-if value="{{ a.isPending }}" hint-placeholder-val="{{ true }}">
+                            <div style="display:flex;gap:9px;margin-top:12px">
+                              <button onClick="{{ a.ok }}" style="flex:1;height:40px;border:none;border-radius:11px;background:#43D9A0;color:#0B1621;font:700 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-active="transform:scale(.97)">قبول</button>
+                              <button onClick="{{ a.no }}" style="flex:1;height:40px;border:1px solid rgba(255,107,112,.34);border-radius:11px;background:transparent;color:#FF6B70;font:700 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-active="transform:scale(.97)">رفض</button>
+                            </div>
+                          </sc-if>
+                          <sc-if value="{{ a.resolved }}" hint-placeholder-val="{{ false }}">
+                            <div style="margin-top:11px"><span style="font:600 10.5px 'IBM Plex Sans Arabic';color:{{ a.resFg }};background:{{ a.resBg }};padding:4px 12px;border-radius:999px">{{ a.resLabel }}</span></div>
+                          </sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ isEmp }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                      <div style="display:flex;gap:11px;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:14px 16px"><span style="width:8px;height:8px;border-radius:50%;background:#43D9A0;margin-top:5px;flex:none"></span><div style="flex:1"><div style="font:600 12.5px/1.5 'IBM Plex Sans Arabic'">تمت الموافقة على طلب المأمورية</div><div style="font:400 11px/1.6 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:2px">الأربعاء 15 يوليو · ميناء الإسكندرية — أمس</div></div></div>
+                      <div style="display:flex;gap:11px;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:14px 16px"><span style="width:8px;height:8px;border-radius:50%;background:#7DD3FC;margin-top:5px;flex:none"></span><div style="flex:1"><div style="font:600 12.5px/1.5 'IBM Plex Sans Arabic'">تذكير: نافذة الانصراف تُغلق 8:00 م</div><div style="font:400 11px/1.6 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:2px">اليوم</div></div></div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ isMore }}" hint-placeholder-val="{{ false }}">
+                <div data-screen-label="More" style="animation:fadeUp .24s ease-out">
+                  <div style="display:flex;align-items:center;gap:13px;background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:16px 18px;margin-top:8px">
+                    <div style="width:48px;height:48px;border-radius:14px;background:#1B2B3B;display:flex;align-items:center;justify-content:center;font:700 19px Alexandria,sans-serif;color:var(--acc,#FCC107)">م</div>
+                    <div style="flex:1">
+                      <div style="font:700 14px 'IBM Plex Sans Arabic'">محمود رمضان</div>
+                      <div style="font:500 10.5px 'JetBrains Mono',monospace;color:#8B9AA8;direction:ltr;text-align:right">mahmoud01@airocean.com</div>
+                    </div>
+                    <span style="font:600 10px 'IBM Plex Sans Arabic';color:var(--acc,#FCC107);background:var(--acc-soft,rgba(252,193,7,.14));border:1px solid var(--acc-line,rgba(252,193,7,.3));padding:3px 10px;border-radius:999px">{{ roleLabel }}</span>
+                  </div>
+                  <sc-if value="{{ isOwner }}" hint-placeholder-val="{{ true }}">
+                    <div style="font:700 10.5px 'IBM Plex Sans Arabic';color:#66727d;letter-spacing:.04em;padding:18px 4px 8px">التشغيل والفريق</div>
+                    <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;overflow:hidden">
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#43D9A0"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">لوحة الحضور</span><span style="font:600 10px 'IBM Plex Sans Arabic';color:#0B1621;background:var(--acc,#FCC107);padding:2px 8px;border-radius:999px">2</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg></div>
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;border-top:1px solid rgba(180,196,210,.07);cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#43D9A0"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">أمان الحضور</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg></div>
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;border-top:1px solid rgba(180,196,210,.07);cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#B49CFF"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">الموظفون</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg></div>
+                    </div>
+                    <div style="font:700 10.5px 'IBM Plex Sans Arabic';color:#66727d;letter-spacing:.04em;padding:18px 4px 8px">المالية</div>
+                    <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;overflow:hidden">
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#FFB84D"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">الخزنة</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg></div>
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;border-top:1px solid rgba(180,196,210,.07);cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#FFB84D"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">المصروفات</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg></div>
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;border-top:1px solid rgba(180,196,210,.07);cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#FFB84D"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">الاستقطاعات</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg></div>
+                      <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;border-top:1px solid rgba(180,196,210,.07);cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#F0B96B"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">دفتر شخصي</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+                    </div>
+                  </sc-if>
+                  <div style="font:700 10.5px 'IBM Plex Sans Arabic';color:#66727d;letter-spacing:.04em;padding:18px 4px 8px">المعرفة والنظام</div>
+                  <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;overflow:hidden">
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#67E8F9"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">التدريب</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg></div>
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;border-top:1px solid rgba(180,196,210,.07);cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#C4A7FF"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">المساعد الذكي</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"></path></svg></div>
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;border-top:1px solid rgba(180,196,210,.07);cursor:pointer" style-hover="background:#1B2B3B"><span style="width:8px;height:8px;border-radius:50%;background:#94A3B8"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic'">الوضع الفاتح</span><span style="width:36px;height:21px;border-radius:999px;background:#1B2B3B;border:1px solid rgba(180,196,210,.2);position:relative"><span style="position:absolute;top:2px;right:2px;width:15px;height:15px;border-radius:50%;background:#66727d"></span></span></div>
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 17px;border-top:1px solid rgba(180,196,210,.07);cursor:pointer" style-hover="background:rgba(255,107,112,.07)"><span style="width:8px;height:8px;border-radius:50%;background:#FF6B70"></span><span style="flex:1;font:500 13px 'IBM Plex Sans Arabic';color:#FF6B70">تسجيل الخروج</span></div>
+                  </div>
+                  <div style="text-align:center;font:500 9.5px 'JetBrains Mono',monospace;color:#66727d;padding:18px 0 4px">AOI · v2 concept — nonfunctional prototype</div>
+                </div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ isReq }}" hint-placeholder-val="{{ false }}">
+              <button style="position:absolute;bottom:104px;left:18px;width:52px;height:52px;border-radius:18px;border:none;background:var(--acc,#FCC107);color:var(--acc-on,#251F05);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 14px 34px var(--acc-soft,rgba(252,193,7,.25))" style-active="transform:scale(.94)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+              </button>
+            </sc-if>
+
+            <div style="position:absolute;bottom:0;left:0;right:0;display:flex;background:rgba(14,25,38,.92);backdrop-filter:blur(14px);border-top:1px solid rgba(180,196,210,.12);padding:8px 6px 22px">
+              <button onClick="{{ goToday }}" style="flex:1;min-height:48px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;color:{{ navToday }};font:600 10px 'IBM Plex Sans Arabic';padding:6px 0">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+                اليوم
+              </button>
+              <button onClick="{{ goRecord }}" style="flex:1;min-height:48px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;color:{{ navRecord }};font:600 10px 'IBM Plex Sans Arabic';padding:6px 0">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path><path d="M12 8v4l2.5 1.5"></path></svg>
+                سجلي
+              </button>
+              <button onClick="{{ goReq }}" style="flex:1;min-height:48px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;color:{{ navReq }};font:600 10px 'IBM Plex Sans Arabic';padding:6px 0">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"></rect><path d="M16 3v4"></path><path d="M8 3v4"></path><path d="M3 11h18"></path></svg>
+                طلباتي
+              </button>
+              <sc-if value="{{ isOwner }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ goPay }}" style="flex:1;min-height:48px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;color:{{ navPay }};font:600 10px 'IBM Plex Sans Arabic';padding:6px 0">
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 7.6-7 9-4-1.4-7-4.4-7-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                  الرواتب
+                </button>
+              </sc-if>
+              <button onClick="{{ goMore }}" style="flex:1;min-height:48px;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;color:{{ navMore }};font:600 10px 'IBM Plex Sans Arabic';padding:6px 0">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"></rect><rect x="13" y="4" width="7" height="7" rx="1.5"></rect><rect x="4" y="13" width="7" height="7" rx="1.5"></rect><rect x="13" y="13" width="7" height="7" rx="1.5"></rect></svg>
+                المزيد
+              </button>
+            </div>
+          </div>
+        </x-import>
+      </div>
+    </div>
+    <div style="margin-top:48px">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+        <div style="font:700 10px 'JetBrains Mono',monospace;letter-spacing:.14em;background:#141F2B;color:#FCC107;padding:5px 9px;border-radius:5px">DESKTOP</div>
+        <h2 style="margin:0;font:700 17px Alexandria,'IBM Plex Sans Arabic',sans-serif;color:#141F2B">Owner command center — الرواتب والتقارير</h2>
+        <span style="font:400 12px 'IBM Plex Sans Arabic';color:#66727d">نفس الحالة التفاعلية — الفترات والموافقات مشتركة مع الهاتف</span>
+      </div>
+      <x-import component-from-global-scope="ChromeWindow" from="./browser-window.jsx" width="{{ 1300 }}" height="{{ 960 }}" url="aoi.airocean.app/#/owner" hint-size="1300px,960px">
+        <div dir="rtl" style="--acc:{{ acc }};--acc-on:{{ accOn }};--acc-soft:{{ accSoft }};--acc-line:{{ accLine }};display:flex;height:100%;background:#0B1621;font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;color:#F7FAFC;overflow:hidden">
+          <div style="width:246px;flex:none;display:flex;flex-direction:column;background:#0E1926;border-left:1px solid rgba(180,196,210,.1)">
+            <div style="display:flex;align-items:center;gap:11px;padding:18px 20px 14px">
+              <img src="assets/aoi-logo-tile.png" alt="AOI" style="width:36px;height:36px;border-radius:10px;display:block">
+              <div><div style="font:700 12.5px 'JetBrains Mono',monospace;letter-spacing:.06em">AIR OCEAN LINE</div><div style="font:400 10px 'IBM Plex Sans Arabic';color:#66727d;margin-top:2px">نظام الحضور والموارد البشرية</div></div>
+            </div>
+            <div data-noscroll="true" style="flex:1;overflow-y:auto;scrollbar-width:none;padding-bottom:10px">
+              <div style="font:700 9.5px 'IBM Plex Sans Arabic';color:#5E6B78;letter-spacing:.05em;padding:12px 24px 6px">مساحتي</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#7DD3FC"></span>اليوم</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#7DD3FC"></span>سجلي</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#7DD3FC"></span>طلباتي</div>
+              <div style="font:700 9.5px 'IBM Plex Sans Arabic';color:#5E6B78;letter-spacing:.05em;padding:14px 24px 6px">التشغيل</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#43D9A0"></span><span style="flex:1">لوحة الحضور</span><span style="font:600 9.5px 'IBM Plex Sans Arabic';color:#0B1621;background:var(--acc,#FCC107);padding:1.5px 7px;border-radius:999px">2</span></div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#43D9A0"></span>أمان الحضور</div>
+              <div style="font:700 9.5px 'IBM Plex Sans Arabic';color:#5E6B78;letter-spacing:.05em;padding:14px 24px 6px">الفريق</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#B49CFF"></span>الموظفون</div>
+              <div style="font:700 9.5px 'IBM Plex Sans Arabic';color:#5E6B78;letter-spacing:.05em;padding:14px 24px 6px">المالية</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#FFB84D"></span>الخزنة</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#FFB84D"></span>المصروفات</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#FFB84D"></span>الاستقطاعات</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#FFB84D"></span>مديونية Air Ocean</div>
+              <div style="font:700 9.5px 'IBM Plex Sans Arabic';color:#5E6B78;letter-spacing:.05em;padding:14px 24px 6px">الرواتب والتقارير</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;background:var(--acc-soft,rgba(252,193,7,.14));border:1px solid var(--acc-line,rgba(252,193,7,.3));color:var(--acc,#FCC107);font:700 12.5px 'IBM Plex Sans Arabic'"><span style="width:6px;height:6px;border-radius:50%;background:var(--acc,#FCC107)"></span>الرواتب والتقارير</div>
+              <div style="font:700 9.5px 'IBM Plex Sans Arabic';color:#5E6B78;letter-spacing:.05em;padding:14px 24px 6px">خاص بك</div>
+              <div style="display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;margin:1px 10px;border-radius:9px;color:#B4C0CC;font:500 12.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#16283A;color:#F7FAFC"><span style="width:6px;height:6px;border-radius:50%;background:#F0B96B"></span><span style="flex:1">دفتر شخصي</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#66727d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid rgba(180,196,210,.1)">
+              <div style="width:32px;height:32px;border-radius:10px;background:#1B2B3B;display:flex;align-items:center;justify-content:center;font:700 13px Alexandria,sans-serif;color:var(--acc,#FCC107)">م</div>
+              <div style="flex:1"><div style="font:600 11.5px 'IBM Plex Sans Arabic'">محمود رمضان</div><div style="display:flex;align-items:center;gap:5px;font:400 9.5px 'IBM Plex Sans Arabic';color:#43D9A0;margin-top:1px"><span style="width:5px;height:5px;border-radius:50%;background:#43D9A0"></span>متصل · مزامنة الآن</div></div>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="height:62px;flex:none;display:flex;align-items:center;gap:14px;padding:0 24px;border-bottom:1px solid rgba(180,196,210,.1);background:#0E1926">
+              <div style="flex:1;min-width:0"><div style="font:700 15px 'IBM Plex Sans Arabic'">الرواتب والتقارير</div><div style="font:400 10.5px 'IBM Plex Sans Arabic';color:#66727d;margin-top:1px">الرئيسية / الرواتب والتقارير · يوليو 2026</div></div>
+              <div style="display:flex;align-items:center;gap:8px;width:250px;height:38px;padding:0 13px;border-radius:10px;background:#14212F;border:1px solid rgba(180,196,210,.13);color:#66727d;box-sizing:border-box">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                <span style="flex:1;font:400 11.5px 'IBM Plex Sans Arabic'">بحث سريع…</span>
+                <span style="font:500 9.5px 'JetBrains Mono',monospace;border:1px solid rgba(180,196,210,.2);border-radius:5px;padding:1px 5px">⌘K</span>
+              </div>
+              <button style="position:relative;width:40px;height:40px;border-radius:11px;border:1px solid rgba(180,196,210,.14);background:#14212F;color:#B4C0CC;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#1B2B3B">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7"></path><path d="M10.5 20a1.7 1.7 0 0 0 3 0"></path></svg>
+                <sc-if value="{{ hasPending }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;top:3px;left:4px;min-width:16px;height:16px;border-radius:999px;background:#FF6B70;color:#fff;font:700 9.5px 'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #14212F;box-sizing:border-box">{{ bellBadge }}</span></sc-if>
+              </button>
+              <div style="width:36px;height:36px;border-radius:11px;background:#1B2B3B;border:1px solid rgba(180,196,210,.16);display:flex;align-items:center;justify-content:center;font:700 14px Alexandria,sans-serif;color:var(--acc,#FCC107)">م</div>
+            </div>
+            <div data-noscroll="true" style="flex:1;overflow-y:auto;scrollbar-width:none;padding:20px 24px 26px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+                <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:14px;padding:14px 16px"><div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:#43D9A0;animation:blink 1.6s ease-in-out infinite"></span><span style="font:500 11px 'IBM Plex Sans Arabic';color:#8B9AA8">بالشركة الآن</span></div><div style="font:600 24px Alexandria,sans-serif;margin-top:6px">6<span style="font:500 12px Alexandria,sans-serif;color:#66727d">/8</span></div></div>
+                <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:14px;padding:14px 16px"><div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:#FFB84D"></span><span style="font:500 11px 'IBM Plex Sans Arabic';color:#8B9AA8">تأخير اليوم</span></div><div style="font:600 24px Alexandria,sans-serif;margin-top:6px">1</div></div>
+                <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:14px;padding:14px 16px"><div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:#FF6B70"></span><span style="font:500 11px 'IBM Plex Sans Arabic';color:#8B9AA8">لم يحضر</span></div><div style="font:600 24px Alexandria,sans-serif;margin-top:6px">1</div></div>
+                <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:14px;padding:14px 16px"><div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:var(--acc,#FCC107)"></span><span style="font:500 11px 'IBM Plex Sans Arabic';color:#8B9AA8">طلبات معلقة</span></div><div style="font:600 24px Alexandria,sans-serif;margin-top:6px;color:var(--acc,#FCC107)">{{ bellBadge }}</div></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start">
+                <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:18px 20px">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                    <div><div style="font:500 11.5px 'IBM Plex Sans Arabic';color:#8B9AA8">صافي المرتبات — يوليو 2026</div><div style="font:600 30px/1.25 Alexandria,sans-serif;color:var(--acc,#FCC107);margin-top:4px">50,550 <span style="font:600 14px Alexandria,sans-serif;color:#B4C0CC">ج.م</span></div><div style="font:400 11px 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:3px;white-space:nowrap">قبل الخصومات 52,400 ج · 6 موظفين نشطين</div></div>
+                    <div style="display:flex;gap:4px;background:#101B28;border:1px solid rgba(180,196,210,.13);border-radius:999px;padding:4px;width:300px">
+                      <sc-for list="{{ periods }}" as="p" hint-placeholder-count="4">
+                        <button onClick="{{ p.go }}" style="flex:1;height:32px;border:none;border-radius:999px;background:{{ p.bg }};color:{{ p.fg }};font:600 11.5px 'IBM Plex Sans Arabic';cursor:pointer">{{ p.label }}</button>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px">
+                    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+                      <div style="background:#101B28;border:1px solid rgba(180,196,210,.1);border-radius:12px;padding:11px 13px">
+                        <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:{{ k.dot }}"></span><span style="font:500 10px 'IBM Plex Sans Arabic';color:#8B9AA8">{{ k.label }}</span></div>
+                        <div style="font:600 18px Alexandria,sans-serif;margin-top:5px;direction:ltr;text-align:right">{{ k.value }}<span style="font:500 10px Alexandria,sans-serif;color:#8B9AA8"> {{ k.unit }}</span></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px">
+                    <span style="font:700 12.5px 'IBM Plex Sans Arabic'">اتجاه الحضور — آخر 30 يوم</span>
+                    <span style="display:flex;align-items:center;gap:5px;font:500 10.5px 'IBM Plex Sans Arabic';color:#8B9AA8"><span style="width:8px;height:3px;border-radius:2px;background:var(--acc,#FCC107)"></span>حضور يومي</span>
+                  </div>
+                  <svg viewBox="0 0 760 152" style="width:100%;height:auto;display:block" preserveAspectRatio="none">
+                    <line x1="0" y1="28" x2="760" y2="28" stroke="rgba(180,196,210,.09)" stroke-width="1"></line>
+                    <line x1="0" y1="84" x2="760" y2="84" stroke="rgba(180,196,210,.09)" stroke-width="1"></line>
+                    <line x1="0" y1="140" x2="760" y2="140" stroke="rgba(180,196,210,.14)" stroke-width="1"></line>
+                    <path d="{{ trendAreaD }}" style="fill:var(--acc,#FCC107);opacity:.12"></path>
+                    <path d="{{ trendLineD }}" style="stroke:var(--acc,#FCC107)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <circle cx="{{ trendLastXD }}" cy="{{ trendLastYD }}" r="3.5" style="fill:var(--acc,#FCC107)"></circle>
+                  </svg>
+                  <div style="display:flex;justify-content:space-between;font:500 9.5px 'JetBrains Mono',monospace;color:#66727d;padding-top:6px;direction:ltr"><span>22/06</span><span>07/07</span><span>22/07</span></div>
+                </div>
+                <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:16px 18px 8px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+                    <span style="font:700 13px 'IBM Plex Sans Arabic'">بانتظار قرارك</span>
+                    <sc-if value="{{ hasPending }}" hint-placeholder-val="{{ true }}"><span style="font:600 10px 'JetBrains Mono',monospace;color:var(--acc,#FCC107);background:var(--acc-soft,rgba(252,193,7,.14));padding:2px 9px;border-radius:999px">{{ bellBadge }}</span></sc-if>
+                  </div>
+                  <sc-for list="{{ inboxItems }}" as="a" hint-placeholder-count="3">
+                    <div style="padding:12px 0;border-top:1px solid rgba(180,196,210,.08)">
+                      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font:700 12px 'IBM Plex Sans Arabic'">{{ a.type }}</span><span style="font:500 10.5px 'IBM Plex Sans Arabic';color:#8B9AA8;white-space:nowrap">{{ a.name }}</span></div>
+                      <div style="font:400 10.5px/1.6 'IBM Plex Sans Arabic';color:#8B9AA8;margin-top:2px">{{ a.range }}</div>
+                      <sc-if value="{{ a.isPending }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:flex;gap:8px;margin-top:9px">
+                          <button onClick="{{ a.ok }}" style="flex:1;height:32px;border:none;border-radius:9px;background:#43D9A0;color:#0B1621;font:700 11.5px 'IBM Plex Sans Arabic';cursor:pointer" style-active="transform:scale(.97)">قبول</button>
+                          <button onClick="{{ a.no }}" style="flex:1;height:32px;border:1px solid rgba(255,107,112,.34);border-radius:9px;background:transparent;color:#FF6B70;font:700 11.5px 'IBM Plex Sans Arabic';cursor:pointer" style-active="transform:scale(.97)">رفض</button>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ a.resolved }}" hint-placeholder-val="{{ false }}">
+                        <div style="margin-top:8px"><span style="font:600 10px 'IBM Plex Sans Arabic';color:{{ a.resFg }};background:{{ a.resBg }};padding:3px 10px;border-radius:999px">{{ a.resLabel }}</span></div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start">
+                <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;overflow:hidden">
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:15px 18px 12px">
+                    <span style="font:700 13px 'IBM Plex Sans Arabic'">المرتبات والخصومات — تفصيلي</span>
+                    <span style="font:500 10.5px 'IBM Plex Sans Arabic';color:#8B9AA8">مرتّب حسب قيمة الخصومات</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1.6fr .9fr .7fr .9fr 1fr 1fr 1.3fr;gap:8px;padding:9px 18px;background:#101B28;border-top:1px solid rgba(180,196,210,.1);font:600 10px 'IBM Plex Sans Arabic';color:#8B9AA8">
+                    <span>الموظف</span><span>الأساسي</span><span>خصم أيام</span><span>قيمة الخصم</span><span>استقطاعات</span><span>الصافي التقديري</span><span>مؤشرات</span>
+                  </div>
+                  <sc-for list="{{ payroll }}" as="e" hint-placeholder-count="6">
+                    <div style="display:grid;grid-template-columns:1.6fr .9fr .7fr .9fr 1fr 1fr 1.3fr;gap:8px;align-items:center;padding:11px 18px;border-top:1px solid rgba(180,196,210,.07)" style-hover="background:#16283A">
+                      <span style="font:600 12px 'IBM Plex Sans Arabic'">{{ e.name }}</span>
+                      <span style="font:500 11px 'JetBrains Mono',monospace;color:#B4C0CC;white-space:nowrap">{{ e.salaryF }}</span>
+                      <span style="font:500 11px 'JetBrains Mono',monospace;color:#B4C0CC">{{ e.dedDaysF }}</span>
+                      <span style="font:500 11px 'JetBrains Mono',monospace;color:{{ e.dedAmtC }};white-space:nowrap">{{ e.dedAmtF }}</span>
+                      <span style="font:500 11px 'JetBrains Mono',monospace;color:{{ e.finC }};white-space:nowrap">{{ e.finF }}</span>
+                      <span style="font:600 11.5px 'JetBrains Mono',monospace;white-space:nowrap">{{ e.netF }}</span>
+                      <span style="font:400 10px 'IBM Plex Sans Arabic';color:#8B9AA8">{{ e.flags }}</span>
+                    </div>
+                  </sc-for>
+                  <div style="display:grid;grid-template-columns:1.6fr .9fr .7fr .9fr 1fr 1fr 1.3fr;gap:8px;padding:12px 18px;background:#101B28;border-top:1px solid rgba(180,196,210,.12);font:600 11px 'JetBrains Mono',monospace">
+                    <span style="font:600 11.5px 'IBM Plex Sans Arabic';color:#8B9AA8">الإجمالي — 6 موظفين</span>
+                    <span style="white-space:nowrap">52,400 ج</span><span>3.0</span><span style="color:#FFB84D;white-space:nowrap">1,220 ج</span><span style="color:#FFB84D;white-space:nowrap">630 ج</span><span style="color:var(--acc,#FCC107);white-space:nowrap">50,550 ج</span><span></span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:14px">
+                  <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:15px 18px 6px">
+                    <span style="font:700 13px 'IBM Plex Sans Arabic'">أعلى التأخيرات</span>
+                    <sc-for list="{{ lates }}" as="l" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-top:1px solid rgba(180,196,210,.08)">
+                        <span style="width:22px;height:22px;border-radius:7px;background:rgba(255,184,77,.13);color:#FFB84D;display:flex;align-items:center;justify-content:center;font:600 11px 'JetBrains Mono',monospace;flex:none">{{ l.rank }}</span>
+                        <span style="flex:1;font:600 12px 'IBM Plex Sans Arabic'">{{ l.name }}</span>
+                        <span style="font:500 10.5px 'JetBrains Mono',monospace;color:#8B9AA8;direction:ltr;white-space:nowrap">{{ l.stat }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="background:#14212F;border:1px solid rgba(180,196,210,.13);border-radius:16px;padding:15px 18px">
+                    <span style="font:700 13px 'IBM Plex Sans Arabic'">تصدير التقارير</span>
+                    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+                      <button style="display:flex;align-items:center;gap:9px;height:38px;padding:0 14px;border-radius:10px;border:1px solid rgba(180,196,210,.16);background:#101B28;color:#B4C0CC;font:600 11.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#1B2B3B"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"></path><path d="m8.5 9.5 3.5 3.5 3.5-3.5"></path><path d="M4 17v3h16v-3"></path></svg>Excel — كشف الحضور</button>
+                      <button style="display:flex;align-items:center;gap:9px;height:38px;padding:0 14px;border-radius:10px;border:1px solid rgba(180,196,210,.16);background:#101B28;color:#B4C0CC;font:600 11.5px 'IBM Plex Sans Arabic';cursor:pointer" style-hover="background:#1B2B3B"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"></path><path d="m8.5 9.5 3.5 3.5 3.5-3.5"></path><path d="M4 17v3h16v-3"></path></svg>Excel — المرتبات</button>
+                      <button style="display:flex;align-items:center;gap:9px;height:38px;padding:0 14px;border-radius:10px;border:1px solid var(--acc-line,rgba(252,193,7,.3));background:var(--acc-soft,rgba(252,193,7,.14));color:var(--acc,#FCC107);font:700 11.5px 'IBM Plex Sans Arabic';cursor:pointer" style-active="transform:scale(.98)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"></path><path d="m8.5 9.5 3.5 3.5 3.5-3.5"></path><path d="M4 17v3h16v-3"></path></svg>PDF — تقرير الشهر</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+    <p style="max-width:1160px;margin:26px auto 0;font:400 12px/1.6 system-ui,sans-serif;color:#77828c">Next steps: notifications center &amp; admin attendance ops board · employee statement (كشف حساب) detail · light theme pass · desktop/tablet layout for the owner reports.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;: {&quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#FCC107&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;options&quot;: [&quot;#FCC107&quot;, &quot;#D93A8C&quot;, &quot;#7DD3FC&quot;, &quot;#43D9A0&quot;], &quot;section&quot;: &quot;Brand&quot;}, &quot;role&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;owner&quot;, &quot;options&quot;: [&quot;owner&quot;, &quot;employee&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Prototype&quot;}, &quot;texture&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Prototype&quot;}, &quot;offline&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Prototype&quot;}, &quot;checkinOutcome&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;success&quot;, &quot;options&quot;: [&quot;success&quot;, &quot;gps_fail&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Prototype&quot;}}">
+class Component extends DCLogic {
+  state = {
+    tab: "today", period: "month", reqFilter: "all", phase: "none", inAt: null, outAt: null, now: new Date(),
+    verifyStep: "", payLoading: false,
+    approvals: [
+      { id: 1, type: "إجازة اعتيادية", name: "أحمد سامي", range: "من 28 إلى 30 يوليو · 3 أيام", note: "ظروف عائلية — التسليمات مغطاة.", status: "pending" },
+      { id: 2, type: "تصحيح انصراف مفقود", name: "سارة إبراهيم", range: "الأحد 19 يوليو · انصراف 5:35 م", note: "", status: "pending" },
+      { id: 3, type: "مأمورية", name: "عبدالرحمن علي", range: "الخميس 23 يوليو · ميناء دمياط", note: "معاينة شحنة واردة.", status: "pending" },
+    ],
+  };
+
+  componentDidMount() {
+    this.timer = setInterval(() => this.setState({ now: new Date() }), 1000);
+  }
+  componentWillUnmount() { clearInterval(this.timer); clearTimeout(this.v1); clearTimeout(this.v2); clearTimeout(this.pt); }
+
+  decide(id, st) {
+    this.setState((s) => ({ approvals: s.approvals.map((a) => (a.id === id ? { ...a, status: st } : a)) }));
+  }
+
+  fmt(d) {
+    const h = d.getHours(), m = ("0" + d.getMinutes()).slice(-2);
+    return { t: `${h % 12 || 12}:${m}`, t24: `${("0" + h).slice(-2)}:${m}`, ap: h >= 12 ? "م" : "ص" };
+  }
+
+  hexToRgba(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+
+  renderVals() {
+    const s = this.state;
+    const acc = this.props.accent ?? "#FCC107";
+    const role = this.props.role ?? "owner";
+    const texture = this.props.texture ?? true;
+    const isOwner = role === "owner";
+    // Accent legibility: dark text on light/yellow accents, white on deep ones.
+    const n = parseInt(acc.slice(1), 16);
+    const lum = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+    const accOn = lum > 150 ? "#251F05" : "#FFFFFF";
+
+    const setTab = (tab) => () => this.setState({ tab });
+    const f = this.fmt(s.now);
+    const hour = s.now.getHours();
+
+    // Live elapsed since check-in
+    let elapsed = "0د";
+    if (s.inAt) {
+      const end = s.outAt || s.now;
+      const mins = Math.max(0, Math.floor((end - s.inAt) / 60000));
+      const sec = ("0" + Math.floor(((end - s.inAt) / 1000) % 60)).slice(-2);
+      elapsed = `${Math.floor(mins / 60)}:${("0" + (mins % 60)).slice(-2)}:${sec}`;
+    }
+    const fIn = s.inAt ? this.fmt(s.inAt) : null;
+    const fOut = s.outAt ? this.fmt(s.outAt) : null;
+
+    // Owner KPIs per period (from real screen semantics: coverage, lates, missing checkout, deductions)
+    const KPI = {
+      day:   [["التغطية", "88", "%", "#43D9A0"], ["تأخيرات", "1", "", "#FFB84D"], ["بدون انصراف", "1", "", "#FF6B70"], ["خصومات الفترة", "150", "ج", "#FFB84D"]],
+      week:  [["التغطية", "92", "%", "#43D9A0"], ["تأخيرات", "3", "", "#FFB84D"], ["بدون انصراف", "1", "", "#FF6B70"], ["خصومات الفترة", "900", "ج", "#FFB84D"]],
+      month: [["التغطية", "94", "%", "#43D9A0"], ["تأخيرات", "9", "", "#FFB84D"], ["بدون انصراف", "3", "", "#FF6B70"], ["خصومات الفترة", "4,250", "ج", "#FFB84D"]],
+      range: [["التغطية", "93", "%", "#43D9A0"], ["تأخيرات", "21", "", "#FFB84D"], ["بدون انصراف", "7", "", "#FF6B70"], ["خصومات الفترة", "9,780", "ج", "#FFB84D"]],
+    };
+    const kpis = KPI[s.period].map(([label, value, unit, dot]) => ({ label, value, unit, dot }));
+    const periods = [["day", "يومي"], ["week", "أسبوعي"], ["month", "شهري"], ["range", "فترة"]].map(([id, label]) => ({
+      label,
+      go: () => this.setState({ period: id }),
+      bg: s.period === id ? "#22374A" : "transparent",
+      fg: s.period === id ? "#F7FAFC" : "#8B9AA8",
+    }));
+
+    // 30-day attendance trend (of 8 employees)
+    const pts = [6, 7, 6, 8, 7, 8, 8, 5, 7, 8, 6, 8, 7, 7, 8, 6, 8, 8, 7, 5, 8, 7, 8, 6, 7, 8];
+    const X = (i) => (i * (320 / (pts.length - 1))).toFixed(1);
+    const Y = (v) => (104 - (v / 8) * 84).toFixed(1);
+    const trendLine = pts.map((v, i) => `${i ? "L" : "M"}${X(i)},${Y(v)}`).join(" ");
+    const XD = (i) => (i * (760 / (pts.length - 1))).toFixed(1);
+    const YD = (v) => (140 - (v / 8) * 112).toFixed(1);
+    const trendLineD = pts.map((v, i) => `${i ? "L" : "M"}${XD(i)},${YD(v)}`).join(" ");
+
+    const mn = (v) => v.toLocaleString("en-US");
+    const payroll = [
+      ["أحمد سامي", 9500, 1.0, 380, 0, "خصم 380 ج", "2 تأخير · 1.0 يوم"],
+      ["إسراء محمد", 8200, 0, 0, 0, "مكتمل", "بدون ملاحظات"],
+      ["عبدالرحمن علي", 7800, 1.5, 560, 0, "خصم 560 ج", "1 غياب · 2 تأخير"],
+      ["حبيبة أشرف", 6900, 0, 0, 250, "قسط 250 ج", "سلفة جارية"],
+      ["محمد فتحي", 11400, 0, 0, 380, "خصم 380 ج", "كانتين"],
+      ["سارة إبراهيم", 8600, 0.5, 280, 0, "خصم 280 ج", "1 تأخير"],
+    ].map(([name, salary, dedDays, dedAmt, fin, ded, flags]) => ({
+      name, ded, flags, init: name[0],
+      net: mn(salary - dedAmt - fin),
+      dedColor: ded === "مكتمل" ? "#43D9A0" : "#FFB84D",
+      salaryF: mn(salary) + " ج", dedDaysF: dedDays.toFixed(1), dedAmtF: mn(dedAmt) + " ج", finF: mn(fin) + " ج", netF: mn(salary - dedAmt - fin) + " ج",
+      dedAmtC: dedAmt > 0 ? "#FFB84D" : "#66727d", finC: fin > 0 ? "#FFB84D" : "#66727d",
+    }));
+
+    const lates = [
+      { rank: "1", name: "عبدالرحمن علي", stat: "4 مرات · 96 د" },
+      { rank: "2", name: "أحمد سامي", stat: "3 مرات · 51 د" },
+      { rank: "3", name: "سارة إبراهيم", stat: "2 مرة · 18 د" },
+    ];
+
+    const chip = {
+      present: ["حاضر", "#43D9A0", "rgba(67,217,160,.12)"],
+      late: ["متأخر", "#FFB84D", "rgba(255,184,77,.12)"],
+      absent: ["غياب", "#FF6B70", "rgba(255,107,112,.12)"],
+      leave: ["إجازة", "#7DD3FC", "rgba(125,211,252,.12)"],
+      mission: ["مأمورية", "#B49CFF", "rgba(180,156,255,.12)"],
+    };
+    const days = [
+      ["الأربعاء 22 يوليو", "اليوم", s.inAt ? `${fIn.t} ${fIn.ap} ← ${fOut ? `${fOut.t} ${fOut.ap}` : "…"}` : "لم يُسجَّل بعد", s.inAt ? "present" : "leave"],
+      ["الثلاثاء 21 يوليو", "يوم كامل · 8:38 س", "8:54 ص ← 5:32 م", "present"],
+      ["الاثنين 20 يوليو", "تأخير 26 دقيقة", "9:41 ص ← 5:30 م", "late"],
+      ["الأحد 19 يوليو", "يوم كامل · 8:37 س", "8:58 ص ← 5:35 م", "present"],
+      ["الخميس 16 يوليو", "يوم كامل · 8:36 س", "9:05 ص ← 5:41 م", "present"],
+      ["الأربعاء 15 يوليو", "مأمورية — ميناء الإسكندرية", "", "mission"],
+      ["الثلاثاء 14 يوليو", "إجازة اعتيادية معتمدة", "", "leave"],
+      ["الاثنين 13 يوليو", "غياب — خصم يوم", "", "absent"],
+    ].map(([label, sub, times, st]) => {
+      const c = chip[st];
+      // Today before check-in: neutral chip
+      const neutral = label.indexOf("22") > -1 && !s.inAt;
+      return { label, sub, times, status: neutral ? "—" : c[0], chipFg: neutral ? "#8B9AA8" : c[1], chipBg: neutral ? "rgba(180,196,210,.1)" : c[2] };
+    });
+
+    const REQ = [
+      { type: "إجازة اعتيادية", range: "من الثلاثاء 28 يوليو إلى الخميس 30 يوليو · 3 أيام", status: "معلّقة", st: "p", note: "ظروف عائلية — التسليمات مغطاة مع إسراء." },
+      { type: "مأمورية", range: "الأربعاء 15 يوليو · يوم واحد", status: "مقبولة", st: "a", note: "معاينة شحنة — ميناء الإسكندرية." },
+      { type: "إجازة مرضية", range: "من 6 إلى 7 يوليو · يومان", status: "مقبولة", st: "a", note: "" },
+      { type: "إجازة عارضة", range: "الأربعاء 1 يوليو · يوم واحد", status: "مرفوضة", st: "r", note: "" },
+    ];
+    const stC = { p: ["#FFB84D", "rgba(255,184,77,.12)"], a: ["#43D9A0", "rgba(67,217,160,.12)"], r: ["#FF6B70", "rgba(255,107,112,.12)"] };
+    const requests = REQ.filter((r) => s.reqFilter === "all" || r.st === "p").map((r) => ({ ...r, fg: stC[r.st][0], bg: stC[r.st][1] }));
+
+    const startVerify = () => {
+      this.setState({ phase: "verify", verifyStep: "تثبيت الموقع (GPS)…" });
+      this.v1 = setTimeout(() => this.setState({ verifyStep: "التحقق من بصمة الوجه…" }), 900);
+      this.v2 = setTimeout(() => {
+        const fail = (this.props.checkinOutcome ?? "success") === "gps_fail" && !this.retried;
+        if (fail) { this.retried = true; this.setState({ phase: "fail" }); }
+        else this.setState({ phase: "in", inAt: new Date() });
+      }, 1800);
+    };
+    const goInbox = () => { if (this.state.tab !== "inbox") this.prev = this.state.tab; this.setState({ tab: "inbox" }); };
+    const goBack = () => this.setState({ tab: this.prev || "today" });
+    const goPay = () => {
+      if (!this.paySeen) { this.paySeen = true; this.setState({ tab: "pay", payLoading: true }); this.pt = setTimeout(() => this.setState({ payLoading: false }), 900); }
+      else this.setState({ tab: "pay" });
+    };
+    const inboxItems = s.approvals.map((a) => ({
+      ...a,
+      isPending: a.status === "pending",
+      resolved: a.status !== "pending",
+      resLabel: a.status === "ok" ? "تمت الموافقة ✓" : "تم الرفض",
+      resFg: a.status === "ok" ? "#43D9A0" : "#FF6B70",
+      resBg: a.status === "ok" ? "rgba(67,217,160,.12)" : "rgba(255,107,112,.12)",
+      ok: () => this.decide(a.id, "ok"),
+      no: () => this.decide(a.id, "no"),
+    }));
+    const pending = inboxItems.filter((a) => a.isPending).length;
+    const navC = (tab) => (s.tab === tab ? acc : "#7E8D9B");
+    return {
+      acc, accOn,
+      accSoft: this.hexToRgba(acc, 0.16),
+      accLine: this.hexToRgba(acc, 0.34),
+      texture, isOwner,
+      roleLabel: isOwner ? "مالك" : "موظف",
+      greeting: hour < 12 ? "صباح الخير" : "مساء الخير",
+      dateLine: s.now.toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" }),
+      dateFull: s.now.toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+      clockTime: f.t, clockAp: f.ap,
+      isToday: s.tab === "today", isPay: s.tab === "pay", isRecord: s.tab === "record", isReq: s.tab === "req", isMore: s.tab === "more", isInbox: s.tab === "inbox", isEmp: !isOwner,
+      goToday: setTab("today"), goPay, goRecord: setTab("record"), goReq: setTab("req"), goMore: setTab("more"), goInbox, goBack,
+      bellC: s.tab === "inbox" ? acc : "#B4C0CC", hasPending: isOwner && pending > 0, bellBadge: pending, inboxItems,
+      inboxSub: pending > 0 ? pending + " طلبات معلقة — اضغط للمراجعة" : "لا توجد طلبات معلقة",
+      offline: this.props.offline ?? false, payLoading: s.payLoading, payReady: !s.payLoading,
+      navToday: navC("today"), navPay: navC("pay"), navRecord: navC("record"), navReq: navC("req"), navMore: navC("more"),
+      inDot: s.inAt ? "#43D9A0" : "#3C4E5F", outDot: s.outAt ? "#43D9A0" : "#3C4E5F",
+      inLabel: fIn ? `${fIn.t} ${fIn.ap}` : "لم يُسجَّل", outLabel: fOut ? `${fOut.t} ${fOut.ap}` : "لم يُسجَّل",
+      ringPrimary: s.phase === "none", ringVerify: s.phase === "verify", ringFail: s.phase === "fail", ringOut: s.phase === "in", ringDone: s.phase === "done",
+      verifyStep: s.verifyStep,
+      doCheckIn: startVerify, doRetry: startVerify,
+      doCheckOut: () => this.setState({ phase: "done", outAt: new Date() }),
+      elapsed, workedTotal: elapsed,
+      periods, kpis,
+      trendLine, trendArea: trendLine + " L320,112 L0,112 Z",
+      trendLastX: X(pts.length - 1), trendLastY: Y(pts[pts.length - 1]),
+      trendLineD, trendAreaD: trendLineD + " L760,150 L0,150 Z",
+      trendLastXD: XD(pts.length - 1), trendLastYD: YD(pts[pts.length - 1]),
+      payroll, lates, days, requests,
+      reqAll: () => this.setState({ reqFilter: "all" }),
+      reqPending: () => this.setState({ reqFilter: "pending" }),
+      reqAllBg: s.reqFilter === "all" ? "#22374A" : "transparent",
+      reqAllFg: s.reqFilter === "all" ? "#F7FAFC" : "#8B9AA8",
+      reqPendBg: s.reqFilter === "pending" ? "#22374A" : "transparent",
+      reqPendFg: s.reqFilter === "pending" ? "#F7FAFC" : "#8B9AA8",
+    };
+  }
+}
+</script>
+</body>
+</html>
