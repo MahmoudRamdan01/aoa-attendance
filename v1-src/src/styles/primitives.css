@@ -39,7 +39,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: var(--c);
+  color: var(--text-muted);
   font-size: 0.74rem;
   font-weight: 700;
 }
@@ -288,7 +288,7 @@
   place-items: center;
   border-radius: 15px;
   background: var(--surface-nested);
-  color: var(--c);
+  color: var(--text-secondary);
 }
 
 .ui-state[data-kind="error"] .ui-state-icon {
@@ -432,8 +432,8 @@
 }
 
 .ui-tab[aria-selected="true"] {
-  background: var(--surface-raised);
-  color: var(--c);
+  background: var(--surface-overlay);
+  color: var(--text);
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.12);
 }
 
@@ -490,7 +490,7 @@
   .ui-toast[data-tone="info"] { border-color: color-mix(in srgb, var(--info) 38%, transparent); }
 }
 
-.ui-toast-icon { color: var(--c); }
+.ui-toast-icon { color: var(--text-secondary); }
 .ui-toast[data-tone="success"] .ui-toast-icon { color: var(--success); }
 .ui-toast[data-tone="warning"] .ui-toast-icon { color: var(--warning); }
 .ui-toast[data-tone="danger"] .ui-toast-icon { color: var(--danger); }

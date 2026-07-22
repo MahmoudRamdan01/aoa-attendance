@@ -169,9 +169,10 @@
 }
 
 .ops-icon-btn:hover {
-  border-color: var(--c-line);
-  background: var(--c-soft);
-  color: var(--c);
+  /* Accent discipline: chrome hovers are neutral — accent stays reserved. */
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--text);
   translate: 0 -1px;
 }
 
@@ -265,11 +266,7 @@
   scrollbar-width: thin;
 }
 
-@supports (background: color-mix(in srgb, white, black)) {
-  .ops-sidebar {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--chrome) 96%, var(--c) 4%), var(--chrome));
-  }
-}
+/* Accent discipline: the sidebar no longer tints toward the section accent. */
 
 .ops-sidebar-nav {
   flex: 1 0 auto;
@@ -368,7 +365,7 @@
 }
 
 .ops-nav-item[aria-current="page"] svg {
-  color: var(--c);
+  color: var(--nav-active);
 }
 
 .ops-nav-label {
@@ -732,7 +729,7 @@
   place-items: center;
   border-radius: 9px;
   background: var(--surface-nested);
-  color: var(--c);
+  color: var(--text-secondary);
 }
 
 .ops-palette-result-copy {

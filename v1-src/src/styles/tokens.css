@@ -6,19 +6,20 @@
   --font-display: "Alexandria", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
-  --canvas: #0c1722;
-  --chrome: #101b26;
-  --surface: #172331;
-  --surface-nested: #202f3c;
-  --surface-raised: #263847;
-  --surface-overlay: #2c4050;
-  --text: #f9fbfd;
-  --text-secondary: #b7c2cd;
-  --text-muted: #93a1ad;
-  --text-disabled: #6f7e8b;
-  --line-subtle: rgba(183, 194, 205, 0.13);
-  --line: rgba(183, 194, 205, 0.22);
-  --line-strong: rgba(183, 194, 205, 0.34);
+  --canvas: #0b1621;
+  --chrome: #0e1926;
+  --surface: #14212f;
+  --surface-nested: #101b28;
+  --surface-raised: #1b2b3b;
+  --surface-overlay: #22374a;
+  --text: #f7fafc;
+  --text-secondary: #b4c0cc;
+  --text-muted: #8b9aa8;
+  --text-disabled: #66727d;
+  --line-subtle: rgba(180, 196, 210, 0.1);
+  --line: rgba(180, 196, 210, 0.14);
+  --line-strong: rgba(180, 196, 210, 0.26);
+  --surface-hero: linear-gradient(150deg, #1b2b3b, #14212f 70%);
 
   --gold: #fcc107;
   --gold-hover: #ffd13f;
@@ -75,6 +76,10 @@
   --radius-lg: 18px;
   --radius-xl: 24px;
   --radius-pill: 999px;
+  --radius-card: 16px; /* unified card radius (was mixed 14/18) */
+  --ring-size: 186px; /* check-in ring outer size */
+  --nav-active: var(--gold-text);
+  --nav-idle: #7e8d9b;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -175,6 +180,9 @@
   --shadow-raised: 0 18px 48px rgba(20, 35, 48, 0.14);
   --shadow-overlay: 0 28px 80px rgba(20, 35, 48, 0.22);
   --focus-ring: 0 0 0 3px rgba(7, 102, 142, 0.2);
+
+  --surface-hero: linear-gradient(150deg, #ffffff, #f1f5f8 70%);
+  --nav-idle: #6b7a87;
 }
 
 [data-section="home"] {
