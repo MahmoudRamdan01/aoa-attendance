@@ -9,3 +9,8 @@ v1-src/dist/
 v2-src/dist/
 v2-src/node_modules/
 .claude/
+
+# Local-only offline demo (mock data + throwaway build) — never shipped.
+v1-src/demo-dist/
+v1-src/src/lib/demoClient.js
+v1-src/src/lib/demoData.js
