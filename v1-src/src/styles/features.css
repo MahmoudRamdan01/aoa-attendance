@@ -3665,3 +3665,21 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
 }
 
 .notif-push { margin-block-start: 14px; padding-block-start: 12px; border-block-start: 1px solid var(--line-subtle); }
+
+/* الإشعارات والطلبات — compose shortcut (admins) in the header */
+.approvals-head { justify-content: flex-start; }
+.approvals-head h2 { flex: 1; }
+
+.approvals-compose {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-pill);
+  background: var(--gold-soft);
+  color: var(--gold-text);
+  font: 600 11.5px/1 var(--font-body);
+  cursor: pointer;
+}

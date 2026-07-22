@@ -186,16 +186,17 @@ const DEFINITIONS = [
     mobileSlot: null,
   },
   {
-    // Approvals inbox (redesign spec D): navigated from the owner dashboard
-    // entry card / admin shortcut — not listed in the nav itself.
+    // «الإشعارات والطلبات» (redesign spec D): the bell's destination for every
+    // role — notifications for all, plus the approvals section for owner/hr.
+    // Reached via the bell + the owner dashboard/admin entry cards; not in nav.
     id: "inbox",
     section: "operations",
     accent: "attendance",
-    ar: "بانتظار قرارك",
-    en: "Approvals",
+    ar: "الإشعارات والطلبات",
+    en: "Inbox",
     icon: Inbox,
-    legacyKind: "admin",
-    capability: capabilities.admin,
+    legacyKind: "all",
+    capability: capabilities.authenticated,
     mobileSlot: null,
     nav: false,
   },

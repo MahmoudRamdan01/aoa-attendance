@@ -386,14 +386,14 @@ export default function AppShell({
               <RefreshCcw size={17} aria-hidden="true" />
             </button>
             <ThemeButton theme={theme} onToggle={toggleTheme} />
-            {/* Bell opens the full الإشعارات screen (redesign) instead of the
-                old popover. */}
+            {/* Bell opens the full «الإشعارات والطلبات» screen (redesign)
+                instead of the old popover. */}
             <button
               ref={inboxTriggerRef}
               className="ops-icon-btn"
               type="button"
-              onClick={() => navigate("notifications")}
-              aria-label={unread > 0 ? `فتح الإشعارات، ${unread} غير مقروء` : "فتح الإشعارات"}
+              onClick={() => navigate("inbox")}
+              aria-label={unread > 0 ? `فتح الإشعارات والطلبات، ${unread} غير مقروء` : "فتح الإشعارات والطلبات"}
             >
               <Bell size={18} aria-hidden="true" />
               {unread > 0 ? <bdi className="ops-unread-badge" dir="ltr">{unread > 99 ? "99+" : unread}</bdi> : null}
