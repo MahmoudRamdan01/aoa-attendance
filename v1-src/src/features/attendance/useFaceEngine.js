@@ -96,16 +96,28 @@ function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+// Light random challenge for quick mode (owner request, after the photo and
+// video replay analysis): the prompt is revealed only AFTER the natural blink
+// is seen, so a pre-recorded clip can't know which gesture to perform when.
+const QUICK_EXTRAS = [
+  { id: "smile", label: "ابتسم 🙂" },
+  { id: "turn", label: "أدر وشك شوية ناحية اليمين" },
+];
+
 // gesture=false → "quick" mode (owner request: behave like the phone's Face
-// ID). No blink/smile/turn challenge — holding a stable face for a few frames
-// is the capture trigger. The antispoof + liveness model scores are STILL
-// required at the same thresholds (that's what actually rejects photo/video
-// replays); only the interactive gesture is dropped.
+// ID). No upfront posed challenge and no capture button. Liveness is passive
+// but still layered: a NATURAL involuntary blink (photos never blink), then
+// ONE light random gesture, plus the antispoof + liveness model scores at the
+// same thresholds as before.
 export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, gesture = true }) {
   const challenge = useMemo(
     () => (gesture
       ? CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)]
       : { id: "steady", label: "ثبّت وشك لحظة أمام الكاميرا…" }),
+    [gesture],
+  );
+  const extra = useMemo(
+    () => (gesture ? null : QUICK_EXTRAS[Math.floor(Math.random() * QUICK_EXTRAS.length)]),
     [gesture],
   );
   const [state, setState] = useState(() => ({
@@ -134,7 +146,9 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
     // selfie passed): a NATURAL involuntary blink must be observed before
     // capture. A photo never blinks; a real person blinks within seconds
     // without being asked. After 4s without one, a gentle hint appears.
+    // Then ONE random light gesture (prompt revealed only after the blink).
     let blinkSeen = false;
+    let extraDone = false;
     let firstFaceAt = 0;
     const realScores = [];
     const liveScores = [];
@@ -188,7 +202,10 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
             if (challenge.id === "steady") {
               if (!firstFaceAt) firstFaceAt = timestamp;
               if (challengePassed("blink", result, face)) blinkSeen = true;
-              if (stableFrames >= 3 && blinkSeen) challengeDone = true;
+              // The extra gesture only counts after the blink — its prompt is
+              // shown then, so performing it earlier (a looping video) doesn't.
+              if (blinkSeen && extra && challengePassed(extra.id, result, face)) extraDone = true;
+              if (stableFrames >= 3 && blinkSeen && (!extra || extraDone)) challengeDone = true;
             } else if (stableFrames >= 2 && challengePassed(challenge.id, result, face)) {
               challengeDone = true;
             }
@@ -223,6 +240,8 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
             else if (challengeDone && liveness < 0.5) instruction = "ثبّت وجهك لحظة للتأكد من الحيوية";
             else if (challenge.id === "steady" && !blinkSeen && firstFaceAt && timestamp - firstFaceAt > 4000) {
               instruction = "ارمش بعينيك";
+            } else if (challenge.id === "steady" && blinkSeen && extra && !extraDone) {
+              instruction = extra.label;
             }
             setState((current) => ({ ...current, status: "challenge", instruction }));
           } catch {
@@ -245,7 +264,7 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
       activeRef.current = false;
       if (frameId) cancelAnimationFrame(frameId);
     };
-  }, [enabled, engine, videoRef, challenge.id, challenge.label, antispoofMin]);
+  }, [enabled, engine, videoRef, challenge.id, challenge.label, extra, antispoofMin]);
 
   return state;
 }
