@@ -189,8 +189,12 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
             previousBox = face.boxRaw;
             if (Number.isFinite(face.real)) realScores.push(face.real);
             if (Number.isFinite(face.live)) liveScores.push(face.live);
-            if (realScores.length > 18) realScores.shift();
-            if (liveScores.length > 18) liveScores.shift();
+            // Short RECENT window: the first frames (face entering, autofocus
+            // hunting) score terribly and a long average drags the gate down
+            // for seconds — the owner kept seeing "حسّن الإضاءة" with good
+            // light. Six frames reflect current conditions and recover fast.
+            if (realScores.length > 6) realScores.shift();
+            if (liveScores.length > 6) liveScores.shift();
 
             if (challenge.id === "steady") {
               if (extra && challengePassed(extra.id, result, face)) extraDone = true;
@@ -225,8 +229,8 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
             }
 
             let instruction = challenge.label;
-            if (challengeDone && antispoof < antispoofMin) instruction = "ثبّت الهاتف وحسّن الإضاءة";
-            else if (challengeDone && liveness < 0.5) instruction = "ثبّت وجهك لحظة للتأكد من الحيوية";
+            if (challengeDone && antispoof < antispoofMin) instruction = "قرّب من النور شوية…";
+            else if (challengeDone && liveness < 0.5) instruction = "ثبّت وشك لحظة…";
             else if (challenge.id === "steady" && extra && !extraDone) instruction = extra.label;
             setState((current) => ({ ...current, status: "challenge", instruction }));
           } catch {
