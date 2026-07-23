@@ -216,6 +216,7 @@ export default function FaceLoginSetup({ session, onToast }) {
           session={capture.session}
           faceMode="verify"
           requireGps={false}
+          quick
           onCapture={handleCapture}
           onCancel={() => setCapture(null)}
         />

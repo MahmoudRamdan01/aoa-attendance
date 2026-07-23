@@ -145,7 +145,7 @@ function LoginScreen() {
     const match = await matchFace(embedding);
     if (!match) {
       closeFaceCapture();
-      setMessage("لم يتم التعرّف على وجهك — سجّل الدخول بكلمة المرور.");
+      setMessage("الوجه غير متطابق — جرّب مرة تانية أو ادخل بكلمة المرور.");
       return;
     }
     const { error } = await supabase.auth.signInWithPassword({ email: match.email, password: match.password });
@@ -255,6 +255,7 @@ function LoginScreen() {
         session={faceCapture.session}
         faceMode="verify"
         requireGps={false}
+        quick
         onCapture={handleFaceCapture}
         onCancel={closeFaceCapture}
       />

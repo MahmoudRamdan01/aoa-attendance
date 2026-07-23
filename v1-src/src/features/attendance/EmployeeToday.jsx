@@ -600,6 +600,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
           session={capture.session}
           faceMode={securityConfig.face_mode}
           antispoofMin={Number(securityConfig.antispoof_min || 0.6)}
+          quick
           onCapture={(data) => submitCapture(capture.kind, data)}
           onCancel={() => setCapture(null)}
         />

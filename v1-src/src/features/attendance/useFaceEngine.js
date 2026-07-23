@@ -96,8 +96,18 @@ function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 }) {
-  const challenge = useMemo(() => CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)], []);
+// gesture=false → "quick" mode (owner request: behave like the phone's Face
+// ID). No blink/smile/turn challenge — holding a stable face for a few frames
+// is the capture trigger. The antispoof + liveness model scores are STILL
+// required at the same thresholds (that's what actually rejects photo/video
+// replays); only the interactive gesture is dropped.
+export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, gesture = true }) {
+  const challenge = useMemo(
+    () => (gesture
+      ? CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)]
+      : { id: "steady", label: "ثبّت وشك لحظة أمام الكاميرا…" }),
+    [gesture],
+  );
   const [state, setState] = useState(() => ({
     status: enabled ? "loading" : "off",
     instruction: enabled ? "جارٍ تحميل التحقق من الوجه…" : "",
@@ -169,7 +179,11 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
             if (realScores.length > 18) realScores.shift();
             if (liveScores.length > 18) liveScores.shift();
 
-            if (stableFrames >= 2 && challengePassed(challenge.id, result, face)) challengeDone = true;
+            if (challenge.id === "steady") {
+              if (stableFrames >= 3) challengeDone = true;
+            } else if (stableFrames >= 2 && challengePassed(challenge.id, result, face)) {
+              challengeDone = true;
+            }
 
             const antispoof = average(realScores);
             const liveness = average(liveScores);

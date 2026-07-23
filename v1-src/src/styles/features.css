@@ -2074,6 +2074,20 @@ a.secondary {
 }
 
 .capture-checks { display: flex; justify-content: center; gap: 9px; flex-wrap: wrap; }
+
+/* Quick (Face-ID-like) mode: the submit button is replaced by this line. */
+.capture-auto-note {
+  margin: 0;
+  min-block-size: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: center;
+}
 .capture-checks > span {
   display: inline-flex;
   align-items: center;
