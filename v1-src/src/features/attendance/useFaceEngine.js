@@ -96,19 +96,17 @@ function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-// Light random challenge for quick mode (owner request, after the photo and
-// video replay analysis): the prompt is revealed only AFTER the natural blink
-// is seen, so a pre-recorded clip can't know which gesture to perform when.
+// Light random challenge for quick mode (owner request, after the photo
+// red-team): ONE random gesture shown immediately. A static photo can't
+// perform it, and a pre-recorded clip can't know which one will be asked.
 const QUICK_EXTRAS = [
   { id: "smile", label: "ابتسم 🙂" },
   { id: "turn", label: "أدر وشك شوية ناحية اليمين" },
 ];
 
 // gesture=false → "quick" mode (owner request: behave like the phone's Face
-// ID). No upfront posed challenge and no capture button. Liveness is passive
-// but still layered: a NATURAL involuntary blink (photos never blink), then
-// ONE light random gesture, plus the antispoof + liveness model scores at the
-// same thresholds as before.
+// ID). No capture button: one light random gesture + the antispoof/liveness
+// model scores at the same thresholds, then capture fires by itself.
 export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, gesture = true }) {
   const challenge = useMemo(
     () => (gesture
@@ -142,14 +140,9 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
     let stableFrames = 0;
     let challengeDone = false;
     let failures = 0;
-    // Quick-mode passive liveness (owner's red-team found a printed/screen
-    // selfie passed): a NATURAL involuntary blink must be observed before
-    // capture. A photo never blinks; a real person blinks within seconds
-    // without being asked. After 4s without one, a gentle hint appears.
-    // Then ONE random light gesture (prompt revealed only after the blink).
-    let blinkSeen = false;
+    // Quick-mode liveness: one random light gesture (a photo can't perform
+    // it on demand). The blink prerequisite was dropped for speed per owner.
     let extraDone = false;
-    let firstFaceAt = 0;
     const realScores = [];
     const liveScores = [];
 
@@ -200,12 +193,8 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
             if (liveScores.length > 18) liveScores.shift();
 
             if (challenge.id === "steady") {
-              if (!firstFaceAt) firstFaceAt = timestamp;
-              if (challengePassed("blink", result, face)) blinkSeen = true;
-              // The extra gesture only counts after the blink — its prompt is
-              // shown then, so performing it earlier (a looping video) doesn't.
-              if (blinkSeen && extra && challengePassed(extra.id, result, face)) extraDone = true;
-              if (stableFrames >= 3 && blinkSeen && (!extra || extraDone)) challengeDone = true;
+              if (extra && challengePassed(extra.id, result, face)) extraDone = true;
+              if (stableFrames >= 2 && (!extra || extraDone)) challengeDone = true;
             } else if (stableFrames >= 2 && challengePassed(challenge.id, result, face)) {
               challengeDone = true;
             }
@@ -238,11 +227,7 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
             let instruction = challenge.label;
             if (challengeDone && antispoof < antispoofMin) instruction = "ثبّت الهاتف وحسّن الإضاءة";
             else if (challengeDone && liveness < 0.5) instruction = "ثبّت وجهك لحظة للتأكد من الحيوية";
-            else if (challenge.id === "steady" && !blinkSeen && firstFaceAt && timestamp - firstFaceAt > 4000) {
-              instruction = "ارمش بعينيك";
-            } else if (challenge.id === "steady" && blinkSeen && extra && !extraDone) {
-              instruction = extra.label;
-            }
+            else if (challenge.id === "steady" && extra && !extraDone) instruction = extra.label;
             setState((current) => ({ ...current, status: "challenge", instruction }));
           } catch {
             failures += 1;
