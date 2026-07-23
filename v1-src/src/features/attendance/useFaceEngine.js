@@ -130,6 +130,12 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
     let stableFrames = 0;
     let challengeDone = false;
     let failures = 0;
+    // Quick-mode passive liveness (owner's red-team found a printed/screen
+    // selfie passed): a NATURAL involuntary blink must be observed before
+    // capture. A photo never blinks; a real person blinks within seconds
+    // without being asked. After 4s without one, a gentle hint appears.
+    let blinkSeen = false;
+    let firstFaceAt = 0;
     const realScores = [];
     const liveScores = [];
 
@@ -180,7 +186,9 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
             if (liveScores.length > 18) liveScores.shift();
 
             if (challenge.id === "steady") {
-              if (stableFrames >= 3) challengeDone = true;
+              if (!firstFaceAt) firstFaceAt = timestamp;
+              if (challengePassed("blink", result, face)) blinkSeen = true;
+              if (stableFrames >= 3 && blinkSeen) challengeDone = true;
             } else if (stableFrames >= 2 && challengePassed(challenge.id, result, face)) {
               challengeDone = true;
             }
@@ -213,6 +221,9 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, g
             let instruction = challenge.label;
             if (challengeDone && antispoof < antispoofMin) instruction = "ثبّت الهاتف وحسّن الإضاءة";
             else if (challengeDone && liveness < 0.5) instruction = "ثبّت وجهك لحظة للتأكد من الحيوية";
+            else if (challenge.id === "steady" && !blinkSeen && firstFaceAt && timestamp - firstFaceAt > 4000) {
+              instruction = "ارمش بعينيك";
+            }
             setState((current) => ({ ...current, status: "challenge", instruction }));
           } catch {
             failures += 1;

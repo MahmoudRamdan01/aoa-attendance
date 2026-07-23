@@ -256,6 +256,7 @@ function LoginScreen() {
         faceMode="verify"
         requireGps={false}
         quick
+        antispoofMin={0.7}
         onCapture={handleFaceCapture}
         onCancel={closeFaceCapture}
       />
