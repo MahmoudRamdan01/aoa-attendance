@@ -10,7 +10,7 @@ const COMPANIES = {
     key: "aol",
     name: "Air Ocean Line",
     appTitle: "AOI.",
-    opsTitle: "AOI Ops Hub",
+    opsTitle: "Air Ocean Line",
     // Client-side fallback only — the live office location comes from the
     // company_locations table via get_my_context_v1.
     location: {
