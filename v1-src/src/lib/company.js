@@ -25,7 +25,7 @@ const COMPANIES = {
     key: "airocean",
     name: "Air Ocean Line",
     appTitle: "Air Ocean Line",
-    opsTitle: "AOL HR Hub",
+    opsTitle: "Air Ocean Line",
     // Placeholder (wide radius = no effective geo-fence) until the owner
     // sends the real office pin; the real value lives in company_locations.
     location: {
