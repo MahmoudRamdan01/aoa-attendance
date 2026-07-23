@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   Moon,
   RefreshCcw,
+  ScanFace,
   Search,
   Sun,
   X,
@@ -17,6 +18,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { COMPANY } from "../lib/company";
 import CommandPalette from "../ui/CommandPalette";
+import FaceLoginSetup, { requestFaceSetup } from "../features/system/FaceLoginSetup";
 import OfflineBanner from "../ui/OfflineBanner";
 import { PageHeader } from "../ui/primitives";
 import {
@@ -574,6 +576,22 @@ export default function AppShell({
                 <RefreshCcw size={16} aria-hidden="true" />
                 <span className="more-row-label">تحديث البيانات</span>
               </button>
+              <button
+                type="button"
+                className="more-row"
+                onClick={() => {
+                  closeMore();
+                  // The sheet's back-close consumes a history entry ~175ms
+                  // after closing; opening the setup dialog before that would
+                  // get it popped right back shut. The dialog needs no user
+                  // gesture (the camera opens from ITS confirm tap).
+                  window.setTimeout(requestFaceSetup, 230);
+                }}
+              >
+                <ScanFace size={16} aria-hidden="true" />
+                <span className="more-row-label">تسجيل بصمة الوجه للدخول</span>
+                <ChevronLeft size={14} aria-hidden="true" />
+              </button>
               <button type="button" className="more-row" onClick={toggleTheme}>
                 {theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
                 <span className="more-row-label">{theme === "dark" ? "الوضع الفاتح" : "الوضع الغامق"}</span>
@@ -596,6 +614,8 @@ export default function AppShell({
         onNavigate={navigate}
         triggerRef={paletteTriggerRef}
       />
+
+      <FaceLoginSetup session={session} onToast={onToast} />
     </div>
   );
 }

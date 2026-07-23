@@ -184,6 +184,24 @@ export async function matchFace(embedding) {
   return { email: best.email, password, score: bestScore };
 }
 
+// ---- In-memory hand-off from the login screen to the in-app setup flow ----
+// After a successful password login, the credentials are kept ONLY in module
+// memory (never persisted) so the post-login "سجّل وشك" offer can enroll
+// without asking for the password again. A page refresh clears it naturally.
+let stashedCredentials = null;
+
+export function stashCredentialsForEnroll(email, password) {
+  stashedCredentials = { email: normalizeEmail(email), password };
+}
+
+export function peekStashedCredentials() {
+  return stashedCredentials;
+}
+
+export function clearStashedCredentials() {
+  stashedCredentials = null;
+}
+
 export async function removeEnrollment(email) {
   if (!isFaceLoginSupported()) return;
   try {
@@ -192,3 +210,4 @@ export async function removeEnrollment(email) {
     // best effort — a stale enrollment simply fails the next password check
   }
 }
+

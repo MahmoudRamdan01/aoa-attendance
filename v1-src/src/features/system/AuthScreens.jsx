@@ -11,6 +11,7 @@ import {
   isFaceLoginSupported,
   matchFace,
   removeEnrollment,
+  stashCredentialsForEnroll,
 } from "../../lib/faceLogin";
 
 function Splash() {
@@ -68,6 +69,11 @@ function LoginScreen() {
     // Mobile keyboards/autofill/copy-paste add stray spaces around both the
     // email and the password → auth 400. No real password here has edge spaces.
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
+    if (!error && faceSupported) {
+      // Memory-only hand-off: right after login the app offers "سجّل وشك مرة
+      // واحدة" (FaceLoginSetup) without asking for the password again.
+      stashCredentialsForEnroll(email.trim(), password.trim());
+    }
     if (error) {
       // A flaky connection is NOT wrong credentials. Team members on mobile
       // were seeing "البريد الإلكتروني أو كلمة المرور غير صحيح" for network drops, then the
@@ -88,7 +94,7 @@ function LoginScreen() {
     setMessage("");
     // Enrollment needs the real password once — guide the first-timer.
     if (!faceEnrolled && (!email.trim() || !password.trim())) {
-      setMessage("سجّل الدخول بكلمة المرور أول مرة، ثم فعّل الدخول بالوجه بالتقاط وجهك.");
+      setMessage("سجّل الدخول بكلمة المرور الأول — وبعد الدخول هيظهرلك تفعيل «الدخول ببصمة الوجه»، أو فعّله من قائمة «المزيد».");
       return;
     }
     setFaceBusy(true);
