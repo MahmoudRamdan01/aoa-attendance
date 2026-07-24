@@ -10,6 +10,7 @@ import { Bar, Metric, StatusBadge } from "../../ui/legacy";
 import { Area, AreaChart, Bar as ReBar, BarChart as ReBarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import CompanyReports from "./CompanyReports";
 import EmployeeStatement from "./EmployeeStatement";
+import EmployeeDrawer from "./EmployeeDrawer";
 import PulseStrip from "./PulseStrip";
 import { CollapsiblePanel, Skeleton, SkeletonTableRows } from "../../ui/primitives";
 
@@ -28,8 +29,17 @@ function OwnerDashboard({ onToast }) {
   const [customRange, setCustomRange] = useState({ from: `${todayIso().slice(0, 7)}-01`, to: todayIso() });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // Spec 06 §C: a payroll row opens كشف حساب for that employee.
+  // A payroll row opens كشف حساب for that employee: as the desktop drawer
+  // (spec 07) from 1024px, and by selecting + scrolling to the statement
+  // section on smaller screens (spec 06 §C).
   const [focusEmployee, setFocusEmployee] = useState(null);
+  const [drawerEmployee, setDrawerEmployee] = useState(null);
+
+  function openEmployee(row) {
+    const desktop = window.matchMedia("(min-width: 1024px)").matches;
+    if (desktop) setDrawerEmployee({ id: row.employee_id, name: row.name });
+    else setFocusEmployee({ id: row.employee_id, at: Date.now() });
+  }
   // Narrow screens squeeze the employee bar chart — shrink its Arabic Y-axis.
   const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 640px)").matches);
   // Brand accent for charts, resolved at runtime so the airocean magenta build
@@ -432,7 +442,7 @@ function OwnerDashboard({ onToast }) {
                     type="button"
                     className="payroll-card-row"
                     key={row.employee_id}
-                    onClick={() => setFocusEmployee({ id: row.employee_id, at: Date.now() })}
+                    onClick={() => openEmployee(row)}
                     aria-label={`كشف حساب ${row.name}`}
                   >
                     <span className="payroll-initial" aria-hidden="true">{String(row.name).trim().charAt(0)}</span>
@@ -549,6 +559,7 @@ function OwnerDashboard({ onToast }) {
       />
 
       <EmployeeStatement onToast={onToast} focusEmployee={focusEmployee} />
+      <EmployeeDrawer employee={drawerEmployee} onClose={() => setDrawerEmployee(null)} onToast={onToast} />
       <AccountManager onToast={onToast} />
     </div>
   );

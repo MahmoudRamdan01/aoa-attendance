@@ -4836,3 +4836,315 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   }
   .lg-logo { animation: lgRise 0.5s ease-out both; }
 }
+
+/* =====================================================================
+   Phase 9 — desktop content patterns + employee drawer
+   (07-desktop-spec.md §Content patterns / §Employee drawer).
+   The four patterns below are the ONLY desktop layout primitives; every
+   screen composes from them so the workspace stays consistent.
+   ===================================================================== */
+@media (min-width: 1024px) {
+  /* 1 — metric row */
+  .dk-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .dk-metric {
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+
+  .dk-metric-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-muted);
+    font: 500 11px/1.5 var(--font-body);
+  }
+
+  .dk-metric-label i {
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+    background: currentcolor;
+    flex: none;
+  }
+
+  .dk-metric-value {
+    margin-block-start: 4px;
+    font: 600 24px/1.2 var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 4 — main + right rail */
+  .dk-rail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .dk-rail-col { display: grid; gap: 12px; align-content: start; }
+
+  /* 3 — table */
+  .dk-table-wrap {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .dk-table { inline-size: 100%; border-collapse: collapse; }
+
+  .dk-table thead th {
+    padding: 10px 14px;
+    background: var(--surface-nested);
+    color: var(--text-muted);
+    font: 600 10px/1.5 var(--font-body);
+    text-align: start;
+    white-space: nowrap;
+  }
+
+  .dk-table tbody td {
+    padding: 0 14px;
+    block-size: 44px;
+    border-block-start: 1px solid var(--line-subtle);
+    font: 400 12px/1.5 var(--font-body);
+    vertical-align: middle;
+  }
+
+  .dk-table tbody tr:hover { background: var(--surface-raised); }
+  .dk-table tbody tr[data-clickable] { cursor: pointer; }
+  .dk-table .num,
+  .dk-table .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .dk-avatar {
+    inline-size: 30px;
+    block-size: 30px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--surface-raised);
+    font: 600 12px/1 var(--font-display);
+  }
+
+  .dk-cell-emp { display: flex; align-items: center; gap: 10px; min-inline-size: 0; }
+
+  .dk-table tfoot td {
+    padding: 12px 14px;
+    background: var(--surface-nested);
+    border-block-start: 1px solid var(--line);
+    font: 600 12.5px/1.4 var(--font-body);
+  }
+
+  .dk-table tfoot .dk-total { color: var(--gold-text); font-family: var(--font-mono); }
+}
+
+/* Employee drawer — desktop detail surface. Rendered on every breakpoint so
+   a deep link works, but sized as a right-side sheet only from 1024px. */
+.emp-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(6, 12, 20, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.emp-drawer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 121;
+  inline-size: min(520px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome);
+  border-inline-start: 1px solid var(--line);
+  box-shadow: -30px 0 70px rgba(0, 0, 0, 0.4);
+  animation: dkDrawerIn 0.22s ease-out both;
+}
+
+@keyframes dkDrawerIn {
+  from { opacity: 0; translate: 24px 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+.emp-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 20px 22px 16px;
+  border-block-end: 1px solid var(--line-subtle);
+}
+
+.emp-drawer-avatar {
+  inline-size: 48px;
+  block-size: 48px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  color: var(--gold-text);
+  font: 600 19px/1 var(--font-display);
+}
+
+.emp-drawer-id { flex: 1; min-inline-size: 0; }
+.emp-drawer-id strong { display: block; font: 700 15px/1.4 var(--font-body); }
+.emp-drawer-id span { display: block; margin-block-start: 2px; color: var(--text-muted); font: 400 11px/1.4 var(--font-body); }
+
+.emp-drawer-body {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 16px 22px 22px;
+}
+
+.emp-drawer-body::-webkit-scrollbar { inline-size: 0; }
+
+/* The embedded statement is already a panel — strip its chrome inside the
+   drawer so it reads as one surface. */
+.emp-drawer-body > .panel {
+  border: none;
+  background: none;
+  padding: 0;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emp-drawer { animation: none; }
+}
+
+/* Desktop table treatment (spec 07 §Content patterns 3) applied to the
+   EXISTING tables so every table screen — لوحة الحضور، الموظفون، المالية،
+   الرواتب — gets the workspace density without forking layouts. */
+@media (min-width: 1024px) {
+  .table-wrap {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    overflow: auto hidden;
+  }
+
+  .table-wrap > table { inline-size: 100%; border-collapse: collapse; }
+
+  .table-wrap > table > thead > tr > th {
+    padding: 10px 14px;
+    background: var(--surface-nested);
+    border-block-end: none;
+    color: var(--text-muted);
+    font: 600 10px/1.5 var(--font-body);
+    text-align: start;
+    white-space: nowrap;
+  }
+
+  .table-wrap > table > tbody > tr > td {
+    padding: 0 14px;
+    block-size: 44px;
+    border-block-start: 1px solid var(--line-subtle);
+    font: 400 12px/1.5 var(--font-body);
+    vertical-align: middle;
+  }
+
+  .table-wrap > table > tbody > tr:hover { background: var(--surface-raised); }
+
+  /* Times and money read as figures, never as prose. */
+  .table-wrap > table > tbody > tr > td bdi,
+  .table-wrap > table > tbody > tr > td .num,
+  .table-wrap > table > tbody > tr > td .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Panels breathe less on a workspace than on a phone. */
+  .ops-main .panel { padding: 16px 18px; }
+}
+
+/* The desktop topbar carries the view title + breadcrumb, so the in-page
+   header would repeat it. This lives in the LAST layer because the base
+   `.ui-page-header` rule sits in the primitives layer, and layer order beats
+   specificity. */
+@media (min-width: 1024px) {
+  .ops-main > .ops-main-inner > .ui-page-header { display: none; }
+}
+
+/* =====================================================================
+   Phase 9 — desktop screen layouts (07-desktop-spec.md §Screens).
+   The redesigned screens are phone-width by default; on the workspace they
+   spread into the spec's two-column shapes instead of a stretched column.
+   ===================================================================== */
+@media (min-width: 1024px) {
+  /* اليوم — 1fr / 380px: map + status on the left, the check-in column on
+     the right rail (spec 07 §Screens). Explicit placement keeps the rail one
+     card even though the DOM order is phone-first. */
+  .today-screen {
+    max-inline-size: none;
+    margin-inline: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    align-content: start;
+    gap: 14px;
+  }
+
+  .today-screen > .lmap { grid-column: 1; grid-row: 1 / span 2; block-size: 340px; margin-block-start: 0; }
+  .today-screen > .today-status { grid-column: 1; grid-row: 3; margin-block-start: 0; }
+  .today-screen > .today-note-field { grid-column: 1; grid-row: 4; }
+  .today-screen > .today-note-line { grid-column: 1; grid-row: 5; margin: 0; }
+  .today-screen > .today-location-chip { grid-column: 1; grid-row: 6; }
+
+  /* Rail: clock card above the check-in card (spec 07 §Screens). */
+  .today-screen > .today-clockline,
+  .today-screen > .ring-wrap {
+    grid-column: 2;
+    align-self: start;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+  }
+
+  .today-screen > .today-clockline { grid-row: 1; padding: 18px 0; }
+  .today-screen > .ring-wrap { grid-row: 2; padding-block: 18px 24px; }
+
+  .today-screen > .capture-shortcut { grid-column: 2; }
+
+  /* الرواتب / سجلي / طلباتي — use the workspace width; payroll gains the
+     right rail from the spec's pattern 4. */
+  .record-screen,
+  .payroll-screen,
+  .requests-screen {
+    max-inline-size: none;
+    margin-inline: 0;
+  }
+
+  .payroll-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 14px;
+    align-items: start;
+  }
+
+  /* Pulse + hero + KPIs lead the main column; the queue and the lists that
+     read as "side" content move into the rail. */
+  .payroll-screen > .pulse-strip,
+  .payroll-screen > .owner-hero,
+  .payroll-screen > .owner-kpis,
+  .payroll-screen > .payroll-card-list,
+  .payroll-screen > .panel { grid-column: 1; }
+
+  .payroll-screen > .owner-inbox-entry,
+  .payroll-screen > .owner-lates { grid-column: 2; }
+
+  .payroll-screen > .pulse-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .payroll-screen > .owner-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  /* Requests: the type grid and list read better centred at reading width. */
+  .requests-screen { max-inline-size: 980px; }
+  .record-screen { max-inline-size: 980px; }
+}

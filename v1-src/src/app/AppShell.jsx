@@ -22,6 +22,7 @@ import FaceLoginSetup, { requestFaceSetup } from "../features/system/FaceLoginSe
 import OfflineBanner from "../ui/OfflineBanner";
 import { PageHeader } from "../ui/primitives";
 import {
+  SECTION_META,
   allowedViews,
   createQuickActions,
   getFallbackView,
@@ -362,6 +363,17 @@ export default function AppShell({
             </span>
           </button>
 
+          {/* Desktop (spec 07): the topbar carries the view title + breadcrumb;
+              the brand moved into the sidebar. Hidden on mobile by CSS. */}
+          <div className="ops-topbar-title">
+            <strong>{activeItem?.ar || "لوحة التحكم"}</strong>
+            <span>
+              الرئيسية
+              {SECTION_META[activeItem?.section]?.ar ? ` / ${SECTION_META[activeItem.section].ar}` : ""}
+              {activeItem?.ar ? ` / ${activeItem.ar}` : ""}
+            </span>
+          </div>
+
           <div className="ops-topbar-center">
             <button ref={paletteTriggerRef} className="ops-search-trigger" type="button" onClick={openPalette}>
               <Search size={17} aria-hidden="true" />
@@ -416,6 +428,21 @@ export default function AppShell({
 
       <div className="ops-layout">
         <aside className="ops-sidebar" aria-label="التنقل الرئيسي">
+          {/* Desktop brand block (spec 07 §Shell). The sidebar is hidden on
+              mobile, so this never competes with the mobile greeting. */}
+          <button
+            type="button"
+            className="ops-sidebar-brand"
+            onClick={() => navigate(getFallbackView(accessibleViews, context))}
+            aria-label="الرجوع للصفحة الرئيسية"
+          >
+            <img src="./logo.png" alt="" />
+            <span>
+              <strong lang="en" dir="ltr">{COMPANY.opsTitle}</strong>
+              <small>{roleNames[role] || role}</small>
+            </span>
+          </button>
+
           <nav className="ops-sidebar-nav">
             {navGroups.map((group) => (
               <section className="ops-nav-section" key={group.id}>
