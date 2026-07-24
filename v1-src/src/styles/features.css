@@ -2804,7 +2804,9 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
 }
 
 .today-clock span {
-  font: 600 46px/1.15 var(--font-display);
+  /* 46px → 32px in spec 06 so the map leads the screen. */
+  font: 600 32px/1.1 var(--font-display);
+  letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
   unicode-bidi: isolate;
 }
@@ -2941,10 +2943,14 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
 }
 
 .ring-fail {
-  background: var(--danger-soft);
+  /* Solid fill (spec 06) — the translucent one muddied over the map. */
+  background: #241a22;
+  border: 1px solid rgba(255, 107, 112, 0.3);
   color: var(--danger);
   cursor: default;
 }
+
+:root:not(.dark) .ring-fail { background: #fdf0f1; }
 
 .ring-fail strong { font: 700 12.5px/1.5 var(--font-body); }
 .ring-fail small { color: var(--text-secondary); opacity: 1; font-weight: 400; max-block-size: 48px; overflow: hidden; }
@@ -2986,10 +2992,14 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
 }
 
 .ring-done {
-  background: var(--success-soft);
+  /* Solid fill (spec 06). */
+  background: #16302b;
+  border: 1px solid rgba(67, 217, 160, 0.3);
   color: var(--success);
   cursor: default;
 }
+
+:root:not(.dark) .ring-done { background: #eefaf5; }
 
 .ring-done strong { font: 700 15px/1.4 var(--font-body); }
 .ring-done small { font: 600 13px/1.4 var(--font-mono); opacity: 0.9; }
@@ -3002,6 +3012,171 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
 }
 
 .ring-locked strong { font: 700 13px/1.5 var(--font-body); }
+
+/* =====================================================================
+   Phase 8 — hybrid map card on اليوم (06-hybrid-map-spec.md).
+   A status view, not a pannable map: pointer-events are off so a finger
+   starting on the card still scrolls the page.
+   ===================================================================== */
+.lmap {
+  position: relative;
+  block-size: 200px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: #0f1b28;
+  overflow: hidden;
+  margin-block-start: 12px;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+:root:not(.dark) .lmap { background: #e8edf2; }
+
+.lmap-canvas {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* Shown as soon as Leaflet boots — it carries the geofence circle and the
+   pin, which must render even when no tile ever arrives. */
+.lmap.has-map .lmap-canvas { opacity: 1; }
+.lmap.has-tiles .lmap-streets { opacity: 0; }
+
+/* Placeholder streets — the look until tiles arrive, and permanently when
+   the tile host is blocked or the device is offline. */
+.lmap-streets { position: absolute; inset: 0; transition: opacity 0.5s ease; }
+.lmap-streets i,
+.lmap-streets b { position: absolute; background: #16283a; display: block; }
+:root:not(.dark) .lmap-streets i,
+:root:not(.dark) .lmap-streets b { background: #d3dce6; }
+.lmap-streets i:nth-child(1) { inset-inline: 0; inset-block-start: 54px; block-size: 9px; }
+.lmap-streets i:nth-child(2) { inset-inline: 0; inset-block-start: 128px; block-size: 13px; }
+.lmap-streets i:nth-child(3) { inset-block: 0; inset-inline-start: 58px; inline-size: 9px; }
+.lmap-streets i:nth-child(4) { inset-block: 0; inset-inline-end: 84px; inline-size: 12px; }
+.lmap-streets b { background: #131f2c; border-radius: 5px; }
+:root:not(.dark) .lmap-streets b { background: #dde4ec; }
+.lmap-streets b:nth-child(5) { inset-block-start: 8px; inset-inline-start: 78px; inline-size: 90px; block-size: 36px; }
+.lmap-streets b:nth-child(6) { inset-block-start: 8px; inset-inline-end: 110px; inline-size: 64px; block-size: 34px; }
+.lmap-streets b:nth-child(7) { inset-block-start: 74px; inset-inline-end: 14px; inline-size: 58px; block-size: 42px; }
+.lmap-streets b:nth-child(8) { inset-block-start: 152px; inset-inline-start: 16px; inline-size: 70px; block-size: 44px; }
+
+/* Geofence + pin drawn in CSS while the placeholder is showing. */
+.lmap-fallback-zone { position: absolute; inset: 0; }
+
+.lmap-fallback-circle {
+  position: absolute;
+  inset-block-start: 46%;
+  inset-inline-start: 50%;
+  inline-size: 118px;
+  block-size: 118px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(180, 196, 210, 0.05);
+  border: 1.5px solid rgba(180, 196, 210, 0.22);
+  transition: background 0.45s, border-color 0.45s;
+}
+
+.lmap[data-state="in"] .lmap-fallback-circle { background: rgba(67, 217, 160, 0.08); border-color: rgba(67, 217, 160, 0.35); }
+.lmap[data-state="poor"] .lmap-fallback-circle { background: rgba(255, 184, 77, 0.08); border-color: rgba(255, 184, 77, 0.38); }
+.lmap[data-state="out"] .lmap-fallback-circle { background: rgba(255, 107, 112, 0.07); border-color: rgba(255, 107, 112, 0.4); }
+
+.lmap-fallback-pin {
+  position: absolute;
+  inset-block-start: 46%;
+  inset-inline-start: 50%;
+  transform: translate(-50%, -100%);
+  transition: inset-block-start 0.55s ease, inset-inline-start 0.55s ease;
+}
+
+.lmap[data-state="out"] .lmap-fallback-pin { inset-block-start: 76%; inset-inline-start: 22%; }
+
+/* Shared pin visual (Leaflet divIcon + CSS fallback). */
+.lmap-fallback-pin i,
+.lmap-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 25px;
+  block-size: 25px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 6px 18px var(--gold-soft);
+}
+
+.lmap-fallback-pin i::after,
+.lmap-pin i {
+  content: "";
+  display: block;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: #0b1621;
+}
+
+.lmap-pin-icon { display: flex; flex-direction: column; align-items: center; }
+.lmap-pin-stem { inline-size: 3px; block-size: 9px; background: var(--gold); }
+
+.lmap-chip {
+  position: absolute;
+  inset-block-start: 12px;
+  inset-inline-end: 12px;
+  z-index: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(14, 25, 38, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(180, 196, 210, 0.22);
+  color: var(--text-muted);
+  font: 600 10.5px/1 var(--font-body);
+  transition: color 0.4s, border-color 0.4s;
+}
+
+:root:not(.dark) .lmap-chip { background: rgba(255, 255, 255, 0.9); }
+
+.lmap-chip i {
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+.lmap[data-state="in"] .lmap-chip { color: var(--success); border-color: rgba(67, 217, 160, 0.28); }
+.lmap[data-state="poor"] .lmap-chip { color: var(--warning); border-color: rgba(255, 184, 77, 0.3); }
+.lmap[data-state="out"] .lmap-chip { color: var(--danger); border-color: rgba(255, 107, 112, 0.35); }
+
+.lmap-scrim {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 56px;
+  z-index: 400;
+  background: linear-gradient(180deg, transparent, rgba(11, 22, 33, 0.55));
+}
+
+:root:not(.dark) .lmap-scrim { background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.5)); }
+
+/* Leaflet's own stylesheet is imported by LocationMap and may load after
+   this file, so the container background needs !important — otherwise its
+   default #ddd hides the placeholder streets underneath. */
+.lmap .leaflet-container {
+  inline-size: 100%;
+  block-size: 100%;
+  background: transparent !important;
+  outline: none;
+  font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lmap-fallback-pin,
+  .lmap-fallback-circle,
+  .lmap-canvas,
+  .lmap-streets { transition: none; }
+}
 
 /* ---- chips + fields under the ring ---- */
 .today-location-chip {
@@ -3258,34 +3433,44 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   font: 400 11.5px/1.6 var(--font-body);
 }
 
-/* Sticky (not fixed): the animated view container keeps a transform, which
-   would re-anchor position:fixed to the view instead of the viewport. Sticky
-   pins to the scrollport and stays correct inside transformed ancestors.
-   In RTL margin-inline-start:auto pushes it to the LEFT edge (spec F). */
-.requests-fab {
-  position: sticky;
-  inset-block-end: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 18px);
-  z-index: 40;
-  margin-inline-start: auto;
-  margin-block-start: 4px;
-  inline-size: 52px;
-  block-size: 52px;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 18px;
-  background: var(--gold);
-  color: var(--gold-on);
-  box-shadow: 0 14px 34px var(--gold-soft);
-  cursor: pointer;
+/* Spec 06 §F — "طلب جديد" type grid replaces the FAB. Types come from the
+   app's real request types (إذن / أجازة). */
+.req-types { margin-block-end: 18px; }
+
+.req-types-title {
+  margin: 0 0 10px;
+  font: 700 13px/1.5 var(--font-body);
 }
 
-.requests-fab:active { transform: scale(0.95); }
+.req-types-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
 
-@media (min-width: 821px) {
-  .requests-fab {
-    inset-block-end: 26px;
-  }
+.req-type {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 13px 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--text-secondary);
+  font: 600 11px/1 var(--font-body);
+  cursor: pointer;
+  transition: transform var(--duration-fast), border-color var(--duration-fast);
+}
+
+.req-type:active { transform: scale(0.96); }
+.req-type[data-tone="leave"] > svg { color: var(--info); }
+.req-type[data-tone="permission"] > svg { color: var(--warning); }
+.req-type:hover { border-color: var(--gold-line); }
+
+.req-list-title {
+  margin: 0 0 10px;
+  font: 700 13px/1.5 var(--font-body);
 }
 
 /* =====================================================================
@@ -3472,10 +3657,23 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   block-size: 34px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  /* Circle in spec 06 §C (was a 10px rounded square). */
+  border-radius: 50%;
   background: var(--surface-raised);
   font: 600 13px/1 var(--font-display);
 }
+
+/* The row became a button (opens كشف حساب for that employee). */
+.payroll-card-row {
+  inline-size: 100%;
+  text-align: start;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.payroll-card-row:active { transform: scale(0.995); }
+.payroll-row-chevron { flex: 0 0 auto; color: var(--text-disabled); }
 
 .payroll-copy { flex: 1; min-inline-size: 0; display: grid; gap: 1px; }
 .payroll-copy strong { font: 600 13px/1.5 var(--font-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4238,6 +4436,18 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   border-radius: var(--radius-card);
   background: var(--surface);
   overflow: hidden;
+}
+
+/* "أمان الحضور" copy block (moved off اليوم in spec 06). */
+.more-note {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text-muted);
+  font: 400 11px/1.6 var(--font-body);
 }
 
 .ops-mobile-more .more-row {

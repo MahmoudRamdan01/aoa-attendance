@@ -28,6 +28,8 @@ function OwnerDashboard({ onToast }) {
   const [customRange, setCustomRange] = useState({ from: `${todayIso().slice(0, 7)}-01`, to: todayIso() });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Spec 06 §C: a payroll row opens كشف حساب for that employee.
+  const [focusEmployee, setFocusEmployee] = useState(null);
   // Narrow screens squeeze the employee bar chart — shrink its Arabic Y-axis.
   const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 640px)").matches);
   // Brand accent for charts, resolved at runtime so the airocean magenta build
@@ -426,7 +428,13 @@ function OwnerDashboard({ onToast }) {
               {stats.payrollRows.map((row) => {
                 const totalCut = row.deductionAmount + row.financialDeduction;
                 return (
-                  <div className="payroll-card-row" key={row.employee_id}>
+                  <button
+                    type="button"
+                    className="payroll-card-row"
+                    key={row.employee_id}
+                    onClick={() => setFocusEmployee({ id: row.employee_id, at: Date.now() })}
+                    aria-label={`كشف حساب ${row.name}`}
+                  >
                     <span className="payroll-initial" aria-hidden="true">{String(row.name).trim().charAt(0)}</span>
                     <span className="payroll-copy">
                       <strong>{row.name}</strong>
@@ -440,7 +448,8 @@ function OwnerDashboard({ onToast }) {
                         ? <i className="is-cut">خصم {money(totalCut)} ج</i>
                         : <i className="is-ok">مكتمل</i>}
                     </span>
-                  </div>
+                    <ChevronLeft size={14} className="payroll-row-chevron" aria-hidden="true" />
+                  </button>
                 );
               })}
               <div className="payroll-cards-foot">
@@ -539,7 +548,7 @@ function OwnerDashboard({ onToast }) {
         loading={loading}
       />
 
-      <EmployeeStatement onToast={onToast} />
+      <EmployeeStatement onToast={onToast} focusEmployee={focusEmployee} />
       <AccountManager onToast={onToast} />
     </div>
   );

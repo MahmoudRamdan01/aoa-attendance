@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { CalendarCheck, Clock4, X } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { addDays } from "../../lib/dates";
 
 import { StatusBadge } from "../../ui/legacy";
 
+// Spec 06 §F asks for a "طلب جديد" type grid instead of the FAB, with the
+// types read from the app's REAL request types — this system has exactly two
+// (إذن / أجازة); the prototype's اعتيادية/عارضة/مرضية/مأمورية have no
+// backing column or RPC, so inventing them would create requests the server
+// cannot record.
+const REQUEST_TYPES = [
+  { id: "leave", label: "أجازة", tone: "leave", Icon: CalendarCheck },
+  { id: "permission", label: "إذن", tone: "permission", Icon: Clock4 },
+];
+
 function RequestsView({ context, onToast }) {
   const [kind, setKind] = useState("permission");
   const [refreshKey, setRefreshKey] = useState(0);
-  // The create flow sits behind the FAB (redesign spec F); the forms and
+  // The create flow now opens from the type grid (spec 06 §F); the forms and
   // their RPCs are unchanged.
   const [createOpen, setCreateOpen] = useState(false);
   const refreshRequests = () => {
@@ -17,9 +27,38 @@ function RequestsView({ context, onToast }) {
     setCreateOpen(false);
   };
 
+  function startRequest(typeId) {
+    setKind(typeId);
+    setCreateOpen(true);
+  }
+
   return (
     <div className="requests-screen">
-      <MyRequests context={context} refreshKey={refreshKey} createOpen={createOpen} onCloseCreate={() => setCreateOpen(false)}>
+      <MyRequests
+        context={context}
+        refreshKey={refreshKey}
+        createOpen={createOpen}
+        onCloseCreate={() => setCreateOpen(false)}
+        typeGrid={
+          <div className="req-types">
+            <p className="req-types-title">طلب جديد</p>
+            <div className="req-types-grid">
+              {REQUEST_TYPES.map(({ id, label, tone, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="req-type"
+                  data-tone={tone}
+                  onClick={() => startRequest(id)}
+                >
+                  <Icon size={19} aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        }
+      >
         {createOpen ? (
           <section className="panel requests-create">
             <div className="panel-title between">
@@ -39,9 +78,6 @@ function RequestsView({ context, onToast }) {
           </section>
         ) : null}
       </MyRequests>
-      <button type="button" className="requests-fab" onClick={() => setCreateOpen((open) => !open)} aria-label="طلب جديد" aria-expanded={createOpen}>
-        <Plus size={22} aria-hidden="true" />
-      </button>
     </div>
   );
 }
@@ -134,7 +170,7 @@ function LeaveForm({ context, onToast, onDone }) {
   );
 }
 
-function MyRequests({ context, refreshKey, children }) {
+function MyRequests({ context, refreshKey, children, typeGrid }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all"); // all | pending (spec F)
@@ -188,8 +224,10 @@ function MyRequests({ context, refreshKey, children }) {
         </div>
       </div>
 
+      {typeGrid}
       {children}
 
+      <p className="req-list-title">طلباتي السابقة</p>
       <div className="requests-list">
         {loading && <p className="muted">جارٍ تحميل الطلبات...</p>}
         {!loading && visible.length === 0 && (

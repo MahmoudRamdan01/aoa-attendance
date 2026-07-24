@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, MapPin, MessageSquare, ShieldCheck } from "lucide-react";
+import { Camera, MessageSquare } from "lucide-react";
 import { distanceMeters, supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { getCompanyLocation } from "../../lib/dates";
@@ -20,6 +20,7 @@ import { ConfirmDialog } from "../../ui/primitives";
 import { SYNC_REQUEST_EVENT, announceQueue } from "../../ui/OfflineBanner";
 import CaptureSheet, { requestCaptureSession } from "./CaptureSheet";
 import CheckInRing from "./CheckInRing";
+import LocationMap from "./LocationMap";
 import { prepareFaceEngine } from "./useFaceEngine";
 import { startGpsSampler } from "./useGpsSampler";
 
@@ -166,6 +167,32 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
     const timer = window.setInterval(() => setClock(new Date()), 1_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Phase-8 map card: a low-power watcher feeds the pin/zone chip. This is
+  // presentation only — the recorded fix still comes from the same GPS
+  // sampler the RPC path uses; nothing here is ever submitted. Employees
+  // exempt from the geofence don't need it (and the map is hidden for them).
+  useEffect(() => {
+    if (employee?.location_exempt || !navigator.geolocation) return undefined;
+    let alive = true;
+    const id = navigator.geolocation.watchPosition(
+      (position) => {
+        if (!alive) return;
+        const fix = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: Math.round(position.coords.accuracy || 0),
+        };
+        setLocationState({ ...fix, distance: distanceMeters(fix, companyLocation) });
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 },
+    );
+    return () => {
+      alive = false;
+      navigator.geolocation.clearWatch(id);
+    };
+  }, [employee?.location_exempt, companyLocation.lat, companyLocation.lng]);
 
   useEffect(() => {
     if (routeParam === "capture-in" && !todayRecord?.check_in && !dayLocked) setShortcutRequested(true);
@@ -364,6 +391,17 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       onToast(ERROR_MESSAGES.day_locked);
       return;
     }
+    // Known-outside fix: the server would reject this anyway, so fail in the
+    // ring immediately instead of paying a round-trip (spec 06 §gating). Only
+    // this one case short-circuits — every OTHER failure still comes from the
+    // server response, and employees exempt from the geofence never hit it.
+    if (!employee?.location_exempt && locationState && !insideRange) {
+      setRingError({
+        title: ERROR_TITLES.outside,
+        detail: `أنت على بُعد ~${roundedDistance} م — اقترب من الموقع وأعد المحاولة`,
+      });
+      return;
+    }
     if (!cameraNeeded) {
       submitDirect(kind);
       return;
@@ -500,7 +538,26 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
         ? { open: false, label: "انتهى وقت الانصراف" }
         : { open: true, label: "تسجيل انصراف" };
   const bigClock = fmtClock12(clock);
-  const insideRange = locationState && locationState.distance <= (companyLocation.radiusMeters || 1000);
+  const zoneRadius = companyLocation.radiusMeters || 1000;
+  const insideRange = locationState && locationState.distance <= zoneRadius;
+
+  // ---- Phase-8 map state (presentation; the server stays the authority) ----
+  const showMap = !employee?.location_exempt;
+  const accuracyLimit = 300; // same ceiling the capture path rejects at
+  const mapState = !locationState
+    ? "unknown"
+    : !insideRange
+      ? "out"
+      : locationState.accuracy > accuracyLimit
+        ? "poor"
+        : "in";
+  const roundedDistance = locationState ? Math.round(locationState.distance / 10) * 10 : 0;
+  const mapChip = {
+    unknown: "جارٍ تحديد موقعك…",
+    in: `داخل نطاق الشركة · دقة ±${Math.round(locationState?.accuracy || 0)} م`,
+    poor: `دقة GPS ضعيفة · ±${Math.round(locationState?.accuracy || 0)} م`,
+    out: `خارج نطاق الشركة · ~${roundedDistance} م`,
+  }[mapState];
 
   return (
     <>
@@ -521,6 +578,17 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
           <StatusDot done={!!todayRecord?.check_out} label="انصراف" value={fmtTime12(todayRecord?.check_out) || "لم يُسجَّل"} />
         </div>
 
+        {/* Map card (spec 06): leads the screen, ring sits below it */}
+        {showMap ? (
+          <LocationMap
+            center={companyLocation}
+            radiusMeters={zoneRadius}
+            position={locationState}
+            state={mapState}
+            chipText={mapChip}
+          />
+        ) : null}
+
         {/* The ring — same attendance() entrypoints as the old buttons */}
         <CheckInRing
           phase={ringPhase}
@@ -536,15 +604,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
           disabled={Boolean(busy)}
         />
 
-        {/* Location chip (after a live fix exists) */}
-        {locationState ? (
-          <p className={cls("today-location-chip", insideRange && "is-inside")}>
-            {insideRange ? <MapPin size={13} /> : <MapPin size={13} />}
-            {insideRange
-              ? `داخل نطاق الشركة · دقة ±${Math.round(locationState.accuracy)} م`
-              : `خارج النطاق — المسافة ${Math.round(locationState.distance)} م · دقة ±${Math.round(locationState.accuracy)} م`}
-          </p>
-        ) : null}
+        {/* Location chip removed in spec 06 — it now lives inside the map */}
         {todayNote ? <p className="muted today-note-line">{todayNote}</p> : null}
 
         {shortcutRequested ? (
@@ -570,18 +630,8 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
           <p className="muted"><MessageSquare size={15} /> ملاحظتك المسجلة: {todayRecord.employee_note}</p>
         ) : null}
 
-        {/* Security card — the design's exact copy */}
-        <div className="today-security-card">
-          <div className="today-security-head">
-            <ShieldCheck size={15} aria-hidden="true" />
-            <strong>تسجيل آمن — بدون صور</strong>
-          </div>
-          <div className="today-security-rules">
-            <span>· التحقق من الوجه لحظي؛ تُخزَّن بصمة رقمية مشفّرة فقط.</span>
-            <span>· يلزم التواجد داخل نطاق {companyLocation.radiusMeters} متر من موقع الشركة.</span>
-            <span>· تُحفظ العمليات دون اتصال وتُزامَن تلقائيًا.</span>
-          </div>
-        </div>
+        {/* Security card removed in spec 06 — its three lines moved to
+            المزيد → "أمان الحضور"; the ring already says "لا تُحفظ أي صور". */}
       </div>
 
       <ConfirmDialog

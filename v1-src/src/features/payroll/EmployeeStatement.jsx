@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Banknote, CalendarDays, Clock3, FileSpreadsheet, FileText, PiggyBank, TrendingDown, UserCheck, UserX, Wallet } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { computePayroll, getPayrollConfig } from "../../lib/payroll";
@@ -13,6 +13,10 @@ import { Metric, StatusBadge } from "../../ui/legacy";
 function EmployeeStatement({
   onToast, fixedEmployeeId = null, fixedEmployeeName = "",
   from: fromProp, to: toProp, setFrom: setFromProp, setTo: setToProp,
+  // Spec 06 §C: tapping a payroll row opens this statement for that
+  // employee. The parent bumps `focusEmployee` ({ id, at }) and we select +
+  // scroll; `at` makes repeat taps on the same row still scroll back.
+  focusEmployee = null,
 }) {
   const [employees, setEmployees] = useState([]);
   const [employeeId, setEmployeeId] = useState(fixedEmployeeId ? String(fixedEmployeeId) : "");
@@ -30,6 +34,14 @@ function EmployeeStatement({
   // Payroll mode (monthly / daily-allowance) comes from the company database.
   const [payConfig, setPayConfig] = useState(null);
   useEffect(() => { getPayrollConfig().then(setPayConfig); }, []);
+
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!focusEmployee?.id || fixedEmployeeId) return;
+    setEmployeeId(String(focusEmployee.id));
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusEmployee?.id, focusEmployee?.at, fixedEmployeeId]);
 
   useEffect(() => {
     if (fixedEmployeeId) { setEmployeeId(String(fixedEmployeeId)); return; }
@@ -157,7 +169,7 @@ function EmployeeStatement({
   }
 
   return (
-    <section className="panel">
+    <section className="panel" ref={rootRef}>
       <div className="panel-title between">
         <div><FileText size={20} /><h2>{fixedEmployeeId ? `كشف حساب — ${fixedEmployeeName}` : "كشف حساب موظف"}</h2></div>
         <div className="toolbar">

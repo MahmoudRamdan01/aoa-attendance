@@ -601,6 +601,14 @@ export default function AppShell({
                 <span className="more-row-label">تسجيل خروج</span>
               </button>
             </div>
+
+            {/* Spec 06: the three "تسجيل آمن" lines moved off اليوم to here. */}
+            <p className="more-section-label">أمان الحضور</p>
+            <div className="more-note">
+              <span>· التحقق من الوجه لحظي؛ تُخزَّن بصمة رقمية مشفّرة فقط — بدون صور.</span>
+              <span>· يلزم التواجد داخل نطاق موقع الشركة عند التسجيل.</span>
+              <span>· تُحفظ العمليات دون اتصال وتُزامَن تلقائيًا.</span>
+            </div>
           </section>
         </div>
       ) : null}
