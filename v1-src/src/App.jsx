@@ -26,6 +26,7 @@ const VIEW_LOADERS = {
   assistant: () => import("./features/assistant/AssistantView"),
   team: () => import("./features/people/EmployeesView"),
   admin: () => import("./features/attendance/AdminDashboard"),
+  inbox: () => import("./features/system/ApprovalsInbox"),
   security: () => import("./features/system/SecuritySettings"),
   owner: () => import("./features/payroll/OwnerDashboard"),
   expenses: () => import("./features/finance/ExpensesView"),
@@ -107,6 +108,7 @@ function lazyView(viewId) {
 const AssistantView = lazyView("assistant");
 const EmployeesView = lazyView("team");
 const AdminDashboard = lazyView("admin");
+const ApprovalsInbox = lazyView("inbox");
 const SecuritySettings = lazyView("security");
 const OwnerDashboard = lazyView("owner");
 const ExpensesView = lazyView("expenses");
@@ -207,6 +209,7 @@ function App() {
       partner: PartnerLedgerView,
       team: EmployeesView,
       admin: AdminDashboard,
+      inbox: ApprovalsInbox,
       security: SecuritySettings,
       owner: OwnerDashboard,
       ownerbook: OwnerLedgerView,
@@ -330,18 +333,8 @@ function App() {
     });
   }, [activeView, routeSignature, context?.role, context?.employee?.id, viewRegistry]);
 
-  useEffect(() => {
-    if (!session || !context || context.migration_required) return;
-    let cancelled = false;
-    supabase.rpc("broadcast_daily_qr_v1").then(({ data }) => {
-      if (!cancelled && data?.sent && (context.role === "hr" || context.role === "owner")) {
-        setToast(`تم إرسال QR اليوم تلقائيًا إلى ${data.count || 0} من الفريق.`);
-      }
-    }).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.user?.id, context?.role, context?.employee?.id, context?.migration_required]);
+  // QR was removed from the product (owner decision; qr_required is off in
+  // both databases) — the daily broadcast_daily_qr_v1 call went with it.
 
   async function loadContext(activeSession = session, isCancelled = () => false) {
     if (!activeSession) return;

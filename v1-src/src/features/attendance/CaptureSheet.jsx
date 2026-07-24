@@ -58,6 +58,10 @@ export default function CaptureSheet({
   faceMode = "off",
   antispoofMin = 0.6,
   requireGps = true,
+  // quick: Face-ID-like flow (owner request) — no gesture challenge and no
+  // submit button; the capture fires by itself the moment every check is
+  // green. Server-side validation is untouched (same args, real scores).
+  quick = false,
   onCapture,
   onCancel,
 }) {
@@ -73,6 +77,7 @@ export default function CaptureSheet({
     videoRef,
     engine: session?.faceEngine,
     antispoofMin,
+    gesture: !quick,
   });
   const faceReady = faceMode === "off" || face.status === "ready" || face.status === "unavailable";
 
@@ -84,6 +89,17 @@ export default function CaptureSheet({
     if (requireGps) session.gpsSampler.first.then(() => setGpsReady(true)).catch((err) => setError(err.message));
     return () => stopSession(session);
   }, [session]);
+
+  // Quick mode: hands-free — the moment camera + GPS + face are all green,
+  // capture fires on its own (like unlocking a phone). A failed attempt shows
+  // the error with a manual retry instead of looping.
+  const autoFiredRef = useRef(false);
+  useEffect(() => {
+    if (!quick || busy || error || autoFiredRef.current) return;
+    if (!cameraReady || !gpsReady || !faceReady) return;
+    autoFiredRef.current = true;
+    capture();
+  });
 
   async function capture() {
     if (!cameraReady || busy) return;
@@ -129,16 +145,26 @@ export default function CaptureSheet({
         </button>
       </header>
 
-      <div className="capture-preview">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          autoPlay
-          onLoadedMetadata={() => setCameraReady(true)}
-        />
-        <div className="capture-guide" aria-hidden="true" />
-        <p>{faceMode === "off" ? "يُرجى توجيه الوجه داخل الإطار والنظر إلى الكاميرا" : face.instruction}</p>
+      <div className="capture-stage">
+        <div className="capture-preview">
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            autoPlay
+            onLoadedMetadata={() => setCameraReady(true)}
+          />
+          <div className="capture-guide" aria-hidden="true" />
+          <p>
+            {busy
+              ? "ثواني — جارٍ التحقق والتسجيل…"
+              : faceMode === "off"
+                ? "يُرجى توجيه الوجه داخل الإطار والنظر إلى الكاميرا"
+                : quick && face.status === "ready"
+                  ? "تم التعرف على وشك ✓"
+                  : face.instruction}
+          </p>
+        </div>
       </div>
 
       <div className="capture-checks" aria-live="polite">
@@ -162,15 +188,33 @@ export default function CaptureSheet({
 
       {error ? <p className="capture-error" role="alert">{error}</p> : null}
 
-      <button
-        className="capture-submit"
-        type="button"
-        onClick={capture}
-        disabled={!cameraReady || !gpsReady || !faceReady || busy}
-      >
-        {busy ? <Loader2 className="spin" size={21} /> : <Camera size={21} />}
-        {busy ? "جارٍ التحقق والتسجيل…" : "تحقق وتسجيل"}
-      </button>
+      {quick ? (
+        error ? (
+          <button
+            className="capture-submit"
+            type="button"
+            onClick={() => { setError(""); autoFiredRef.current = false; }}
+          >
+            <Camera size={21} />
+            إعادة المحاولة
+          </button>
+        ) : (
+          <p className="capture-auto-note" aria-live="polite">
+            {busy ? <Loader2 className="spin" size={17} /> : null}
+            {busy ? " جارٍ التسجيل تلقائيًا…" : "التسجيل تلقائي — مفيش أي زرار، بس بص للكاميرا"}
+          </p>
+        )
+      ) : (
+        <button
+          className="capture-submit"
+          type="button"
+          onClick={capture}
+          disabled={!cameraReady || !gpsReady || !faceReady || busy}
+        >
+          {busy ? <Loader2 className="spin" size={21} /> : <Camera size={21} />}
+          {busy ? "جارٍ التحقق والتسجيل…" : "تحقق وتسجيل"}
+        </button>
+      )}
       <p className="capture-privacy">لا يتم حفظ أي صور أو مقاطع فيديو — يتم استخراج بصمة رقمية مشفّرة فقط وتُحذف اللقطات فورًا.</p>
     </div>
   );

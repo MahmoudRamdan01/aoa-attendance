@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, RefreshCcw, Save, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Save, ShieldCheck } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { ConfirmDialog } from "../../ui/primitives";
 
@@ -64,7 +64,6 @@ export default function SecuritySettings({ onToast }) {
       <section className="panel">
         <div className="panel-title between">
           <div><ShieldCheck size={20} /><h2>أمان الحضور</h2></div>
-          <button className="secondary" type="button" onClick={load}><RefreshCcw size={16} /> تحديث</button>
         </div>
         <p className="muted">جميع التغييرات هنا للمالك فقط وتُسجَّل في سجل التدقيق. الانتقال الموصى به: إيقاف ← مراقبة لمدة أسبوعين ← منع.</p>
         <div className="security-metrics">

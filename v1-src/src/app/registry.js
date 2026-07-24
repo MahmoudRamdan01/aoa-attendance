@@ -5,6 +5,7 @@ import {
   Clock3,
   GraduationCap,
   History,
+  Inbox,
   Receipt,
   Scale,
   Settings2,
@@ -185,6 +186,21 @@ const DEFINITIONS = [
     mobileSlot: null,
   },
   {
+    // «الإشعارات والطلبات» (redesign spec D): the bell's destination for every
+    // role — notifications for all, plus the approvals section for owner/hr.
+    // Reached via the bell + the owner dashboard/admin entry cards; not in nav.
+    id: "inbox",
+    section: "operations",
+    accent: "attendance",
+    ar: "الإشعارات والطلبات",
+    en: "Inbox",
+    icon: Inbox,
+    legacyKind: "all",
+    capability: capabilities.authenticated,
+    mobileSlot: null,
+    nav: false,
+  },
+  {
     id: "security",
     section: "operations",
     accent: "attendance",
@@ -279,7 +295,7 @@ export function createQuickActions(context) {
     {
       id: "quick-team-requests",
       label: "مراجعة تشغيل الفريق",
-      description: "الحضور والطلبات المعلقة والـ QR",
+      description: "الحضور والطلبات المعلقة",
       icon: UserCog,
       view: "admin",
       capability: capabilities.admin,

@@ -169,9 +169,10 @@
 }
 
 .ops-icon-btn:hover {
-  border-color: var(--c-line);
-  background: var(--c-soft);
-  color: var(--c);
+  /* Accent discipline: chrome hovers are neutral — accent stays reserved. */
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--text);
   translate: 0 -1px;
 }
 
@@ -265,11 +266,7 @@
   scrollbar-width: thin;
 }
 
-@supports (background: color-mix(in srgb, white, black)) {
-  .ops-sidebar {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--chrome) 96%, var(--c) 4%), var(--chrome));
-  }
-}
+/* Accent discipline: the sidebar no longer tints toward the section accent. */
 
 .ops-sidebar-nav {
   flex: 1 0 auto;
@@ -368,7 +365,7 @@
 }
 
 .ops-nav-item[aria-current="page"] svg {
-  color: var(--c);
+  color: var(--nav-active);
 }
 
 .ops-nav-label {
@@ -401,6 +398,15 @@
 .ops-main {
   min-width: 0;
   padding: clamp(16px, 2.3vw, 34px);
+}
+
+/* اليوم scrolls normally (the owner tried a fully-pinned version and asked
+   for scrolling back); only sideways rubber-banding is suppressed. */
+@media (max-width: 980px) {
+  html:has(.ops-shell[data-view="today"]),
+  html:has(.ops-shell[data-view="today"]) body {
+    overscroll-behavior-x: none;
+  }
 }
 
 .ops-main-inner {
@@ -732,7 +738,7 @@
   place-items: center;
   border-radius: 9px;
   background: var(--surface-nested);
-  color: var(--c);
+  color: var(--text-secondary);
 }
 
 .ops-palette-result-copy {
@@ -1194,4 +1200,314 @@
 .ops-mobile-more,
 .ops-inbox-list {
   overscroll-behavior: contain;
+}
+
+/* =====================================================================
+   Redesign v2 — Phase 2: app chrome (mobile greeting header, offline
+   banner, refreshed bottom nav). Desktop chrome unchanged.
+   ===================================================================== */
+.ops-mobile-greeting {
+  display: none;
+}
+
+.ops-offline-banner {
+  position: sticky;
+  inset-block-start: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+  z-index: 85;
+  inline-size: 100%;
+  min-block-size: 38px;
+  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-block-end: 1px solid var(--warning-line);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font: 600 11px/1.5 var(--font-body);
+  cursor: pointer;
+}
+
+.ops-offline-banner:disabled {
+  opacity: 0.75;
+  cursor: progress;
+}
+
+.ops-offline-count {
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--warning-line);
+  font: 700 10px/1.4 var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 820px) {
+  /* Greeting header replaces the brand block on mobile (spec G). */
+  .ops-brand,
+  .ops-refresh-top,
+  .ops-theme-top {
+    display: none;
+  }
+
+  .ops-mobile-greeting {
+    min-inline-size: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ops-mobile-avatar {
+    flex: 0 0 auto;
+    inline-size: 38px;
+    block-size: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: var(--surface-raised);
+    color: var(--gold-text);
+    font: 700 16px/1 var(--font-display);
+  }
+
+  .ops-mobile-greet-copy {
+    min-inline-size: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .ops-mobile-greet-top {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-inline-size: 0;
+  }
+
+  .ops-mobile-greet-top strong {
+    font: 600 14px/1.4 var(--font-body);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ops-role-chip {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--gold-soft);
+    color: var(--gold-text);
+    font: 600 9.5px/1.4 var(--font-body);
+    font-style: normal;
+  }
+
+  .ops-mobile-greet-copy small {
+    color: var(--text-muted);
+    font: 400 11px/1.5 var(--font-body);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Bottom nav — frosted bar, gold active, calm idle (spec A). */
+  .ops-bottom-nav {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    border-block-start: 1px solid var(--line-subtle);
+    background: color-mix(in srgb, var(--chrome) 92%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: none;
+  }
+
+  .ops-bottom-tab {
+    color: var(--nav-idle);
+    font: 600 10px/1.4 var(--font-body);
+  }
+
+  .ops-bottom-tab svg {
+    inline-size: 21px;
+    block-size: 21px;
+  }
+
+  .ops-bottom-tab[aria-current="page"],
+  .ops-bottom-tab[aria-expanded="true"] {
+    background: transparent;
+    color: var(--nav-active);
+  }
+}
+
+/* Navigation scrolls #main-content into view — keep it clear of the fixed
+   topbar (the old PageHeader used to absorb this overlap). */
+.ops-main {
+  scroll-margin-block-start: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+}
+
+/* =====================================================================
+   Phase 9 — desktop workspace (07-desktop-spec.md).
+   ≥1024px: app-height grid, sidebar full height, only the content column
+   scrolls. 768–1023px keeps the current single column. <768px is the
+   untouched mobile design.
+   ===================================================================== */
+@media (min-width: 1024px) {
+  .ops-shell {
+    /* Spec 07: topbar h62 on desktop (the mobile bar is taller). */
+    --topbar-h: 62px;
+    block-size: 100vh;
+    block-size: 100dvh;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 246px minmax(0, 1fr);
+    grid-template-rows: auto var(--topbar-h) minmax(0, 1fr);
+  }
+
+  /* Lets the aside + main become direct grid items of the shell. */
+  .ops-layout {
+    display: contents;
+  }
+
+  .ops-offline-banner {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .ops-topbar {
+    grid-column: 2;
+    grid-row: 2;
+    position: static;
+    inline-size: auto;
+    min-block-size: 0;
+    block-size: var(--topbar-h);
+    border-block-end: 1px solid var(--line-subtle);
+  }
+
+  .ops-topbar::before { content: none; }
+
+  .ops-topbar-inner {
+    block-size: 100%;
+    min-block-size: 0;
+    padding-inline: 22px;
+    gap: 14px;
+  }
+
+  /* The brand lives in the sidebar on desktop; the topbar carries the
+     view title + breadcrumb instead. */
+  .ops-brand,
+  .ops-mobile-greeting,
+  .ops-refresh-top { display: none; }
+
+  .ops-topbar-title { display: grid; gap: 2px; min-inline-size: 0; }
+  .ops-topbar-title strong { font: 700 15px/1.3 var(--font-body); }
+  .ops-topbar-title span {
+    color: var(--text-disabled);
+    font: 400 10.5px/1.4 var(--font-body);
+  }
+
+  .ops-topbar-center { flex: 0 0 auto; margin-inline-start: auto; }
+  .ops-search-trigger { inline-size: 250px; block-size: 38px; }
+
+  .ops-sidebar {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    position: static;
+    block-size: auto;
+    min-block-size: 0;
+    padding: 0;
+    border-inline-end: none;
+    border-inline-start: 1px solid var(--line-subtle);
+    overflow: hidden;
+  }
+
+  .ops-sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 18px 20px 14px;
+    text-align: start;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .ops-sidebar-brand img {
+    inline-size: 36px;
+    block-size: 36px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex: none;
+  }
+
+  .ops-sidebar-brand strong {
+    display: block;
+    font: 700 12.5px/1.3 var(--font-mono);
+    letter-spacing: 0.06em;
+  }
+
+  .ops-sidebar-brand small {
+    display: block;
+    color: var(--text-disabled);
+    font: 400 10px/1.4 var(--font-body);
+  }
+
+  .ops-sidebar-nav {
+    flex: 1;
+    min-block-size: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding-block-end: 10px;
+  }
+
+  .ops-sidebar-nav::-webkit-scrollbar { inline-size: 0; }
+
+  .ops-nav-section + .ops-nav-section {
+    margin-block-start: 14px;
+    padding-block-start: 12px;
+  }
+
+  .ops-nav-heading {
+    margin: 0 20px 6px;
+    color: var(--text-disabled);
+    font: 700 9.5px/1.4 var(--font-body);
+    letter-spacing: 0.05em;
+  }
+
+  .ops-nav-list { padding-inline: 10px; }
+
+  .ops-nav-item {
+    min-block-size: 38px;
+    border-radius: 9px;
+    padding: 0 10px;
+    gap: 9px;
+  }
+
+  .ops-nav-item:hover { background: var(--surface-raised); }
+
+  .ops-nav-item[aria-current="page"] {
+    background: var(--gold-soft);
+    border: 1px solid var(--gold-line);
+    color: var(--gold-text);
+  }
+
+  .ops-nav-label strong { font: 500 12.5px/1.4 var(--font-body); }
+  .ops-nav-label small { display: none; }
+
+  .ops-sidebar-foot {
+    margin: 0;
+    padding: 14px 20px;
+    border-block-start: 1px solid var(--line-subtle);
+  }
+
+  .ops-main {
+    grid-column: 2;
+    grid-row: 3;
+    min-block-size: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 20px 22px 28px;
+  }
+
+  .ops-main::-webkit-scrollbar { inline-size: 0; }
+
+  .ops-main-inner { inline-size: 100%; max-inline-size: none; }
+
+  /* Pull-to-refresh belongs to touch layouts only. */
+  .ops-ptr { display: none; }
 }

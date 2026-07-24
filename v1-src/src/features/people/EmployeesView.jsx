@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, CalendarDays, ChevronLeft, Clock3, Plus, Power, RefreshCcw, Search, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
+import { Banknote, CalendarDays, ChevronLeft, Clock3, Plus, Power, Search, Sparkles, Trash2, UserPlus, Users } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { fmtTime12, money } from "../../lib/format";
@@ -141,7 +141,6 @@ function EmployeesView({ context, session, onToast, onNavigate, routeParam }) {
           <div><Users size={20} /><h2>الموظفين</h2></div>
           <div className="toolbar">
             {isAdmin && !showAdd && <button className="secondary" onClick={() => { setAddForm(emptyAdd); setShowAdd(true); }}><UserPlus size={16} /> إضافة موظف</button>}
-            <button className="secondary" onClick={load}><RefreshCcw size={16} /> تحديث</button>
           </div>
         </div>
         {isAdmin && showAdd && (

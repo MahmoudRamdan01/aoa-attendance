@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, FileSpreadsheet, Receipt, RefreshCcw, Wallet, TrendingUp } from "lucide-react";
+import { Banknote, FileSpreadsheet, Receipt, Wallet, TrendingUp } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { monthRangeFor } from "../../lib/dates";
@@ -367,7 +367,6 @@ function DeductionsAdmin({ context, onToast }) {
               {employees.map((emp) => <option key={emp.id} value={emp.id}>{empName.get(emp.id) || emp.name}</option>)}
             </select>
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-            <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
           </div>
         </div>
         <div className="tabs compact-tabs">

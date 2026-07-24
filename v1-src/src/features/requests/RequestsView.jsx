@@ -1,31 +1,83 @@
 import { useEffect, useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarCheck, Clock4, X } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { addDays } from "../../lib/dates";
-import { fmtDateTime, fmtSubmittedAt } from "../../lib/format";
 
 import { StatusBadge } from "../../ui/legacy";
+
+// Spec 06 §F asks for a "طلب جديد" type grid instead of the FAB, with the
+// types read from the app's REAL request types — this system has exactly two
+// (إذن / أجازة); the prototype's اعتيادية/عارضة/مرضية/مأمورية have no
+// backing column or RPC, so inventing them would create requests the server
+// cannot record.
+const REQUEST_TYPES = [
+  { id: "leave", label: "أجازة", tone: "leave", Icon: CalendarCheck },
+  { id: "permission", label: "إذن", tone: "permission", Icon: Clock4 },
+];
 
 function RequestsView({ context, onToast }) {
   const [kind, setKind] = useState("permission");
   const [refreshKey, setRefreshKey] = useState(0);
-  const refreshRequests = () => setRefreshKey((key) => key + 1);
+  // The create flow now opens from the type grid (spec 06 §F); the forms and
+  // their RPCs are unchanged.
+  const [createOpen, setCreateOpen] = useState(false);
+  const refreshRequests = () => {
+    setRefreshKey((key) => key + 1);
+    setCreateOpen(false);
+  };
+
+  function startRequest(typeId) {
+    setKind(typeId);
+    setCreateOpen(true);
+  }
 
   return (
-    <div className="grid two">
-      <section className="panel">
-        <div className="tabs compact-tabs">
-          <button className={cls(kind === "permission" && "active")} onClick={() => setKind("permission")}>إذن</button>
-          <button className={cls(kind === "leave" && "active")} onClick={() => setKind("leave")}>أجازة</button>
-        </div>
-        {kind === "permission" ? (
-          <PermissionForm onToast={onToast} onDone={refreshRequests} />
-        ) : (
-          <LeaveForm context={context} onToast={onToast} onDone={refreshRequests} />
-        )}
-      </section>
-      <MyRequests context={context} refreshKey={refreshKey} />
+    <div className="requests-screen">
+      <MyRequests
+        context={context}
+        refreshKey={refreshKey}
+        createOpen={createOpen}
+        onCloseCreate={() => setCreateOpen(false)}
+        typeGrid={
+          <div className="req-types">
+            <p className="req-types-title">طلب جديد</p>
+            <div className="req-types-grid">
+              {REQUEST_TYPES.map(({ id, label, tone, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="req-type"
+                  data-tone={tone}
+                  onClick={() => startRequest(id)}
+                >
+                  <Icon size={19} aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        }
+      >
+        {createOpen ? (
+          <section className="panel requests-create">
+            <div className="panel-title between">
+              <div className="tabs compact-tabs">
+                <button className={cls(kind === "permission" && "active")} onClick={() => setKind("permission")}>إذن</button>
+                <button className={cls(kind === "leave" && "active")} onClick={() => setKind("leave")}>أجازة</button>
+              </div>
+              <button type="button" className="ops-icon-btn" onClick={() => setCreateOpen(false)} aria-label="إغلاق نموذج الطلب">
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            {kind === "permission" ? (
+              <PermissionForm onToast={onToast} onDone={refreshRequests} />
+            ) : (
+              <LeaveForm context={context} onToast={onToast} onDone={refreshRequests} />
+            )}
+          </section>
+        ) : null}
+      </MyRequests>
     </div>
   );
 }
@@ -118,9 +170,10 @@ function LeaveForm({ context, onToast, onDone }) {
   );
 }
 
-function MyRequests({ context, refreshKey }) {
+function MyRequests({ context, refreshKey, children, typeGrid }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all"); // all | pending (spec F)
 
   useEffect(() => {
     if (!context?.employee?.id) return;
@@ -158,24 +211,41 @@ function MyRequests({ context, refreshKey }) {
     });
   }, [context?.employee?.id, refreshKey]);
 
+  const visible = filter === "pending" ? rows.filter((row) => row.status === "pending") : rows;
+
   return (
-    <section className="panel">
-      <div className="panel-title"><CalendarDays size={20} /><h2>طلباتي</h2></div>
-      <div className="list">
+    <>
+      {/* Screen title row (design ref 07): «طلباتي» + segmented pill */}
+      <div className="scr-head">
+        <h2>طلباتي</h2>
+        <div className="seg-pill">
+          <button type="button" className={cls(filter === "all" && "active")} onClick={() => setFilter("all")}>الكل</button>
+          <button type="button" className={cls(filter === "pending" && "active")} onClick={() => setFilter("pending")}>المعلّقة</button>
+        </div>
+      </div>
+
+      {typeGrid}
+      {children}
+
+      <p className="req-list-title">طلباتي السابقة</p>
+      <div className="requests-list">
         {loading && <p className="muted">جارٍ تحميل الطلبات...</p>}
-        {!loading && rows.length === 0 && <p className="muted">لا توجد طلبات بعد.</p>}
-        {rows.map((row, index) => (
-          <div className="list-row" key={`${row.type}-${row.date}-${index}`}>
-            <div><strong>{row.type}</strong><span>{row.date}</span></div>
-            <p>{row.meta}</p>
-            {row.submittedAt && <p className="muted">قُدّم الطلب: {fmtSubmittedAt(row.submittedAt)}</p>}
-            {row.reason && <p>السبب: {row.reason}</p>}
-            {row.decision && <p>قرار الإدارة: {row.decision}{row.decidedAt ? ` · ${fmtDateTime(row.decidedAt)}` : ""}</p>}
-            <StatusBadge status={row.status} />
+        {!loading && visible.length === 0 && (
+          <p className="muted">{filter === "pending" ? "لا توجد طلبات معلّقة." : "لا توجد طلبات بعد."}</p>
+        )}
+        {visible.map((row, index) => (
+          <div className="request-card" key={`${row.type}-${row.date}-${index}`}>
+            <div className="request-card-head">
+              <strong>{row.type}</strong>
+              <StatusBadge status={row.status} />
+            </div>
+            <div className="request-card-range">{row.date} · {row.meta}</div>
+            {row.reason && <p className="request-card-note">{row.reason}{row.decision ? ` — ${row.decision}` : ""}</p>}
+            {!row.reason && row.decision && <p className="request-card-note">{row.decision}</p>}
           </div>
         ))}
       </div>
-    </section>
+    </>
   );
 }
 

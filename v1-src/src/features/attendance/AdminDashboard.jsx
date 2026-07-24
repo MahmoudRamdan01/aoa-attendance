@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bell, CalendarDays, Clipboard, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, Printer, QrCode, RefreshCcw, ScanFace, Search, UserCheck, Users, UserX, Wrench, X } from "lucide-react";
+import { AlertTriangle, Bell, CalendarDays, Clock3, FileSpreadsheet, History, MessageSquare, PieChart as PieChartIcon, ScanFace, Search, UserCheck, Users, UserX, Wrench, X } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 import { cls } from "../../lib/cls";
 import { haptic } from "../../lib/haptics";
+import { decideLeaveRpc, decidePermissionRpc, pendingLeavesQuery, pendingPermissionsQuery } from "../../lib/approvals";
 import { addDays, datesBetween } from "../../lib/dates";
 import { csvCell, downloadTextFile, fmtSubmittedAt, fmtTime12 } from "../../lib/format";
 import { reqStatusLabel, statusLabels } from "../../lib/labels";
 import { Metric, StatusBadge } from "../../ui/legacy";
 import { ConfirmDialog, PromptDialog, SkeletonList, SkeletonTableRows } from "../../ui/primitives";
-import QRCodeLib from "qrcode";
 import { Cell, Pie, PieChart as RePieChart, ResponsiveContainer, Tooltip as ChartTooltip } from "recharts";
 
 function AdminDashboard({ context, onToast }) {
@@ -18,7 +18,6 @@ function AdminDashboard({ context, onToast }) {
   const [leaves, setLeaves] = useState([]);
   const [reportDate, setReportDate] = useState(todayIso());
   const [holiday, setHoliday] = useState({ date: todayIso(), to: todayIso(), label: "" });
-  const [qr, setQr] = useState({ today: "", tomorrow: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [employeeQuery, setEmployeeQuery] = useState("");
@@ -33,25 +32,19 @@ function AdminDashboard({ context, onToast }) {
     setLoading(true);
     setError("");
     try {
-      const [emp, att, perm, leave, qrData, tomorrowQr] = await Promise.all([
+      const [emp, att, perm, leave] = await Promise.all([
         supabase.from("employees").select("id,name,leave_balance,active,attendance_exempt").order("id"),
         supabase.from("attendance").select("*").eq("work_date", reportDate),
-        supabase.from("permissions").select("*, employees(name)").eq("status", "pending").order("perm_date"),
-        supabase.from("leave_requests").select("*, employees!leave_requests_employee_id_fkey(name), cover:employees!leave_requests_cover_employee_id_fkey(name)").eq("status", "pending").order("from_date"),
-        supabase.rpc("get_daily_qr_v1"),
-        supabase.rpc("get_qr_for_date_v1", { p_date: addDays(todayIso(), 1) }),
+        pendingPermissionsQuery(),
+        pendingLeavesQuery(),
       ]);
-      const failed = [emp, att, perm, leave, qrData, tomorrowQr].find((item) => item.error);
+      const failed = [emp, att, perm, leave].find((item) => item.error);
       if (failed) throw failed.error;
       // Payroll-only employees (attendance_exempt) never appear on the attendance board.
       setEmployees((emp.data || []).filter((e) => !e.attendance_exempt));
       setAttendance(att.data || []);
       setPermissions(perm.data || []);
       setLeaves(leave.data || []);
-      setQr({
-        today: qrData.data?.code || "",
-        tomorrow: tomorrowQr.data?.code || "",
-      });
     } catch (err) {
       setError(err.message || "تعذر تحميل بيانات الإدارة.");
     }
@@ -78,12 +71,7 @@ function AdminDashboard({ context, onToast }) {
       onToast("الموافقة على الأذونات المالك فقط.");
       return;
     }
-    const { data, error } = await supabase.rpc("decide_permission_v1", {
-      p_id: id,
-      p_approve: approve,
-      p_hours_approved: hoursApproved,
-      p_note: approve ? "تمت الموافقة" : (note || "تم الرفض"),
-    });
+    const { data, error } = await decidePermissionRpc({ id, approve, hoursApproved, note });
     if (error || data?.error) onToast(data?.message || "تعذر تحديث الإذن.");
     else {
       haptic();
@@ -97,11 +85,7 @@ function AdminDashboard({ context, onToast }) {
       onToast("الموافقة على الأجازات المالك فقط.");
       return;
     }
-    const { data, error } = await supabase.rpc("decide_leave_v1", {
-      p_id: id,
-      p_approve: approve,
-      p_note: approve ? "تمت الموافقة" : (note || "تم الرفض"),
-    });
+    const { data, error } = await decideLeaveRpc({ id, approve, note });
     if (error || data?.error) onToast(data?.message || "تعذر تحديث الأجازة.");
     else {
       haptic();
@@ -232,6 +216,15 @@ function AdminDashboard({ context, onToast }) {
   return (
     <div className="stack">
       {error && <div className="setup-banner">{error}</div>}
+      {permissions.length + leaves.length > 0 ? (
+        <button type="button" className="approvals-entry" onClick={() => { window.location.hash = "inbox"; }}>
+          <span className="approvals-entry-icon"><Bell size={17} aria-hidden="true" /></span>
+          <span className="approvals-entry-copy">
+            <strong>بانتظار قرارك ({permissions.length + leaves.length})</strong>
+            <span>اضغط لمراجعة الطلبات المعلقة في شاشة مخصصة</span>
+          </span>
+        </button>
+      ) : null}
       <section className="panel">
         <div className="panel-title between">
           <div><Users size={20} /><h2>جدول الحضور</h2></div>
@@ -241,7 +234,6 @@ function AdminDashboard({ context, onToast }) {
               <FileSpreadsheet size={16} /> Excel
             </button>
             <button className="secondary" onClick={markMissingCheckouts}>مراجعة الانصراف</button>
-            <button className="secondary" onClick={loadAdmin}>تحديث</button>
           </div>
         </div>
         <div className="stats-grid compact-stats">
@@ -312,14 +304,6 @@ function AdminDashboard({ context, onToast }) {
       </section>
 
       <div className="grid two">
-        <section className="panel">
-          <div className="panel-title"><QrCode size={20} /><h2>QR اليوم</h2></div>
-          <div className="qr-stack">
-            <QrDisplay label="اليوم" code={qr.today} date={todayIso()} onToast={onToast} />
-            <QrDisplay label="الغد" code={qr.tomorrow} date={addDays(todayIso(), 1)} muted onToast={onToast} />
-          </div>
-          <p className="muted">الكود بيتولد ويتبعت تلقائيًا للفريق مرة واحدة يوميًا. اللوحة هنا للعرض والطباعة فقط.</p>
-        </section>
         <section className="panel">
           <div className="panel-title"><PieChartIcon size={20} /><h2>توزيع حالات اليوم</h2></div>
           {donutData.length > 0 ? (
@@ -452,7 +436,6 @@ function RequestsHistory() {
     <section className="panel">
       <div className="panel-title between">
         <div><History size={20} /><h2>سجل الأجازات والأذونات</h2></div>
-        <button className="secondary" onClick={load}><RefreshCcw size={16} /> تحديث</button>
       </div>
       <div className="seg-row">
         <div className="seg">
@@ -619,50 +602,6 @@ function Approvals({ title, rows, type, canApprove, onPermission, onLeave }) {
         onCancel={() => setRejectId(null)}
       />
     </section>
-  );
-}
-
-function QrDisplay({ label, code, date, muted, onToast }) {
-  const [image, setImage] = useState("");
-
-  useEffect(() => {
-    if (!code) {
-      setImage("");
-      return;
-    }
-    QRCodeLib.toDataURL(code, {
-      width: 190,
-      margin: 2,
-      color: {
-        dark: muted ? "#667085" : "#071224",
-        light: "#ffffff",
-      },
-    }).then(setImage).catch(() => setImage(""));
-  }, [code, muted]);
-
-  async function copyCode() {
-    if (!code) return;
-    await navigator.clipboard.writeText(code);
-    onToast?.(`تم نسخ كود ${label}.`);
-  }
-
-  return (
-    <div className={cls("qr-card", muted && "muted")}>
-      <div>
-        <span>{label}</span>
-        {date && <small>{date}</small>}
-      </div>
-      {image ? <img src={image} alt={`QR ${label}`} /> : <div className="qr-placeholder">QR</div>}
-      <div className="qr-code">{code || "-"}</div>
-      <div className="qr-actions">
-        <button className="secondary" type="button" onClick={copyCode} disabled={!code}>
-          <Clipboard size={15} /> نسخ
-        </button>
-        <button className="secondary" type="button" onClick={() => window.print()} disabled={!code}>
-          <Printer size={15} /> طباعة
-        </button>
-      </div>
-    </div>
   );
 }
 

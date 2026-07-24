@@ -1,31 +1,47 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, CalendarDays, Clock3, FileSpreadsheet, History, UserCheck, UserX } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, FileSpreadsheet } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 
 import { csvCell, downloadTextFile, fmtTime12 } from "../../lib/format";
 import { statusLabels } from "../../lib/labels";
-import { Metric, StatusBadge } from "../../ui/legacy";
+import { StatusBadge } from "../../ui/legacy";
 import { SkeletonTableRows } from "../../ui/primitives";
+import PayslipCard from "./PayslipCard";
 
 function weekdayName(date) {
   return new Intl.DateTimeFormat("ar-EG", { weekday: "long", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
 }
 
-function Sparkline({ data, width = 120, height = 28 }) {
-  if (!data.length) return null;
-  const max = Math.max(...data, 1);
-  const points = data
-    .map((value, index) => {
-      const x = data.length > 1 ? (index / (data.length - 1)) * width : width / 2;
-      const y = height - (value / max) * (height - 4) - 2;
-      return `${x},${y}`;
-    })
-    .join(" ");
-  return (
-    <svg width={width} height={height} style={{ direction: "ltr", flex: "0 0 auto" }}>
-      <polyline fill="none" stroke="#F59E0B" strokeWidth="2" points={points} />
-    </svg>
-  );
+const monthNameFormat = new Intl.DateTimeFormat("ar-EG-u-nu-latn", { month: "long", year: "numeric", timeZone: "UTC" });
+function monthLabel(month) {
+  try {
+    return monthNameFormat.format(new Date(`${month}-01T00:00:00Z`));
+  } catch {
+    return month;
+  }
+}
+
+function shiftMonth(month, delta) {
+  const [year, mon] = month.split("-").map(Number);
+  const next = new Date(Date.UTC(year, mon - 1 + delta, 1));
+  return next.toISOString().slice(0, 7);
+}
+
+// Worked duration for a day row ("8:38 س") from the bare time columns.
+function workedHours(row) {
+  if (!row.check_in || !row.check_out) return "";
+  const start = new Date(`${row.work_date}T${String(row.check_in).slice(0, 8)}`);
+  const end = new Date(`${row.work_date}T${String(row.check_out).slice(0, 8)}`);
+  const minutes = Math.max(0, Math.round((end - start) / 60000));
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")} س`;
+}
+
+function daySubline(row) {
+  if (row.status === "late") return `تأخير ${row.late_minutes || 0} دقيقة`;
+  if (row.status === "absent") return "غياب";
+  if (["leave", "mission", "sick"].includes(row.status)) return statusLabels[row.status] || row.status;
+  const worked = workedHours(row);
+  return worked ? `يوم كامل · ${worked}` : statusLabels[row.status] || row.status;
 }
 
 function MyMonthView({ context, onToast }) {
@@ -33,6 +49,7 @@ function MyMonthView({ context, onToast }) {
   const [month, setMonth] = useState(() => todayIso().slice(0, 7));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const currentMonth = todayIso().slice(0, 7);
 
   const range = useMemo(() => {
     const [year, mon] = month.split("-").map(Number);
@@ -65,14 +82,8 @@ function MyMonthView({ context, onToast }) {
     const absent = rows.filter((row) => row.status === "absent").length;
     const leave = rows.filter((row) => ["leave", "mission", "sick"].includes(row.status)).length;
     const lateMinutes = lateRows.reduce((sum, row) => sum + Number(row.late_minutes || 0), 0);
-    const deductions = rows.reduce(
-      (sum, row) => sum + Number(row.deduction_days || 0) + (row.status === "absent" ? 1 : 0),
-      0
-    );
-    return { present, lateCount: lateRows.length, lateMinutes, absent, leave, deductions };
+    return { present, lateCount: lateRows.length, lateMinutes, absent, leave };
   }, [rows]);
-
-  const spark = useMemo(() => rows.map((row) => Number(row.late_minutes || 0)), [rows]);
 
   function exportMonthCsv() {
     const header = ["التاريخ", "اليوم", "الحالة", "حضور", "انصراف", "دقائق تأخير", "خصم أيام", "ملاحظتي"];
@@ -92,37 +103,66 @@ function MyMonthView({ context, onToast }) {
   }
 
   return (
-    <div className="stack">
-      <section className="panel">
-        <div className="panel-title between">
-          <div><History size={20} /><h2>سجلي الشهري</h2></div>
-          <div className="toolbar">
-            <input type="month" value={month} max={todayIso().slice(0, 7)} onChange={(e) => setMonth(e.target.value)} />
-            <button className="secondary" onClick={exportMonthCsv} disabled={loading || rows.length === 0}>
-              <FileSpreadsheet size={16} /> Excel
-            </button>
-          </div>
+    <div className="record-screen">
+      {/* Screen title row (design ref 06): «سجلي» + month chevrons inline */}
+      <div className="scr-head">
+        <h2>سجلي</h2>
+        <div className="month-selector">
+          <button type="button" className="month-chevron" onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="الشهر السابق">
+            <ChevronRight size={14} aria-hidden="true" />
+          </button>
+          <strong>{monthLabel(month)}</strong>
+          <button
+            type="button"
+            className="month-chevron"
+            onClick={() => setMonth((m) => shiftMonth(m, 1))}
+            disabled={month >= currentMonth}
+            aria-label="الشهر التالي"
+          >
+            <ChevronLeft size={14} aria-hidden="true" />
+          </button>
         </div>
-        <div className="stats-grid compact-stats">
-          <Metric label="أيام حضور" value={summary.present} tone="ok" icon={UserCheck} />
-          <Metric label="تأخير" value={summary.lateCount} sub={`${summary.lateMinutes} دقيقة إجمالًا`} tone="warn" icon={Clock3} />
-          <Metric label="غياب" value={summary.absent} tone="danger" icon={UserX} />
-          <Metric label="أجازة/مأمورية" value={summary.leave} tone="info" icon={CalendarDays} />
-          <Metric label="خصومات" value={summary.deductions.toFixed(2)} sub="يوم" tone="gold" icon={Banknote} />
-        </div>
-        {employee?.leave_balance != null && (
-          <p className="muted">رصيد أجازاتك المتبقي: {employee.leave_balance} يوم</p>
-        )}
-        {spark.some((value) => value > 0) && (
-          <p className="muted">
-            اتجاه دقائق التأخير خلال الشهر: <Sparkline data={spark} />
-          </p>
-        )}
-      </section>
+      </div>
 
-      <section className="panel">
-        <div className="panel-title"><CalendarDays size={20} /><h2>تفاصيل الأيام</h2></div>
-        <div className="table-wrap sticky-table">
+      {/* Summary chips ×4 */}
+      <div className="month-chips">
+        <MonthChip tone="ok" value={summary.present} label="حضور" />
+        <MonthChip tone="warn" value={summary.lateCount} label="تأخير" />
+        <MonthChip tone="danger" value={summary.absent} label="غياب" />
+        <MonthChip tone="info" value={summary.leave} label="إجازة" />
+      </div>
+
+      {/* كشف راتبي — hides itself when salary isn't readable */}
+      <PayslipCard employeeId={employee?.id} month={month} monthLabel={monthLabel(month)} attendanceRows={rows} />
+
+      {/* Day list: ONE card with hairline-separated rows (design), table ≥640 */}
+      <div className="day-list">
+        {loading && <p className="muted day-list-note">جارٍ تحميل السجل…</p>}
+        {!loading && rows.length === 0 && <p className="muted day-list-note">لا توجد سجلات في هذا الشهر.</p>}
+        {!loading && rows.map((row) => (
+          <div className="day-row" key={row.id || row.work_date}>
+            <div className="day-row-copy">
+              <strong>{weekdayName(row.work_date)} <bdi dir="ltr">{row.work_date.slice(8)}/{row.work_date.slice(5, 7)}</bdi></strong>
+              <span>{daySubline(row)}</span>
+            </div>
+            {row.check_in ? (
+              <span className="day-row-times">
+                {fmtTime12(row.check_in)} {row.check_out ? `← ${fmtTime12(row.check_out)}` : ""}
+              </span>
+            ) : null}
+            <StatusBadge status={row.status} />
+          </div>
+        ))}
+      </div>
+
+      <section className="panel day-table-panel">
+        <div className="panel-title between">
+          <div><CalendarDays size={20} /><h2>تفاصيل الأيام</h2></div>
+          <button className="secondary" onClick={exportMonthCsv} disabled={loading || rows.length === 0}>
+            <FileSpreadsheet size={16} /> Excel
+          </button>
+        </div>
+        <div className="table-wrap sticky-table day-table">
           <table>
             <thead>
               <tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>حضور</th><th>انصراف</th><th>تأخير</th><th>خصم</th><th>ملاحظتي</th></tr>
@@ -146,6 +186,15 @@ function MyMonthView({ context, onToast }) {
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+function MonthChip({ tone, value, label }) {
+  return (
+    <div className={`month-chip tone-${tone}`}>
+      <strong>{value}</strong>
+      <span>{label}</span>
     </div>
   );
 }

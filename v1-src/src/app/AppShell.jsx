@@ -3,7 +3,6 @@ import { cls } from "../lib/cls";
 import { haptic } from "../lib/haptics";
 import {
   Bell,
-  CheckCheck,
   ChevronLeft,
   LockKeyhole,
   LogOut,
@@ -11,6 +10,7 @@ import {
   MoreHorizontal,
   Moon,
   RefreshCcw,
+  ScanFace,
   Search,
   Sun,
   X,
@@ -18,9 +18,11 @@ import {
 import { supabase } from "../lib/supabase";
 import { COMPANY } from "../lib/company";
 import CommandPalette from "../ui/CommandPalette";
-import PushToggle from "../ui/PushToggle";
-import { EmptyState, PageHeader, Skeleton } from "../ui/primitives";
+import FaceLoginSetup, { requestFaceSetup } from "../features/system/FaceLoginSetup";
+import OfflineBanner from "../ui/OfflineBanner";
+import { PageHeader } from "../ui/primitives";
 import {
+  SECTION_META,
   allowedViews,
   createQuickActions,
   getFallbackView,
@@ -29,25 +31,23 @@ import {
 import { useBackClose, useSheetDrag } from "./router";
 import { useTheme } from "./theme";
 
-const roleNames = { employee: "موظف", hr: "HR", owner: "Owner" };
-// Primary mobile bottom-tab views per role (short labels below). The 4th tab is
-// always "المزيد" which opens the full menu sheet.
+const roleNames = { employee: "موظف", hr: "HR", owner: "مالك" };
+// Primary mobile bottom-tab views per role (short labels below). Up to 4
+// primary tabs; the last slot is always "المزيد" → full menu sheet. The owner
+// with a linked employee record gets the employee portal tabs too (redesign
+// spec A); without one they keep the ops-first set.
 const MOBILE_PRIMARY = {
   employee: ["today", "month", "requests"],
   hr: ["admin", "deductions", "expenses"],
-  owner: ["owner", "admin", "team"],
+  owner: ["today", "owner", "month", "requests"],
+  ownerNoEmployee: ["owner", "admin", "team"],
 };
+const MOBILE_TAB_MAX = 4;
 const MOBILE_TAB_LABELS = {
   today: "اليوم", month: "سجلي", requests: "طلباتي",
   admin: "الحضور", team: "الفريق", owner: "الرواتب",
   deductions: "الخصومات", expenses: "المصروفات", partner: "المديونية",
   ownerbook: "الخاص", notifications: "الإشعارات", training: "التدريب", assistant: "المساعد",
-};
-const notificationCategoryLabels = {
-  admin_message: "رسالة إدارية",
-  approval: "موافقة مطلوبة",
-  qr: "QR يومي",
-  system: "النظام",
 };
 
 function initials(name) {
@@ -87,182 +87,6 @@ function ThemeButton({ theme, onToggle, mobile = false }) {
   );
 }
 
-function InboxPopover({
-  id,
-  open,
-  closing,
-  panelRef,
-  onClose,
-  unread,
-  setUnread,
-  onNavigate,
-  onToast,
-}) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState(false);
-  const [busy, setBusy] = useState("");
-
-  useEffect(() => {
-    if (!open) return undefined;
-    let cancelled = false;
-    setLoading(true);
-    setLoadError(false);
-    supabase
-      .from("notifications")
-      .select("id,title,body,category,priority,read_at,created_at,created_by,group_id")
-      .order("created_at", { ascending: false })
-      .limit(50)
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) onToast?.("تعذر تحميل الإشعارات.");
-        setRows(data || []);
-        setLoadError(Boolean(error));
-        setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setRows([]);
-        setLoadError(true);
-        setLoading(false);
-        onToast?.("تعذر تحميل الإشعارات.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, unread, onToast]);
-
-  if (!open) return null;
-
-  const markRead = async (id) => {
-    const row = rows.find((item) => item.id === id);
-    if (!row || row.read_at) return;
-    setBusy(String(id));
-    const { error } = await supabase.rpc("mark_notification_read_v1", { p_id: id });
-    setBusy("");
-    if (error) {
-      onToast?.("تعذر تحديث الإشعار.");
-      return;
-    }
-    setRows((items) => items.map((item) => (item.id === id ? { ...item, read_at: new Date().toISOString() } : item)));
-    setUnread?.((count) => Math.max(0, count - 1));
-  };
-
-  const markAllRead = async () => {
-    setBusy("all");
-    const { data, error } = await supabase.rpc("mark_all_notifications_read_v1");
-    setBusy("");
-    if (error || data?.error) {
-      onToast?.(data?.message || "تعذر تحديث الإشعارات.");
-      return;
-    }
-    setRows((items) => items.map((item) => ({ ...item, read_at: item.read_at || new Date().toISOString() })));
-    setUnread?.(0);
-    onToast?.(`تم تعليم ${data?.count || 0} إشعار كمقروء.`);
-  };
-
-  return (
-    <section
-      ref={panelRef}
-      className={cls("ops-inbox", closing && "ops-closing")}
-      id={id}
-      role="dialog"
-      aria-labelledby={`${id}-title`}
-      aria-busy={loading || undefined}
-    >
-      {/* The list scrolls, so only the header acts as the drag handle. */}
-      <header className="ops-inbox-head" data-sheet-handle>
-        <div>
-          <h2 id={`${id}-title`}>صندوق الإشعارات</h2>
-          <span className="ui-page-eyebrow">
-            <bdi dir="ltr">{unread}</bdi>
-            <span>غير مقروء</span>
-          </span>
-        </div>
-        <button
-          className="ops-icon-btn"
-          type="button"
-          onClick={markAllRead}
-          disabled={!unread || busy === "all"}
-          aria-label="تعليم كل الإشعارات كمقروء"
-          title="تعليم الكل كمقروء"
-        >
-          <CheckCheck size={17} aria-hidden="true" />
-        </button>
-      </header>
-
-      <div className="ops-inbox-list">
-        {loading ? (
-          <div className="ops-inbox-loading" role="status" aria-label="جارٍ تحميل الإشعارات">
-            {[0, 1, 2].map((item) => (
-              <div className="ops-inbox-loading-row" key={item}>
-                <Skeleton width={8} height={8} radius="50%" />
-                <span>
-                  <Skeleton width="48%" height={12} />
-                  <Skeleton width="86%" height={9} />
-                  <Skeleton width="32%" height={8} />
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : loadError ? (
-          <EmptyState
-            title="تعذر تحميل الإشعارات"
-            description="اقفل الصندوق وافتحه تاني بعد ما تتأكد من الاتصال."
-            compact
-          />
-        ) : rows.length ? (
-          rows.slice(0, 8).map((item) => (
-            <button
-              className={`ops-inbox-item${item.read_at ? "" : " is-unread"}`}
-              type="button"
-              key={item.id}
-              disabled={busy === String(item.id)}
-              onClick={() => {
-                markRead(item.id);
-                // Take the user TO the notification itself: the full
-                // notifications page, scrolled to and highlighting this one.
-                onNavigate?.("notifications", [String(item.id)]);
-                onClose?.();
-              }}
-            >
-              <span className="ops-inbox-item-dot" aria-hidden="true" />
-              <span className="ops-inbox-item-copy">
-                <strong>{item.title}</strong>
-                <span>{item.body}</span>
-                <time dateTime={item.created_at}>
-                  <bdi dir="ltr">{formatDate(new Date(item.created_at), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</bdi>
-                  {" · "}{notificationCategoryLabels[item.category] || item.category || "النظام"}
-                </time>
-              </span>
-            </button>
-          ))
-        ) : (
-          <EmptyState title="لا توجد إشعارات بعد" description="سيظهر أي تحديث جديد هنا فورًا." compact />
-        )}
-      </div>
-
-      <div className="ops-inbox-push">
-        <PushToggle onToast={onToast} />
-      </div>
-
-      <footer className="ops-inbox-foot">
-        <button
-          className="ui-action"
-          type="button"
-          onClick={() => {
-            onNavigate?.("notifications");
-            onClose?.();
-          }}
-        >
-          فتح كل الإشعارات
-        </button>
-        <button className="ui-action" type="button" onClick={onClose}>إغلاق</button>
-      </footer>
-    </section>
-  );
-}
-
 export default function AppShell({
   session,
   context,
@@ -280,11 +104,9 @@ export default function AppShell({
   children,
 }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [inboxOpen, setInboxOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const paletteTriggerRef = useRef(null);
   const inboxTriggerRef = useRef(null);
-  const inboxWrapRef = useRef(null);
   const mainRef = useRef(null);
   const previousRouteRef = useRef(`${activeView}/${routeParams.join("/")}`);
   const mobileMoreRef = useRef(null);
@@ -294,7 +116,6 @@ export default function AppShell({
   // Animated dismissal: mark the surface as closing, unmount after the exit
   // animation. Drag-to-dismiss finishes its own slide then unmounts directly.
   const [moreClosing, setMoreClosing] = useState(false);
-  const [inboxClosing, setInboxClosing] = useState(false);
   const closeMore = useCallback(() => {
     setMoreClosing((already) => {
       if (already) return already;
@@ -305,26 +126,9 @@ export default function AppShell({
       return true;
     });
   }, []);
-  const closeInbox = useCallback(() => {
-    setInboxClosing((already) => {
-      if (already) return already;
-      window.setTimeout(() => {
-        setInboxOpen(() => false);
-        setInboxClosing(() => false);
-      }, 175);
-      return true;
-    });
-  }, []);
-  const inboxPanelRef = useRef(null);
   useSheetDrag(mobileMoreRef, () => setMobileMoreOpen(() => false), mobileMoreOpen);
-  useSheetDrag(
-    inboxPanelRef,
-    () => setInboxOpen(() => false),
-    inboxOpen && (typeof window === "undefined" || window.matchMedia("(max-width: 820px)").matches)
-  );
   // Hardware Back closes open surfaces instead of leaving the app.
   useBackClose(mobileMoreOpen, () => closeMore());
-  useBackClose(inboxOpen, () => closeInbox());
   const accessibleViews = useMemo(() => allowedViews(views, context), [views, context]);
   const activeItem = accessibleViews.find((view) => view.id === activeView) || accessibleViews[0];
   const navGroups = useMemo(() => groupViewsBySection(accessibleViews), [accessibleViews]);
@@ -334,17 +138,18 @@ export default function AppShell({
   // Every role gets the mobile bottom nav (not just employees). Primary tabs
   // are curated per role; the 4th is always "المزيد" → full menu sheet.
   const mobileTabs = useMemo(() => {
-    const primary = MOBILE_PRIMARY[role] || [];
+    const primaryKey = role === "owner" && !context?.employee ? "ownerNoEmployee" : role;
+    const primary = MOBILE_PRIMARY[primaryKey] || [];
     const tabs = primary
       .map((viewId) => accessibleViews.find((view) => view.id === viewId))
       .filter(Boolean);
     for (const view of accessibleViews) {
-      if (tabs.length >= 3) break;
+      if (tabs.length >= MOBILE_TAB_MAX) break;
       if (view.nav === false || view.mobileSlot === "more") continue;
       if (!tabs.some((tab) => tab.id === view.id)) tabs.push(view);
     }
-    return tabs.slice(0, 3);
-  }, [accessibleViews, role]);
+    return tabs.slice(0, MOBILE_TAB_MAX);
+  }, [accessibleViews, role, context?.employee]);
   const showBottomNav = Boolean(context) && mobileTabs.length > 0;
   const moreViewIsActive = !mobileTabs.some((tab) => tab.id === activeView);
 
@@ -355,25 +160,18 @@ export default function AppShell({
         if (event.repeat) return;
         setPaletteOpen((current) => {
           const next = !current;
-          if (next) {
-            closeInbox();
-            closeMore();
-          }
+          if (next) closeMore();
           return next;
         });
       }
       if (event.key === "Escape") {
-        if (inboxOpen) {
-          window.requestAnimationFrame(() => inboxTriggerRef.current?.focus());
-        }
         setPaletteOpen(false);
-        closeInbox();
         closeMore();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [inboxOpen]);
+  }, []);
 
   useEffect(() => {
     const routeKey = `${activeView}/${routeParams.join("/")}`;
@@ -385,21 +183,6 @@ export default function AppShell({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeView, routeParams]);
-
-  useEffect(() => {
-    if (!inboxOpen) return undefined;
-    const onPointerDown = (event) => {
-      if (!inboxWrapRef.current?.contains(event.target)) closeInbox();
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    // Lock the page behind the inbox so swiping the list doesn't scroll the app.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [inboxOpen]);
 
   useEffect(() => {
     if (!mobileMoreOpen) return undefined;
@@ -453,25 +236,16 @@ export default function AppShell({
   const navigate = (view, params = []) => {
     onNavigate?.(view, params);
     setPaletteOpen(false);
-    closeInbox();
     closeMore();
   };
 
   const openPalette = () => {
-    closeInbox();
     closeMore();
     setPaletteOpen(true);
   };
 
-  const openInbox = () => {
-    setPaletteOpen(false);
-    closeMore();
-    setInboxOpen((current) => !current);
-  };
-
   const openMore = () => {
     setPaletteOpen(false);
-    closeInbox();
     setMobileMoreOpen(true);
   };
 
@@ -540,6 +314,7 @@ export default function AppShell({
   return (
     <div
       className="ops-shell"
+      data-view={activeView}
       data-section={activeItem?.accent || activeItem?.section || "home"}
       data-employee-tabs={showBottomNav ? "true" : undefined}
     >
@@ -560,6 +335,21 @@ export default function AppShell({
 
       <header className="ops-topbar">
         <div className="ops-topbar-inner">
+          {/* Mobile greeting header (redesign spec G) — desktop keeps the brand. */}
+          <div className="ops-mobile-greeting">
+            <span className="ops-mobile-avatar" aria-hidden="true">{String(displayName).trim().charAt(0) || "A"}</span>
+            <span className="ops-mobile-greet-copy">
+              <span className="ops-mobile-greet-top">
+                <strong>{new Date().getHours() < 12 ? "صباح الخير" : "مساء الخير"}، {String(displayName).trim().split(/\s+/)[0]}</strong>
+                <i className="ops-role-chip">{roleNames[role] || role}</i>
+              </span>
+              <small>
+                <span lang="en" dir="ltr">{COMPANY.name}</span>
+                {" · "}
+                {formatDate(new Date(), { weekday: "long", day: "numeric", month: "long" })}
+              </small>
+            </span>
+          </div>
           <button
             className="ops-brand"
             type="button"
@@ -573,6 +363,17 @@ export default function AppShell({
             </span>
           </button>
 
+          {/* Desktop (spec 07): the topbar carries the view title + breadcrumb;
+              the brand moved into the sidebar. Hidden on mobile by CSS. */}
+          <div className="ops-topbar-title">
+            <strong>{activeItem?.ar || "لوحة التحكم"}</strong>
+            <span>
+              الرئيسية
+              {SECTION_META[activeItem?.section]?.ar ? ` / ${SECTION_META[activeItem.section].ar}` : ""}
+              {activeItem?.ar ? ` / ${activeItem.ar}` : ""}
+            </span>
+          </div>
+
           <div className="ops-topbar-center">
             <button ref={paletteTriggerRef} className="ops-search-trigger" type="button" onClick={openPalette}>
               <Search size={17} aria-hidden="true" />
@@ -582,9 +383,6 @@ export default function AppShell({
           </div>
 
           <div className="ops-topbar-actions">
-            <button className="ops-icon-btn ops-mobile-only" type="button" onClick={openPalette} aria-label="فتح البحث السريع">
-              <Search size={18} aria-hidden="true" />
-            </button>
             {!showBottomNav ? (
               <button
                 ref={mobileMoreTriggerRef}
@@ -603,32 +401,18 @@ export default function AppShell({
               <RefreshCcw size={17} aria-hidden="true" />
             </button>
             <ThemeButton theme={theme} onToggle={toggleTheme} />
-            <div className="ops-inbox-wrap" ref={inboxWrapRef}>
-              <button
-                ref={inboxTriggerRef}
-                className="ops-icon-btn"
-                type="button"
-                onClick={openInbox}
-                aria-label={unread > 0 ? `فتح صندوق الإشعارات، ${unread} غير مقروء` : "فتح صندوق الإشعارات"}
-                aria-haspopup="dialog"
-                aria-expanded={inboxOpen}
-                aria-controls="ops-inbox"
-              >
-                <Bell size={18} aria-hidden="true" />
-                {unread > 0 ? <bdi className="ops-unread-badge" dir="ltr">{unread > 99 ? "99+" : unread}</bdi> : null}
-              </button>
-              <InboxPopover
-                id="ops-inbox"
-                open={inboxOpen}
-                closing={inboxClosing}
-                panelRef={inboxPanelRef}
-                onClose={() => closeInbox()}
-                unread={unread}
-                setUnread={setUnread}
-                onNavigate={navigate}
-                onToast={onToast}
-              />
-            </div>
+            {/* Bell opens the full «الإشعارات والطلبات» screen (redesign)
+                instead of the old popover. */}
+            <button
+              ref={inboxTriggerRef}
+              className="ops-icon-btn"
+              type="button"
+              onClick={() => navigate("inbox")}
+              aria-label={unread > 0 ? `فتح الإشعارات والطلبات، ${unread} غير مقروء` : "فتح الإشعارات والطلبات"}
+            >
+              <Bell size={18} aria-hidden="true" />
+              {unread > 0 ? <bdi className="ops-unread-badge" dir="ltr">{unread > 99 ? "99+" : unread}</bdi> : null}
+            </button>
             <div className="ops-user-chip" title={displayName}>
               <span className="ops-avatar">{initials(displayName)}</span>
               <span className="ops-user-copy">
@@ -640,8 +424,25 @@ export default function AppShell({
         </div>
       </header>
 
+      <OfflineBanner />
+
       <div className="ops-layout">
         <aside className="ops-sidebar" aria-label="التنقل الرئيسي">
+          {/* Desktop brand block (spec 07 §Shell). The sidebar is hidden on
+              mobile, so this never competes with the mobile greeting. */}
+          <button
+            type="button"
+            className="ops-sidebar-brand"
+            onClick={() => navigate(getFallbackView(accessibleViews, context))}
+            aria-label="الرجوع للصفحة الرئيسية"
+          >
+            <img src="./logo.png" alt="" />
+            <span>
+              <strong lang="en" dir="ltr">{COMPANY.opsTitle}</strong>
+              <small>{roleNames[role] || role}</small>
+            </span>
+          </button>
+
           <nav className="ops-sidebar-nav">
             {navGroups.map((group) => (
               <section className="ops-nav-section" key={group.id}>
@@ -750,27 +551,91 @@ export default function AppShell({
           >
             <span className="ops-mobile-more-handle" aria-hidden="true" />
             <header className="ops-mobile-more-head">
-              <h2 id="ops-mobile-more-title">القائمة</h2>
+              <h2 id="ops-mobile-more-title">المزيد</h2>
               <button className="ops-mobile-more-close" type="button" onClick={() => closeMore()} aria-label="إغلاق القائمة">
                 <X size={18} aria-hidden="true" />
               </button>
             </header>
-            {accessibleViews
-              .filter((view) => view.nav !== false && !mobileTabs.some((tab) => tab.id === view.id))
-              .map((view) => {
-              const Icon = view.icon;
-              return (
-                <button type="button" key={view.id} onPointerEnter={() => onViewIntent?.(view.id)} onFocus={() => onViewIntent?.(view.id)} onClick={() => navigate(view.id)}>
-                  <Icon size={19} aria-hidden="true" />
-                  <span>{view.ar}</span>
-                </button>
-              );
-            })}
-            <ThemeButton theme={theme} onToggle={toggleTheme} mobile />
-            <button className="is-danger" type="button" onClick={onSignOut}>
-              <LogOut size={19} aria-hidden="true" />
-              <span>خروج</span>
-            </button>
+
+            {/* Profile card (design ref 08) */}
+            <div className="more-profile">
+              <span className="more-avatar" aria-hidden="true">{String(displayName).trim().charAt(0) || "A"}</span>
+              <span className="more-profile-copy">
+                <strong>{displayName}</strong>
+                <bdi dir="ltr">{session?.user?.email || ""}</bdi>
+              </span>
+              <i className="more-role-chip">{roleNames[role] || role}</i>
+            </div>
+
+            {/* Grouped menu — sections with dot-rows exactly like the design */}
+            {groupViewsBySection(
+              accessibleViews.filter((view) => view.nav !== false && !mobileTabs.some((tab) => tab.id === view.id))
+            ).map((group) => (
+              <div key={group.id} className="more-group-wrap">
+                <p className="more-section-label">{group.ar}</p>
+                <div className="more-group">
+                  {group.items.map((view) => (
+                    <button
+                      type="button"
+                      className="more-row"
+                      key={view.id}
+                      onPointerEnter={() => onViewIntent?.(view.id)}
+                      onFocus={() => onViewIntent?.(view.id)}
+                      onClick={() => navigate(view.id)}
+                    >
+                      <span className="more-dot" data-section={view.accent || view.section} aria-hidden="true" />
+                      <span className="more-row-label">{view.ar}</span>
+                      <ChevronLeft size={14} aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <p className="more-section-label">التطبيق</p>
+            <div className="more-group">
+              <button type="button" className="more-row" onClick={openPalette}>
+                <Search size={16} aria-hidden="true" />
+                <span className="more-row-label">بحث سريع</span>
+                <ChevronLeft size={14} aria-hidden="true" />
+              </button>
+              <button type="button" className="more-row" onClick={() => { onRefresh?.(); closeMore(); }}>
+                <RefreshCcw size={16} aria-hidden="true" />
+                <span className="more-row-label">تحديث البيانات</span>
+              </button>
+              <button
+                type="button"
+                className="more-row"
+                onClick={() => {
+                  closeMore();
+                  // The sheet's back-close consumes a history entry ~175ms
+                  // after closing; opening the setup dialog before that would
+                  // get it popped right back shut. The dialog needs no user
+                  // gesture (the camera opens from ITS confirm tap).
+                  window.setTimeout(requestFaceSetup, 230);
+                }}
+              >
+                <ScanFace size={16} aria-hidden="true" />
+                <span className="more-row-label">تسجيل بصمة الوجه للدخول</span>
+                <ChevronLeft size={14} aria-hidden="true" />
+              </button>
+              <button type="button" className="more-row" onClick={toggleTheme}>
+                {theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+                <span className="more-row-label">{theme === "dark" ? "الوضع الفاتح" : "الوضع الغامق"}</span>
+              </button>
+              <button type="button" className="more-row is-danger" onClick={onSignOut}>
+                <LogOut size={16} aria-hidden="true" />
+                <span className="more-row-label">تسجيل خروج</span>
+              </button>
+            </div>
+
+            {/* Spec 06: the three "تسجيل آمن" lines moved off اليوم to here. */}
+            <p className="more-section-label">أمان الحضور</p>
+            <div className="more-note">
+              <span>· التحقق من الوجه لحظي؛ تُخزَّن بصمة رقمية مشفّرة فقط — بدون صور.</span>
+              <span>· يلزم التواجد داخل نطاق موقع الشركة عند التسجيل.</span>
+              <span>· تُحفظ العمليات دون اتصال وتُزامَن تلقائيًا.</span>
+            </div>
           </section>
         </div>
       ) : null}
@@ -784,6 +649,8 @@ export default function AppShell({
         onNavigate={navigate}
         triggerRef={paletteTriggerRef}
       />
+
+      <FaceLoginSetup session={session} onToast={onToast} />
     </div>
   );
 }

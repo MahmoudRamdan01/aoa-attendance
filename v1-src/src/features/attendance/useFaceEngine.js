@@ -96,8 +96,28 @@ function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 }) {
-  const challenge = useMemo(() => CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)], []);
+// Light random challenge for quick mode (owner request, after the photo
+// red-team): ONE random gesture shown immediately. A static photo can't
+// perform it, and a pre-recorded clip can't know which one will be asked.
+const QUICK_EXTRAS = [
+  { id: "smile", label: "ابتسم 🙂" },
+  { id: "turn", label: "أدر وشك شوية ناحية اليمين" },
+];
+
+// gesture=false → "quick" mode (owner request: behave like the phone's Face
+// ID). No capture button: one light random gesture + the antispoof/liveness
+// model scores at the same thresholds, then capture fires by itself.
+export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6, gesture = true }) {
+  const challenge = useMemo(
+    () => (gesture
+      ? CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)]
+      : { id: "steady", label: "ثبّت وشك لحظة أمام الكاميرا…" }),
+    [gesture],
+  );
+  const extra = useMemo(
+    () => (gesture ? null : QUICK_EXTRAS[Math.floor(Math.random() * QUICK_EXTRAS.length)]),
+    [gesture],
+  );
   const [state, setState] = useState(() => ({
     status: enabled ? "loading" : "off",
     instruction: enabled ? "جارٍ تحميل التحقق من الوجه…" : "",
@@ -120,6 +140,9 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
     let stableFrames = 0;
     let challengeDone = false;
     let failures = 0;
+    // Quick-mode liveness: one random light gesture (a photo can't perform
+    // it on demand). The blink prerequisite was dropped for speed per owner.
+    let extraDone = false;
     const realScores = [];
     const liveScores = [];
 
@@ -166,10 +189,19 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
             previousBox = face.boxRaw;
             if (Number.isFinite(face.real)) realScores.push(face.real);
             if (Number.isFinite(face.live)) liveScores.push(face.live);
-            if (realScores.length > 18) realScores.shift();
-            if (liveScores.length > 18) liveScores.shift();
+            // Short RECENT window: the first frames (face entering, autofocus
+            // hunting) score terribly and a long average drags the gate down
+            // for seconds — the owner kept seeing "حسّن الإضاءة" with good
+            // light. Six frames reflect current conditions and recover fast.
+            if (realScores.length > 6) realScores.shift();
+            if (liveScores.length > 6) liveScores.shift();
 
-            if (stableFrames >= 2 && challengePassed(challenge.id, result, face)) challengeDone = true;
+            if (challenge.id === "steady") {
+              if (extra && challengePassed(extra.id, result, face)) extraDone = true;
+              if (stableFrames >= 2 && (!extra || extraDone)) challengeDone = true;
+            } else if (stableFrames >= 2 && challengePassed(challenge.id, result, face)) {
+              challengeDone = true;
+            }
 
             const antispoof = average(realScores);
             const liveness = average(liveScores);
@@ -197,8 +229,9 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
             }
 
             let instruction = challenge.label;
-            if (challengeDone && antispoof < antispoofMin) instruction = "ثبّت الهاتف وحسّن الإضاءة";
-            else if (challengeDone && liveness < 0.5) instruction = "ثبّت وجهك لحظة للتأكد من الحيوية";
+            if (challengeDone && antispoof < antispoofMin) instruction = "قرّب من النور شوية…";
+            else if (challengeDone && liveness < 0.5) instruction = "ثبّت وشك لحظة…";
+            else if (challenge.id === "steady" && extra && !extraDone) instruction = extra.label;
             setState((current) => ({ ...current, status: "challenge", instruction }));
           } catch {
             failures += 1;
@@ -220,7 +253,7 @@ export function useFaceEngine({ enabled, videoRef, engine, antispoofMin = 0.6 })
       activeRef.current = false;
       if (frameId) cancelAnimationFrame(frameId);
     };
-  }, [enabled, engine, videoRef, challenge.id, challenge.label, antispoofMin]);
+  }, [enabled, engine, videoRef, challenge.id, challenge.label, extra, antispoofMin]);
 
   return state;
 }

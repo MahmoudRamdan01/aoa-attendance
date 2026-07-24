@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Banknote, FileSpreadsheet, Pencil, Receipt, RefreshCcw, Vault, Wallet, TrendingUp } from "lucide-react";
+import { AlertTriangle, Banknote, FileSpreadsheet, Pencil, Receipt, Vault, Wallet, TrendingUp } from "lucide-react";
 import { supabase, todayIso } from "../../lib/supabase";
 
 import { monthRangeFor } from "../../lib/dates";
@@ -148,7 +148,6 @@ function ExpensesView({ context, onToast }) {
             <button className="secondary" onClick={exportCsvFile} disabled={rows.length === 0}>
               <FileSpreadsheet size={16} /> Excel
             </button>
-            <button className="secondary" onClick={loadData}><RefreshCcw size={16} /> تحديث</button>
           </div>
         </div>
         <div className="stats-grid compact-stats">
