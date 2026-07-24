@@ -3145,6 +3145,7 @@ html[data-company="airocean"] .splash p { position: relative; z-index: 1; }
   background: currentcolor;
 }
 
+.lmap[data-state="exempt"] .lmap-chip { color: var(--info); border-color: rgba(125, 211, 252, 0.28); }
 .lmap[data-state="in"] .lmap-chip { color: var(--success); border-color: rgba(67, 217, 160, 0.28); }
 .lmap[data-state="poor"] .lmap-chip { color: var(--warning); border-color: rgba(255, 184, 77, 0.3); }
 .lmap[data-state="out"] .lmap-chip { color: var(--danger); border-color: rgba(255, 107, 112, 0.35); }

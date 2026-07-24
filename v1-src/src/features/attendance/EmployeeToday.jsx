@@ -170,10 +170,9 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
 
   // Phase-8 map card: a low-power watcher feeds the pin/zone chip. This is
   // presentation only — the recorded fix still comes from the same GPS
-  // sampler the RPC path uses; nothing here is ever submitted. Employees
-  // exempt from the geofence don't need it (and the map is hidden for them).
+  // sampler the RPC path uses; nothing here is ever submitted.
   useEffect(() => {
-    if (employee?.location_exempt || !navigator.geolocation) return undefined;
+    if (!navigator.geolocation) return undefined;
     let alive = true;
     const id = navigator.geolocation.watchPosition(
       (position) => {
@@ -192,7 +191,7 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
       alive = false;
       navigator.geolocation.clearWatch(id);
     };
-  }, [employee?.location_exempt, companyLocation.lat, companyLocation.lng]);
+  }, [companyLocation.lat, companyLocation.lng]);
 
   useEffect(() => {
     if (routeParam === "capture-in" && !todayRecord?.check_in && !dayLocked) setShortcutRequested(true);
@@ -542,21 +541,29 @@ function EmployeeToday({ context, session, onToast, routeParam }) {
   const insideRange = locationState && locationState.distance <= zoneRadius;
 
   // ---- Phase-8 map state (presentation; the server stays the authority) ----
-  const showMap = !employee?.location_exempt;
+  // The card shows for everyone. Employees exempt from the geofence (remote
+  // staff) still see where they are — it just never turns red or blocks,
+  // because the server doesn't apply the radius to them either.
+  const locationExempt = Boolean(employee?.location_exempt);
+  const showMap = typeof navigator !== "undefined" && !!navigator.geolocation;
   const accuracyLimit = 300; // same ceiling the capture path rejects at
-  const mapState = !locationState
-    ? "unknown"
-    : !insideRange
-      ? "out"
-      : locationState.accuracy > accuracyLimit
-        ? "poor"
-        : "in";
+  const mapState = locationExempt
+    ? "exempt"
+    : !locationState
+      ? "unknown"
+      : !insideRange
+        ? "out"
+        : locationState.accuracy > accuracyLimit
+          ? "poor"
+          : "in";
   const roundedDistance = locationState ? Math.round(locationState.distance / 10) * 10 : 0;
+  const accuracyText = `±${Math.round(locationState?.accuracy || 0)} م`;
   const mapChip = {
     unknown: "جارٍ تحديد موقعك…",
-    in: `داخل نطاق الشركة · دقة ±${Math.round(locationState?.accuracy || 0)} م`,
-    poor: `دقة GPS ضعيفة · ±${Math.round(locationState?.accuracy || 0)} م`,
+    in: `داخل نطاق الشركة · دقة ${accuracyText}`,
+    poor: `دقة GPS ضعيفة · ${accuracyText}`,
     out: `خارج نطاق الشركة · ~${roundedDistance} م`,
+    exempt: locationState ? `معفى من نطاق الموقع · دقة ${accuracyText}` : "معفى من نطاق الموقع",
   }[mapState];
 
   return (
